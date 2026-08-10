@@ -9,13 +9,15 @@ const dependencies = [
     {
         name: 'CEhelios-core',
         url: 'https://github.com/nickallegator/CEhelios-core.git',
-        commit: '56b2d97',
+        ref: 'launcher-pinned-neoforge',
+        commit: '56b2d9782761aa7d9d646b7eca5a13573592c2a8',
         patch: path.join(root, 'patches', 'helios-core-private-url-redaction.patch')
     },
     {
         name: 'CEhelios-distribution-types',
         url: 'https://github.com/nickallegator/CEhelios-distribution-types.git',
-        commit: 'eaf8336'
+        ref: 'launcher-pinned-neoforge',
+        commit: 'eaf83367c0d830fb2ec735291d043626c48712c3'
     }
 ]
 
@@ -30,7 +32,7 @@ function bootstrapDependency(dependency) {
     const target = path.join(root, 'deps', dependency.name)
     if(!fs.existsSync(path.join(target, '.git'))) {
         fs.mkdirSync(path.dirname(target), { recursive: true })
-        git(['clone', '--no-checkout', dependency.url, target])
+        git(['clone', '--branch', dependency.ref, '--no-checkout', dependency.url, target])
         git(['checkout', dependency.commit], target)
     }
     const current = git(['rev-parse', 'HEAD'], target, true).stdout.trim()
