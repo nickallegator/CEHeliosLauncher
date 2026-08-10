@@ -8,10 +8,7 @@ const config = require('./config')
 const authRoutes = require('./routes/auth')
 const minecraftAuthRoutes = require('./routes/minecraftAuth')
 const entitlementRoutes = require('./routes/entitlements')
-const schematicsRoutes = require('./routes/schematics')
-const collectionsRoutes = require('./routes/collections')
 const releaseRoutes = require('./routes/releases')
-const uploadTokens = require('./services/schematicsUploadTokens')
 const db = require('./db')
 const { createReleaseStorage } = require('./services/releaseStorage')
 const { safeError } = require('./services/logSafety')
@@ -67,8 +64,20 @@ app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
 if(config.schematics.enabled) {
+    const schematicsRoutes = require('./routes/schematics')
+    const collectionsRoutes = require('./routes/collections')
+    const uploadTokens = require('./services/schematicsUploadTokens')
+
     app.use('/v1', schematicsRoutes)
     app.use('/v1', collectionsRoutes)
+
+    const tokenCleanupInterval = setInterval(() => {
+        uploadTokens.cleanupExpired().catch(() => {})
+    }, 10 * 60 * 1000)
+    if(typeof tokenCleanupInterval.unref === 'function'){
+        tokenCleanupInterval.unref()
+    }
+    uploadTokens.cleanupExpired().catch(() => {})
 }
 
 app.use((req, res) => {
@@ -79,14 +88,6 @@ app.use((err, req, res, _next) => {
     console.error('[server] error', { requestId: req.requestId, ...safeError(err) })
     res.status(500).json({ error: 'server_error', requestId: req.requestId })
 })
-
-const tokenCleanupInterval = setInterval(() => {
-    uploadTokens.cleanupExpired().catch(() => {})
-}, 10 * 60 * 1000)
-if(typeof tokenCleanupInterval.unref === 'function'){
-    tokenCleanupInterval.unref()
-}
-uploadTokens.cleanupExpired().catch(() => {})
 
 app.listen(config.port, () => {
     console.log(`[server] listening on ${config.port}`)
