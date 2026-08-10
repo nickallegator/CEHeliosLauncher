@@ -11,6 +11,7 @@ const remote                         = require('@electron/remote')
 const isDev                          = require('./assets/js/isdev')
 const { LoggerUtil }                 = require('helios-core')
 const Lang                           = require('./assets/js/langloader')
+const testerBuild                    = require('./assets/js/testerchannel').isTesterBuild()
 
 const loggerUICore             = LoggerUtil.getLogger('UICore')
 const loggerAutoUpdater        = LoggerUtil.getLogger('AutoUpdater')
@@ -18,6 +19,36 @@ const loggerAutoUpdater        = LoggerUtil.getLogger('AutoUpdater')
 // Log deprecation and process warnings.
 process.traceProcessWarnings = true
 process.traceDeprecation = true
+
+function reportRendererError(kind, error) {
+    try {
+        const payload = {
+            kind,
+            message: error?.message || String(error),
+            stack: error?.stack || null
+        }
+        console.error('[RendererError]', payload)
+        ipcRenderer.send('rendererError', payload)
+    } catch (err) {
+        console.error('[RendererError] failed to report', err)
+    }
+}
+
+window.addEventListener('error', (event) => {
+    reportRendererError('error', event?.error || event?.message)
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+    reportRendererError('unhandledrejection', event?.reason)
+})
+
+process.on('uncaughtException', (err) => {
+    reportRendererError('uncaughtException', err)
+})
+
+process.on('unhandledRejection', (reason) => {
+    reportRendererError('unhandledRejection', reason)
+})
 
 // Disable eval function.
 window.eval = global.eval = function () {
@@ -37,7 +68,7 @@ webFrame.setVisualZoomLevelLimits(1, 1)
 
 // Initialize auto updates in production environments.
 let updateCheckListener
-if(!isDev){
+if(!isDev && !testerBuild){
     ipcRenderer.on('autoUpdateNotification', (event, arg, info) => {
         switch(arg){
             case 'checking-for-update':
@@ -107,7 +138,7 @@ function changeAllowPrerelease(val){
 function showUpdateUI(info){
     //TODO Make this message a bit more informative `${info.version}`
     document.getElementById('image_seal_container').setAttribute('update', true)
-    document.getElementById('image_seal_container').onclick = () => {
+    document.getElementById('image_seal_container').onclick = async () => {
         /*setOverlayContent('Update Available', 'A new update for the launcher is available. Would you like to install now?', 'Install', 'Later')
         setOverlayHandler(() => {
             if(!isDev){
@@ -121,9 +152,18 @@ function showUpdateUI(info){
             toggleOverlay(false)
         })
         toggleOverlay(true, true)*/
-        switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
-            settingsNavItemListener(document.getElementById('settingsNavUpdate'), false)
-        })
+        try {
+            if(typeof ensureSettingsReady === 'function'){
+                await ensureSettingsReady()
+            } else if(typeof prepareSettings === 'function'){
+                await prepareSettings()
+            }
+            switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
+                settingsNavItemListener(document.getElementById('settingsNavUpdate'), false)
+            })
+        } catch (err) {
+            loggerUICore.warn('Failed to initialize settings view.', err)
+        }
     }
 }
 
@@ -132,65 +172,85 @@ $(function(){
     loggerUICore.info('UICore Initialized');
 })*/
 
-document.addEventListener('readystatechange', function () {
-    if (document.readyState === 'interactive'){
-        loggerUICore.info('UICore Initializing..')
+let interactiveUIInitialized = false
+let completeUIInitialized = false
 
-        // Bind close button.
-        Array.from(document.getElementsByClassName('fCb')).map((val) => {
-            val.addEventListener('click', e => {
-                const window = remote.getCurrentWindow()
-                window.close()
-            })
-        })
-
-        // Bind restore down button.
-        Array.from(document.getElementsByClassName('fRb')).map((val) => {
-            val.addEventListener('click', e => {
-                const window = remote.getCurrentWindow()
-                if(window.isMaximized()){
-                    window.unmaximize()
-                } else {
-                    window.maximize()
-                }
-                document.activeElement.blur()
-            })
-        })
-
-        // Bind minimize button.
-        Array.from(document.getElementsByClassName('fMb')).map((val) => {
-            val.addEventListener('click', e => {
-                const window = remote.getCurrentWindow()
-                window.minimize()
-                document.activeElement.blur()
-            })
-        })
-
-        // Remove focus from social media buttons once they're clicked.
-        Array.from(document.getElementsByClassName('mediaURL')).map(val => {
-            val.addEventListener('click', e => {
-                document.activeElement.blur()
-            })
-        })
-
-    } else if(document.readyState === 'complete'){
-
-        //266.01
-        //170.8
-        //53.21
-        // Bind progress bar length to length of bot wrapper
-        //const targetWidth = document.getElementById("launch_content").getBoundingClientRect().width
-        //const targetWidth2 = document.getElementById("server_selection").getBoundingClientRect().width
-        //const targetWidth3 = document.getElementById("launch_button").getBoundingClientRect().width
-
-        document.getElementById('launch_details').style.maxWidth = 266.01
-        document.getElementById('launch_progress').style.width = 170.8
-        document.getElementById('launch_details_right').style.maxWidth = 170.8
-        document.getElementById('launch_progress_label').style.width = 53.21
-        
+function initInteractiveUI(){
+    if(interactiveUIInitialized){
+        return
     }
+    interactiveUIInitialized = true
 
-}, false)
+    loggerUICore.info('UICore Initializing..')
+
+    // Bind close button.
+    Array.from(document.getElementsByClassName('fCb')).map((val) => {
+        val.addEventListener('click', () => {
+            const window = remote.getCurrentWindow()
+            window.close()
+        })
+    })
+
+    // Bind restore down button.
+    Array.from(document.getElementsByClassName('fRb')).map((val) => {
+        val.addEventListener('click', () => {
+            const window = remote.getCurrentWindow()
+            if(window.isMaximized()){
+                window.unmaximize()
+            } else {
+                window.maximize()
+            }
+            document.activeElement.blur()
+        })
+    })
+
+    // Bind minimize button.
+    Array.from(document.getElementsByClassName('fMb')).map((val) => {
+        val.addEventListener('click', () => {
+            const window = remote.getCurrentWindow()
+            window.minimize()
+            document.activeElement.blur()
+        })
+    })
+
+    // Remove focus from social media buttons once they're clicked.
+    Array.from(document.getElementsByClassName('mediaURL')).map(val => {
+        val.addEventListener('click', () => {
+            document.activeElement.blur()
+        })
+    })
+}
+
+function initCompleteUI(){
+    if(completeUIInitialized){
+        return
+    }
+    completeUIInitialized = true
+
+    //266.01
+    //170.8
+    //53.21
+    // Bind progress bar length to length of bot wrapper
+    //const targetWidth = document.getElementById("launch_content").getBoundingClientRect().width
+    //const targetWidth2 = document.getElementById("server_selection").getBoundingClientRect().width
+    //const targetWidth3 = document.getElementById("launch_button").getBoundingClientRect().width
+    document.getElementById('launch_details').style.maxWidth = 266.01
+    document.getElementById('launch_progress').style.width = 170.8
+    document.getElementById('launch_details_right').style.maxWidth = 170.8
+    document.getElementById('launch_progress_label').style.width = 53.21
+}
+
+function handleReadyState(){
+    if(document.readyState === 'interactive' || document.readyState === 'complete'){
+        initInteractiveUI()
+    }
+    if(document.readyState === 'complete'){
+        initCompleteUI()
+    }
+}
+
+document.addEventListener('readystatechange', handleReadyState, false)
+handleReadyState()
 
 /**
  * Open web links in the user's default browser.

@@ -1,6 +1,7 @@
 /**
  * Script for overlay.ejs
  */
+const AccessManagerOverlay = global.AccessManager || require('./assets/js/accessmanager')
 
 /* Overlay Wrapper Functions */
 
@@ -198,7 +199,11 @@ document.getElementById('accountSelectConfirm').addEventListener('click', async 
             ConfigManager.save()
             updateSelectedAccount(authAcc)
             if(getCurrentView() === VIEWS.settings) {
-                await prepareSettings()
+                if(typeof ensureSettingsReady === 'function'){
+                    await ensureSettingsReady()
+                } else if(typeof prepareSettings === 'function'){
+                    await prepareSettings()
+                }
             }
             toggleOverlay(false)
             validateSelectedAccount()
@@ -211,7 +216,11 @@ document.getElementById('accountSelectConfirm').addEventListener('click', async 
         ConfigManager.save()
         updateSelectedAccount(authAcc)
         if(getCurrentView() === VIEWS.settings) {
-            await prepareSettings()
+            if(typeof ensureSettingsReady === 'function'){
+                await ensureSettingsReady()
+            } else if(typeof prepareSettings === 'function'){
+                await prepareSettings()
+            }
         }
         toggleOverlay(false)
         validateSelectedAccount()
@@ -233,6 +242,9 @@ function setServerListingHandlers(){
     const listings = Array.from(document.getElementsByClassName('serverListing'))
     listings.map((val) => {
         val.onclick = e => {
+            if(val.hasAttribute('locked')){
+                return
+            }
             if(val.hasAttribute('selected')){
                 return
             }
@@ -267,13 +279,36 @@ function setAccountListingHandlers(){
     })
 }
 
+function hasSupporterLockedModules(modules){
+    if(!Array.isArray(modules)){
+        return false
+    }
+    for(const mdl of modules){
+        const access = mdl?.rawModule?.access
+        if(access?.provider === 'patreon' && access?.entitlement === 'supporter'){
+            return true
+        }
+        if(mdl?.subModules?.length){
+            if(hasSupporterLockedModules(mdl.subModules)){
+                return true
+            }
+        }
+    }
+    return false
+}
+
 async function populateServerListings(){
     const distro = await DistroAPI.getDistribution()
     const giaSel = ConfigManager.getSelectedServer()
     const servers = distro.servers
     let htmlString = ''
     for(const serv of servers){
-        htmlString += `<button class="serverListing" servid="${serv.rawServer.id}" ${serv.rawServer.id === giaSel ? 'selected' : ''}>
+        const requiresSupporter = hasSupporterLockedModules(serv.modules)
+        const isSupporter = AccessManagerOverlay.hasAccess({ provider: 'patreon', entitlement: 'supporter' })
+        const isLocked = requiresSupporter && !isSupporter
+        const lockAttr = isLocked ? 'locked' : ''
+        const lockNote = isLocked ? `<span class="serverListingRequirement">${Lang.queryJS('settings.serverListing.supporterRequired')}</span>` : ''
+        htmlString += `<button class="serverListing" servid="${serv.rawServer.id}" ${serv.rawServer.id === giaSel ? 'selected' : ''} ${lockAttr}>
             <img class="serverListingImg" src="${serv.rawServer.icon}"/>
             <div class="serverListingDetails">
                 <span class="serverListingName">${serv.rawServer.name}</span>
@@ -281,6 +316,7 @@ async function populateServerListings(){
                 <div class="serverListingInfo">
                     <div class="serverListingVersion">${serv.rawServer.minecraftVersion}</div>
                     <div class="serverListingRevision">${serv.rawServer.version}</div>
+                    ${lockNote}
                     ${serv.rawServer.mainServer ? `<div class="serverListingStarWrapper">
                         <svg id="Layer_1" viewBox="0 0 107.45 104.74" width="20px" height="20px">
                             <defs>

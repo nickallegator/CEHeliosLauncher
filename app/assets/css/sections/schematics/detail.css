@@ -1,0 +1,449 @@
+.schematicsDetailShareAction {
+    position: relative;
+    display: inline-flex;
+}
+#schematicsDetailShareButton.is-open {
+    border-color: rgba(var(--schematic-accent, 92, 160, 255), 0.6);
+    background: rgba(var(--schematic-accent, 92, 160, 255), 0.22);
+    color: rgba(235, 245, 255, 0.95);
+}
+#schematicsDetailShareMenu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(280px, 82vw);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(165deg, rgba(14, 18, 26, 0.98), rgba(8, 10, 16, 0.98));
+    box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.48),
+        0 0 0 1px rgba(var(--schematic-accent, 92, 160, 255), 0.18);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+}
+#schematicsDetailShareMenu[hidden] {
+    display: none;
+}
+.schematicsDetailShareMenuHead {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.schematicsDetailShareMenuTitle {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.58);
+}
+.schematicsDetailShareMenuSubtitle {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.86);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.schematicsDetailShareOptions {
+    display: grid;
+    gap: 6px;
+}
+.schematicsDetailShareOption {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 8px 10px;
+    font-size: 11px;
+    letter-spacing: 0.2px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.schematicsDetailShareOption:hover,
+.schematicsDetailShareOption:focus {
+    border-color: rgba(var(--schematic-accent, 92, 160, 255), 0.45);
+    background: rgba(var(--schematic-accent, 92, 160, 255), 0.16);
+    outline: none;
+}
+.schematicsDetailShareOption:active {
+    transform: translateY(1px);
+}
+.schematicsDetailShareOptionStatus {
+    font-size: 9px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    padding: 2px 6px;
+}
+.schematicsDetailEditRow {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.schematicsDetailEditRow label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.55);
+}
+#schematicsDetailEditName,
+#schematicsDetailEditDescription,
+#schematicsDetailEditTags,
+#schematicsDetailEditVisibility,
+#schematicsDetailEditDifficulty,
+#schematicsDetailEditVersion {
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(6, 8, 12, 0.7);
+    color: #fff;
+    font-size: 12px;
+    font-family: 'Avenir Book';
+}
+.schematicsDetailEditActions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+#schematicsDetailPanel {
+    width: min(1320px, 98%);
+    max-height: 98%;
+}
+#schematicsDetailHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 24px 0px;
+    align-items: flex-start;
+}
+#schematicsDetailHeading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+#schematicsDetailEyebrow {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+#schematicsDetailTitle {
+    margin: 0px;
+    font-family: 'Avenir Medium';
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+#schematicsDetailCreator {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+}
+#schematicsDetailCreator:hover {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: underline;
+}
+#schematicsDetailActions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.schematicsDetailButton {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.25s ease;
+}
+.schematicsDetailButton.primary {
+    border-color: rgba(var(--schematic-accent, 92, 160, 255), 0.65);
+    background: rgba(var(--schematic-accent, 92, 160, 255), 0.2);
+}
+.schematicsDetailButton.is-installed {
+    border-color: rgba(90, 180, 120, 0.55);
+    background: rgba(90, 180, 120, 0.2);
+    color: rgba(200, 255, 215, 0.95);
+}
+#schematicsDetailLike.is-liked {
+    border-color: rgba(255, 120, 120, 0.55);
+    background: rgba(255, 120, 120, 0.18);
+    color: rgba(255, 190, 190, 0.95);
+}
+#schematicsCollectionsBrowseDetailLike.is-liked {
+    border-color: rgba(255, 120, 120, 0.55);
+    background: rgba(255, 120, 120, 0.18);
+    color: rgba(255, 190, 190, 0.95);
+}
+.schematicsDetailButton:hover,
+.schematicsDetailButton:focus {
+    box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.12);
+    outline: none;
+}
+.schematicsDetailButton:active {
+    transform: translateY(1px);
+}
+#schematicsDetailBody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 0.5fr);
+    grid-template-areas:
+        'preview blocks mods'
+        'preview stats stats';
+    grid-template-rows: minmax(240px, 1fr) auto;
+    gap: 18px;
+    padding: 22px 28px;
+    align-items: stretch;
+}
+#schematicsDetailPreview {
+    grid-area: preview;
+    border-radius: 12px;
+    background: linear-gradient(140deg, rgba(10, 12, 18, 0.95), rgba(18, 20, 28, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 360px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+#schematicsDetailBlocks {
+    grid-area: blocks;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(10, 12, 18, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px 14px 10px;
+    max-height: 360px;
+    min-height: 0;
+}
+.schematicsDetailModHeader,
+.schematicsDetailBlockHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+#schematicsDetailMods {
+    grid-area: mods;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(10, 12, 18, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px 14px 10px;
+    max-height: 360px;
+    min-height: 0;
+}
+.schematicsDetailModTitle {
+    font-family: 'Avenir Medium';
+}
+.schematicsDetailModTotal {
+    color: rgba(255, 255, 255, 0.85);
+}
+.schematicsDetailModList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.schematicsDetailModList::-webkit-scrollbar {
+    width: 6px;
+}
+.schematicsDetailModList::-webkit-scrollbar-track {
+    background: transparent;
+}
+.schematicsDetailModList::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+}
+.schematicsDetailModRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+.schematicsDetailModNameWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.schematicsDetailModName {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.84);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.schematicsDetailModNamespace {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.52);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.schematicsDetailModCount {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.62);
+    text-align: right;
+}
+.schematicsDetailBlockTitle {
+    font-family: 'Avenir Medium';
+}
+.schematicsDetailBlockTotal {
+    color: rgba(255, 255, 255, 0.85);
+}
+.schematicsDetailBlockList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.schematicsDetailBlockList::-webkit-scrollbar {
+    width: 6px;
+}
+.schematicsDetailBlockList::-webkit-scrollbar-track {
+    background: transparent;
+}
+.schematicsDetailBlockList::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+}
+.schematicsDetailBlockRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+.schematicsDetailBlockName {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+}
+.schematicsDetailBlockCount {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+}
+#schematicsDetailPreview::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: none;
+    opacity: 0;
+}
+#schematicsDetailPreview svg {
+    width: 48px;
+    height: 48px;
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 1.4px;
+    fill: none;
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+}
+#schematicsDetailCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    position: absolute;
+    inset: 0;
+}
+#schematicsDetailPreview[data-rendered="true"] #schematicsDetailPreviewIcon {
+    opacity: 0;
+}
+#schematicsDetailStats {
+    grid-area: stats;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: rgba(10, 12, 18, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.schematicsDetailInfoTitle {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 4px;
+}
+.schematicsDetailStat {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.schematicsDetailStat:first-of-type {
+    border-top: none;
+}
+.schematicsDetailStatLabel {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.58);
+}
+.schematicsDetailStatValue {
+    font-family: 'Avenir Medium';
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: right;
+}
+#schematicsDetailDescription {
+    padding: 0px 24px 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+}
+#schematicsDetailTags {
+    padding: 0px 24px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.schematicsDetailTag {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+}
+#schematicsDetailPreview {
+    position: relative;
+}
+#schematicsDetailPreview[data-mesh="building"] .schematicMeshOverlay,
+#schematicsUploadPreview[data-mesh="building"] .schematicMeshOverlay {
+    opacity: 1;
+}

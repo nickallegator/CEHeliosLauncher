@@ -4,3 +4,11 @@
 /target/
 /logs/
 /dist/
+/deps/
+backend/.env
+backend/node_modules/
+backend/storage/
+/test-results/
+/.tmp-*
+/__extract_*
+/*.log

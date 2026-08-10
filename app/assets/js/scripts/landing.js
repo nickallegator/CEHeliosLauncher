@@ -3,6 +3,7 @@
  */
 // Requirements
 const { URL }                 = require('url')
+const crypto = require('crypto')
 const {
     MojangRestAPI,
     getServerStatus
@@ -30,6 +31,12 @@ const {
 // Internal Requirements
 const DiscordWrapper          = require('./assets/js/discordwrapper')
 const ProcessBuilder          = require('./assets/js/processbuilder')
+const AccessGate              = require('./assets/js/accessmanager')
+const ChannelManager          = require('./assets/js/channelmanager')
+const { completeJavaSelection } = require('./assets/js/javalaunchworkflow')
+const { seedBundledArtifacts } = require('./assets/js/testerchannel')
+const { quarantineManagedDropins } = require('./assets/js/managedmodcleanup')
+const { isArtifactAuthorizationError } = require('./assets/js/channelpolicy')
 
 // Launch Elements
 const launch_content          = document.getElementById('launch_content')
@@ -41,6 +48,29 @@ const server_selection_button = document.getElementById('server_selection_button
 const user_text               = document.getElementById('user_text')
 
 const loggerLanding = LoggerUtil.getLogger('Landing')
+let settingsReadyPromise = null
+
+async function ensureSettingsScriptLoaded(){
+    if(typeof prepareSettings === 'function'){
+        return
+    }
+    if(!settingsReadyPromise){
+        settingsReadyPromise = loadLazyScript('./assets/js/scripts/settings.js')
+            .catch((err) => {
+                settingsReadyPromise = null
+                throw err
+            })
+    }
+    await settingsReadyPromise
+    if(typeof prepareSettings !== 'function'){
+        throw new Error('Settings script loaded without prepareSettings.')
+    }
+}
+
+async function ensureSettingsReady(){
+    await ensureSettingsScriptLoaded()
+    await prepareSettings()
+}
 
 /* Launch Progress Wrapper Functions */
 
@@ -102,6 +132,10 @@ function setLaunchEnabled(val){
 document.getElementById('launch_button').addEventListener('click', async e => {
     loggerLanding.info('Launching game..')
     try {
+        if(ChannelManager.isRemoteChannel()) {
+            const authorized = await ChannelManager.refreshAuthorizedDistribution({ allowOffline: true })
+            if(authorized?.distribution) onDistroRefresh(authorized.distribution)
+        }
         const server = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
         const jExe = ConfigManager.getJavaExecutable(ConfigManager.getSelectedServer())
         if(jExe == null){
@@ -122,23 +156,31 @@ document.getElementById('launch_button').addEventListener('click', async e => {
             }
         }
     } catch(err) {
-        loggerLanding.error('Unhandled error in during launch process.', err)
-        showLaunchFailure(Lang.queryJS('landing.launch.failureTitle'), Lang.queryJS('landing.launch.failureText'))
+        loggerLanding.error('Unhandled error during launch process.', { code: err?.code, statusCode: err?.statusCode, message: err?.message })
+        showLaunchFailure(Lang.queryJS('landing.launch.failureTitle'), err?.message || Lang.queryJS('landing.launch.failureText'))
     }
 })
 
 // Bind settings button
 document.getElementById('settingsMediaButton').onclick = async e => {
-    await prepareSettings()
-    switchView(getCurrentView(), VIEWS.settings)
+    try {
+        await ensureSettingsReady()
+        switchView(getCurrentView(), VIEWS.settings)
+    } catch (err) {
+        loggerLanding.warn('Failed to initialize settings view.', err)
+    }
 }
 
 // Bind avatar overlay button.
 document.getElementById('avatarOverlay').onclick = async e => {
-    await prepareSettings()
-    switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
-        settingsNavItemListener(document.getElementById('settingsNavAccount'), false)
-    })
+    try {
+        await ensureSettingsReady()
+        switchView(getCurrentView(), VIEWS.settings, 500, 500, () => {
+            settingsNavItemListener(document.getElementById('settingsNavAccount'), false)
+        })
+    } catch (err) {
+        loggerLanding.warn('Failed to initialize settings view.', err)
+    }
 }
 
 // Bind selected account
@@ -294,6 +336,33 @@ function showLaunchFailure(title, desc){
 /* System (Java) Scan */
 
 /**
+ * Persist a validated Java installation and refresh the settings view only
+ * when its lazily loaded controller is already available. The launch path
+ * must not depend on opening Settings first.
+ */
+async function useJavaInstallation(jvmDetails, launchAfter){
+    await completeJavaSelection({
+        jvmDetails,
+        javaExecFromRoot,
+        serverId: ConfigManager.getSelectedServer(),
+        setJavaExecutable: (serverId, javaExec) => ConfigManager.setJavaExecutable(serverId, javaExec),
+        saveConfig: () => ConfigManager.save(),
+        settingsInput: document.getElementById('settingsJavaExecVal'),
+        populateJavaDetails: typeof populateJavaExecDetails === 'function' ? populateJavaExecDetails : null,
+        launchAfter,
+        launch: dlAsync
+    })
+}
+
+function showJavaDownloadFailure(err){
+    loggerLanding.error('Unhandled error in Java download.', err)
+    showLaunchFailure(
+        Lang.queryJS('landing.systemScan.javaDownloadFailureTitle'),
+        Lang.queryJS('landing.systemScan.javaDownloadFailureText')
+    )
+}
+
+/**
  * Asynchronously scan the system for valid Java installations.
  * 
  * @param {boolean} launchAfter Whether we should begin to launch after scanning. 
@@ -318,15 +387,14 @@ async function asyncSystemScan(effectiveJavaOptions, launchAfter = true){
             Lang.queryJS('landing.systemScan.installJava'),
             Lang.queryJS('landing.systemScan.installJavaManually')
         )
-        setOverlayHandler(() => {
+        setOverlayHandler(async () => {
             setLaunchDetails(Lang.queryJS('landing.systemScan.javaDownloadPrepare'))
             toggleOverlay(false)
-            
+
             try {
-                downloadJava(effectiveJavaOptions, launchAfter)
+                await downloadJava(effectiveJavaOptions, launchAfter)
             } catch(err) {
-                loggerLanding.error('Unhandled error in Java Download', err)
-                showLaunchFailure(Lang.queryJS('landing.systemScan.javaDownloadFailureTitle'), Lang.queryJS('landing.systemScan.javaDownloadFailureText'))
+                showJavaDownloadFailure(err)
             }
         })
         setDismissHandler(() => {
@@ -342,96 +410,85 @@ async function asyncSystemScan(effectiveJavaOptions, launchAfter = true){
                     toggleLaunchArea(false)
                     toggleOverlay(false)
                 })
-                setDismissHandler(() => {
+                setDismissHandler(async () => {
                     toggleOverlay(false, true)
-
-                    asyncSystemScan(effectiveJavaOptions, launchAfter)
+                    try {
+                        await asyncSystemScan(effectiveJavaOptions, launchAfter)
+                    } catch(err) {
+                        showJavaDownloadFailure(err)
+                    }
                 })
                 $('#overlayContent').fadeIn(250)
             })
         })
         toggleOverlay(true, true)
     } else {
-        // Java installation found, use this to launch the game.
-        const javaExec = javaExecFromRoot(jvmDetails.path)
-        ConfigManager.setJavaExecutable(ConfigManager.getSelectedServer(), javaExec)
-        ConfigManager.save()
-
-        // We need to make sure that the updated value is on the settings UI.
-        // Just incase the settings UI is already open.
-        settingsJavaExecVal.value = javaExec
-        await populateJavaExecDetails(settingsJavaExecVal.value)
-
-        // TODO Callback hell, refactor
-        // TODO Move this out, separate concerns.
-        if(launchAfter){
-            await dlAsync()
-        }
+        await useJavaInstallation(jvmDetails, launchAfter)
     }
 
 }
 
 async function downloadJava(effectiveJavaOptions, launchAfter = true) {
+    let extractListener = null
 
-    // TODO Error handling.
-    // asset can be null.
-    const asset = await latestOpenJDK(
-        effectiveJavaOptions.suggestedMajor,
-        ConfigManager.getDataDirectory(),
-        effectiveJavaOptions.distribution)
+    try {
+        const asset = await latestOpenJDK(
+            effectiveJavaOptions.suggestedMajor,
+            ConfigManager.getDataDirectory(),
+            effectiveJavaOptions.distribution)
 
-    if(asset == null) {
-        throw new Error(Lang.queryJS('landing.downloadJava.findJdkFailure'))
-    }
+        if(asset == null) {
+            throw new Error(Lang.queryJS('landing.downloadJava.findJdkFailure'))
+        }
 
-    let received = 0
-    await downloadFile(asset.url, asset.path, ({ transferred }) => {
-        received = transferred
-        setDownloadPercentage(Math.trunc((transferred/asset.size)*100))
-    })
-    setDownloadPercentage(100)
+        let received = 0
+        await downloadFile(asset.url, asset.path, ({ transferred }) => {
+            received = transferred
+            setDownloadPercentage(Math.trunc((transferred/asset.size)*100))
+        })
+        setDownloadPercentage(100)
 
-    if(received != asset.size) {
-        loggerLanding.warn(`Java Download: Expected ${asset.size} bytes but received ${received}`)
+        if(received !== asset.size) {
+            loggerLanding.warn(`Java Download: Expected ${asset.size} bytes but received ${received}`)
+        }
         if(!await validateLocalFile(asset.path, asset.algo, asset.hash)) {
-            log.error(`Hashes do not match, ${asset.id} may be corrupted.`)
-            // Don't know how this could happen, but report it.
+            loggerLanding.error(`Hashes do not match, ${asset.id} may be corrupted.`)
             throw new Error(Lang.queryJS('landing.downloadJava.javaDownloadCorruptedError'))
         }
-    }
 
-    // Extract
-    // Show installing progress bar.
-    remote.getCurrentWindow().setProgressBar(2)
+        remote.getCurrentWindow().setProgressBar(2)
 
-    // Wait for extration to complete.
-    const eLStr = Lang.queryJS('landing.downloadJava.extractingJava')
-    let dotStr = ''
-    setLaunchDetails(eLStr)
-    const extractListener = setInterval(() => {
-        if(dotStr.length >= 3){
-            dotStr = ''
-        } else {
-            dotStr += '.'
+        const extractingLabel = Lang.queryJS('landing.downloadJava.extractingJava')
+        let dotStr = ''
+        setLaunchDetails(extractingLabel)
+        extractListener = setInterval(() => {
+            if(dotStr.length >= 3){
+                dotStr = ''
+            } else {
+                dotStr += '.'
+            }
+            setLaunchDetails(extractingLabel + dotStr)
+        }, 750)
+
+        const newJavaExec = await extractJdk(asset.path)
+        const jvmDetails = await validateSelectedJvm(
+            ensureJavaDirIsRoot(newJavaExec),
+            effectiveJavaOptions.supported
+        )
+        if(jvmDetails == null){
+            throw new Error('The installed Java runtime does not satisfy the selected profile.')
         }
-        setLaunchDetails(eLStr + dotStr)
-    }, 750)
 
-    const newJavaExec = await extractJdk(asset.path)
-
-    // Extraction complete, remove the loading from the OS progress bar.
-    remote.getCurrentWindow().setProgressBar(-1)
-
-    // Extraction completed successfully.
-    ConfigManager.setJavaExecutable(ConfigManager.getSelectedServer(), newJavaExec)
-    ConfigManager.save()
-
-    clearInterval(extractListener)
-    setLaunchDetails(Lang.queryJS('landing.downloadJava.javaInstalled'))
-
-    // TODO Callback hell
-    // Refactor the launch functions
-    asyncSystemScan(effectiveJavaOptions, launchAfter)
+        clearInterval(extractListener)
+        extractListener = null
+        setLaunchDetails(Lang.queryJS('landing.downloadJava.javaInstalled'))
+        await useJavaInstallation(jvmDetails, launchAfter)
+    } finally {
+        if(extractListener != null){
+            clearInterval(extractListener)
+        }
+        remote.getCurrentWindow().setProgressBar(-1)
+    }
 
 }
 
@@ -442,7 +499,7 @@ let hasRPC = false
 // Joined server regex
 // Change this if your server uses something different.
 const GAME_JOINED_REGEX = /\[.+\]: Sound engine started/
-const GAME_LAUNCH_REGEX = /^\[.+\]: (?:MinecraftForge .+ Initialized|ModLauncher .+ starting: .+|Loading Minecraft .+ with Fabric Loader .+)$/
+const GAME_LAUNCH_REGEX = /^\[.+\]: (?:MinecraftForge .+ Initialized|NeoForge .+ Initialized|ModLauncher .+ starting: .+|Loading Minecraft .+ with Fabric Loader .+)$/
 const MIN_LINGER = 5000
 
 async function dlAsync(login = true) {
@@ -452,20 +509,41 @@ async function dlAsync(login = true) {
 
     const loggerLaunchSuite = LoggerUtil.getLogger('LaunchSuite')
 
-    setLaunchDetails(Lang.queryJS('landing.dlAsync.loadingServerInfo'))
-
-    let distro
-
     try {
-        distro = await DistroAPI.refreshDistributionOrFallback()
-        onDistroRefresh(distro)
+        seedBundledArtifacts(ConfigManager.getDataDirectory())
     } catch(err) {
-        loggerLaunchSuite.error('Unable to refresh distribution index.', err)
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.fatalError'), Lang.queryJS('landing.dlAsync.unableToLoadDistributionIndex'))
+        loggerLaunchSuite.error('Unable to install bundled tester artifacts.', err)
+        showLaunchFailure(Lang.queryJS('landing.dlAsync.fatalError'), err.message)
         return
     }
 
-    const serv = distro.getServerById(ConfigManager.getSelectedServer())
+    setLaunchDetails(Lang.queryJS('landing.dlAsync.loadingServerInfo'))
+
+    let distro
+    let channelOffline = false
+
+    try {
+        if(ChannelManager.isRemoteChannel()) {
+            const channelResult = await ChannelManager.refreshAuthorizedDistribution({ allowOffline: true })
+            distro = channelResult.distribution
+            channelOffline = channelResult.offline
+        } else {
+            distro = await DistroAPI.refreshDistributionOrFallback()
+        }
+        onDistroRefresh(distro)
+    } catch(err) {
+        loggerLaunchSuite.error('Unable to refresh distribution index.', { code: err?.code, statusCode: err?.statusCode, message: err?.message })
+        showLaunchFailure(
+            Lang.queryJS('landing.dlAsync.fatalError'),
+            err?.message || Lang.queryJS('landing.dlAsync.unableToLoadDistributionIndex')
+        )
+        return
+    }
+
+    await AccessGate.refreshEntitlements(distro)
+    const accessEntitlements = AccessGate.getEntitlements()
+
+    let serv = distro.getServerById(ConfigManager.getSelectedServer())
 
     if(login) {
         if(ConfigManager.getSelectedAccount() == null){
@@ -478,64 +556,84 @@ async function dlAsync(login = true) {
     toggleLaunchArea(true)
     setLaunchPercentage(0, 100)
 
-    const fullRepairModule = new FullRepair(
-        ConfigManager.getCommonDirectory(),
-        ConfigManager.getInstanceDirectory(),
-        ConfigManager.getLauncherDirectory(),
-        ConfigManager.getSelectedServer(),
-        DistroAPI.isDevMode()
-    )
-
-    fullRepairModule.spawnReceiver()
-
-    fullRepairModule.childProcess.on('error', (err) => {
-        loggerLaunchSuite.error('Error during launch', err)
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), err.message || Lang.queryJS('landing.dlAsync.errorDuringLaunchText'))
-    })
-    fullRepairModule.childProcess.on('close', (code, _signal) => {
-        if(code !== 0){
-            loggerLaunchSuite.error(`Full Repair Module exited with code ${code}, assuming error.`)
-            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringLaunchTitle'), Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
-        }
-    })
-
-    loggerLaunchSuite.info('Validating files.')
-    setLaunchDetails(Lang.queryJS('landing.dlAsync.validatingFileIntegrity'))
-    let invalidFileCount = 0
-    try {
-        invalidFileCount = await fullRepairModule.verifyFiles(percent => {
-            setLaunchPercentage(percent)
-        })
-        setLaunchPercentage(100)
-    } catch (err) {
-        loggerLaunchSuite.error('Error during file validation.')
-        showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileVerificationTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
-        return
-    }
-    
-
-    if(invalidFileCount > 0) {
-        loggerLaunchSuite.info('Downloading files.')
-        setLaunchDetails(Lang.queryJS('landing.dlAsync.downloadingFiles'))
-        setLaunchPercentage(0)
+    async function repairOnce(currentDistro, offline) {
+        const repair = new FullRepair(
+            ConfigManager.getCommonDirectory(),
+            ConfigManager.getInstanceDirectory(),
+            ConfigManager.getLauncherDirectory(),
+            ConfigManager.getSelectedServer(),
+            DistroAPI.isDevMode(),
+            accessEntitlements
+        )
+        repair.spawnReceiver()
+        const repairChild = repair.childProcess
+        repairChild.on('error', err => loggerLaunchSuite.error('Repair process error.', err?.message || err))
         try {
-            await fullRepairModule.download(percent => {
-                setDownloadPercentage(percent)
-            })
-            setDownloadPercentage(100)
-        } catch(err) {
-            loggerLaunchSuite.error('Error during file download.')
-            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileDownloadTitle'), err.displayable || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
+            loggerLaunchSuite.info('Validating files.')
+            setLaunchDetails(Lang.queryJS('landing.dlAsync.validatingFileIntegrity'))
+            const invalidFileCount = await repair.verifyFiles(percent => setLaunchPercentage(percent))
+            setLaunchPercentage(100)
+            if(invalidFileCount > 0 && offline) {
+                const error = new Error('The release service is offline and one or more game files are missing or corrupt. Connect to the internet to repair this installation.')
+                error.code = 'offline_repair_required'
+                throw error
+            }
+            if(invalidFileCount > 0) {
+                loggerLaunchSuite.info('Downloading files.')
+                setLaunchDetails(Lang.queryJS('landing.dlAsync.downloadingFiles'))
+                setLaunchPercentage(0)
+                await repair.download(percent => setDownloadPercentage(percent))
+                setDownloadPercentage(100)
+            } else {
+                loggerLaunchSuite.info('No invalid files, skipping download.')
+            }
+            return currentDistro
+        } finally {
+            try { repair.destroyReceiver() } catch(err) { /* receiver already closed */ }
+            if(repairChild && repairChild.exitCode == null) {
+                try { repairChild.kill() } catch(err) { /* already exiting */ }
+            }
+        }
+    }
+
+    try {
+        distro = await repairOnce(distro, channelOffline)
+    } catch(err) {
+        const detail = String(err?.displayable || err?.message || '')
+        const signedUrlExpired = ChannelManager.isRemoteChannel() && isArtifactAuthorizationError(err)
+        if(signedUrlExpired) {
+            loggerLaunchSuite.warn('A signed artifact URL expired; refreshing authorization and retrying the complete repair once.')
+            try {
+                const refreshed = await ChannelManager.refreshAuthorizedDistribution({ allowOffline: false })
+                distro = refreshed.distribution
+                onDistroRefresh(distro)
+                distro = await repairOnce(distro, false)
+            } catch(retryError) {
+                loggerLaunchSuite.error('Repair retry failed.', retryError)
+                showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileDownloadTitle'), retryError?.displayable || retryError?.message || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
+                return
+            }
+        } else {
+            loggerLaunchSuite.error('Error during file repair.', err)
+            showLaunchFailure(Lang.queryJS('landing.dlAsync.errorDuringFileVerificationTitle'), detail || Lang.queryJS('landing.dlAsync.seeConsoleForDetails'))
             return
         }
-    } else {
-        loggerLaunchSuite.info('No invalid files, skipping download.')
+    }
+
+    serv = distro.getServerById(ConfigManager.getSelectedServer())
+    if(ChannelManager.isRemoteChannel()) {
+        const quarantined = quarantineManagedDropins(
+            ConfigManager.getInstanceDirectory(),
+            serv.rawServer.id,
+            serv.rawServer.minecraftVersion
+        )
+        if(quarantined.length > 0) {
+            loggerLaunchSuite.info(`Quarantined ${quarantined.length} unmanaged Cobble Power JAR(s) from the active mods directory.`)
+        }
     }
 
     // Remove download bar.
     remote.getCurrentWindow().setProgressBar(-1)
-
-    fullRepairModule.destroyReceiver()
 
     setLaunchDetails(Lang.queryJS('landing.dlAsync.preparingToLaunch'))
 
@@ -545,9 +643,14 @@ async function dlAsync(login = true) {
     const distributionIndexProcessor = new DistributionIndexProcessor(
         ConfigManager.getCommonDirectory(),
         distro,
-        serv.rawServer.id
+        serv.rawServer.id,
+        accessEntitlements
     )
 
+    const javaExec = ConfigManager.getJavaExecutable(ConfigManager.getSelectedServer())
+    if(javaExec != null){
+        process.env.HELIOS_JAVA_EXEC = javaExec
+    }
     const modLoaderData = await distributionIndexProcessor.loadModLoaderVersionJson(serv)
     const versionData = await mojangIndexProcessor.getVersionJson()
 
@@ -641,6 +744,7 @@ async function dlAsync(login = true) {
  */
 
 // DOM Cache
+const newsContainer                 = document.getElementById('newsContainer')
 const newsContent                   = document.getElementById('newsContent')
 const newsArticleTitle              = document.getElementById('newsArticleTitle')
 const newsArticleDate               = document.getElementById('newsArticleDate')
@@ -649,78 +753,322 @@ const newsArticleComments           = document.getElementById('newsArticleCommen
 const newsNavigationStatus          = document.getElementById('newsNavigationStatus')
 const newsArticleContentScrollable  = document.getElementById('newsArticleContentScrollable')
 const nELoadSpan                    = document.getElementById('nELoadSpan')
+const topActions                    = document.getElementById('topActions')
+
+logLandingTemplateStatus()
 
 // News slide caches.
 let newsActive = false
-let newsGlideCount = 0
+let schematicsActive = false
+let landingOverlayGlideCount = 0
+let newsInitialized = false
+let newsInitPromise = null
+let schematicsReadyPromise = null
+let schematicsInitialized = false
+
+const SCHEMATICS_LAZY_SCRIPT_PATHS = [
+    './assets/js/scripts/landing/schematics/core.js',
+    './assets/js/scripts/landing/schematics/api.js',
+    './assets/js/scripts/landing/schematics/admin.js',
+    './assets/js/scripts/landing/schematics/preview.js',
+    './assets/js/scripts/landing/schematics/render.js',
+    './assets/js/scripts/landing/schematics/creator.js',
+    './assets/js/scripts/landing/schematics/collections.js',
+    './assets/js/scripts/landing/schematics/upload.js',
+    './assets/js/scripts/landing/schematics/edit.js',
+    './assets/js/scripts/landing/schematics/detail.js',
+    './assets/js/scripts/landing/schematics/index.js'
+]
+
+const landingUpperSection = document.querySelector('#landingContainer > #upper')
+const landingLowerLeftSection = document.querySelector('#landingContainer > #lower > #left')
+const landingLowerCenterSection = document.querySelector('#landingContainer > #lower > #center')
+const landingLowerRightSection = document.querySelector('#landingContainer > #lower > #right')
+
+function setElementInertState(element, inert){
+    if(!element){
+        return
+    }
+    if('inert' in element){
+        element.inert = inert
+    }
+    element.setAttribute('aria-hidden', inert ? 'true' : 'false')
+}
+
+function updateOverlayAccessibility(mode = 'landing'){
+    const overlayMode = mode === 'news' || mode === 'schematics' ? mode : 'landing'
+    const showNews = overlayMode === 'news'
+    const showSchematics = overlayMode === 'schematics'
+    const overlayOpen = showNews || showSchematics
+
+    setElementInertState(newsContainer, !showNews)
+    setElementInertState(schematicsContainer, !showSchematics)
+    setElementInertState(landingUpperSection, overlayOpen)
+    setElementInertState(landingLowerLeftSection, overlayOpen)
+    setElementInertState(landingLowerRightSection, overlayOpen)
+    setElementInertState(landingLowerCenterSection, false)
+    setElementInertState(topActions, false)
+}
+
+function loadLazyScript(src){
+    return new Promise((resolve, reject) => {
+        const selector = `script[data-lazy-src="${src}"]`
+        const existing = document.querySelector(selector)
+        if(existing){
+            if(existing.getAttribute('data-loaded') === 'true'){
+                resolve()
+                return
+            }
+            existing.addEventListener('load', () => resolve(), { once: true })
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true })
+            return
+        }
+
+        const script = document.createElement('script')
+        script.src = src
+        script.defer = true
+        script.setAttribute('data-lazy-src', src)
+        script.onload = () => {
+            script.setAttribute('data-loaded', 'true')
+            resolve()
+        }
+        script.onerror = () => {
+            reject(new Error(`Failed to load ${src}`))
+        }
+        document.body.appendChild(script)
+    })
+}
+
+async function ensureSchematicsReady(){
+    if(schematicsInitialized && typeof initSchematics === 'function'){
+        return
+    }
+    if(!schematicsReadyPromise){
+        schematicsReadyPromise = (async () => {
+            for(const scriptPath of SCHEMATICS_LAZY_SCRIPT_PATHS){
+                await loadLazyScript(scriptPath)
+            }
+            if(typeof initSchematics === 'function' && !schematicsInitialized){
+                initSchematics()
+                schematicsInitialized = true
+            }
+        })().catch((err) => {
+            schematicsReadyPromise = null
+            throw err
+        })
+    }
+    await schematicsReadyPromise
+}
+
+async function ensureNewsInitialized({ force = false } = {}){
+    if(force){
+        newsInitPromise = null
+        newsInitialized = false
+    }
+    if(newsInitialized && !force){
+        return
+    }
+    if(!newsInitPromise){
+        newsInitPromise = initNews()
+            .then(() => {
+                newsInitialized = true
+            })
+            .finally(() => {
+                newsInitPromise = null
+            })
+    }
+    await newsInitPromise
+}
+
+function refreshNewsIfInitialized(){
+    if(!newsInitialized){
+        return
+    }
+    ensureNewsInitialized({ force: true })
+        .catch((err) => {
+            loggerLanding.warn('Failed to refresh news.', err)
+        })
+}
 
 /**
  * Show the news UI via a slide animation.
  * 
+ * @param {HTMLElement} container The overlay container to slide.
  * @param {boolean} up True to slide up, otherwise false. 
  */
-function slide_(up){
+function slide_(container, up){
     const lCUpper = document.querySelector('#landingContainer > #upper')
     const lCLLeft = document.querySelector('#landingContainer > #lower > #left')
     const lCLCenter = document.querySelector('#landingContainer > #lower > #center')
     const lCLRight = document.querySelector('#landingContainer > #lower > #right')
-    const newsBtn = document.querySelector('#landingContainer > #lower > #center #content')
+    const centerContent = document.querySelector('#landingContainer > #lower > #center #content')
     const landingContainer = document.getElementById('landingContainer')
-    const newsContainer = document.querySelector('#landingContainer > #newsContainer')
+    const overlayContainers = [newsContainer, schematicsContainer]
+    const isNews = container === newsContainer
+    const isSchematics = container === schematicsContainer
+    const moveDown = isNews
 
-    newsGlideCount++
+    landingOverlayGlideCount++
 
     if(up){
-        lCUpper.style.top = '-200vh'
-        lCLLeft.style.top = '-200vh'
-        lCLCenter.style.top = '-200vh'
-        lCLRight.style.top = '-200vh'
-        newsBtn.style.top = '130vh'
-        newsContainer.style.top = '0px'
+        const offscreen = moveDown ? '200vh' : '-200vh'
+        const communityOffset = '-72vh'
+        if(landingContainer){
+            if(isNews){
+                landingContainer.setAttribute('data-overlay', 'news')
+            } else if(isSchematics){
+                landingContainer.setAttribute('data-overlay', 'schematics')
+            } else {
+                landingContainer.removeAttribute('data-overlay')
+            }
+        }
+        overlayContainers.forEach((overlay) => {
+            if(overlay && overlay !== container){
+                hideOverlay(overlay)
+            }
+        })
+        if(topActions){
+            if(isNews){
+                topActions.style.top = 'calc(100% - 60px)'
+            } else if(isSchematics){
+                topActions.style.top = offscreen
+            } else {
+                topActions.style.top = '18px'
+            }
+        }
+        lCUpper.style.top = offscreen
+        lCLLeft.style.top = offscreen
+        lCLCenter.style.top = isSchematics ? communityOffset : offscreen
+        lCLRight.style.top = offscreen
+        centerContent.style.top = isSchematics ? '-8px' : '130vh'
+        if(lCLCenter){
+            lCLCenter.style.zIndex = isSchematics ? '650' : ''
+        }
+        container.style.top = '22px'
         //date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric'})
         //landingContainer.style.background = 'rgba(29, 29, 29, 0.55)'
         landingContainer.style.background = 'rgba(0, 0, 0, 0.50)'
         setTimeout(() => {
-            if(newsGlideCount === 1){
+            if(landingOverlayGlideCount === 1){
                 lCLCenter.style.transition = 'none'
-                newsBtn.style.transition = 'none'
+                centerContent.style.transition = 'none'
             }
-            newsGlideCount--
+            landingOverlayGlideCount--
         }, 2000)
     } else {
         setTimeout(() => {
-            newsGlideCount--
+            landingOverlayGlideCount--
         }, 2000)
+        if(landingContainer){
+            landingContainer.removeAttribute('data-overlay')
+        }
         landingContainer.style.background = null
         lCLCenter.style.transition = null
-        newsBtn.style.transition = null
-        newsContainer.style.top = '100%'
+        centerContent.style.transition = null
+        hideOverlay(container)
         lCUpper.style.top = '0px'
         lCLLeft.style.top = '0px'
         lCLCenter.style.top = '0px'
         lCLRight.style.top = '0px'
-        newsBtn.style.top = '10px'
+        if(topActions){
+            topActions.style.top = '18px'
+        }
+        if(lCLCenter){
+            lCLCenter.style.zIndex = ''
+        }
+        centerContent.style.top = '4px'
     }
 }
+
+function getOverlayHiddenTop(container){
+    return container === newsContainer ? '-100%' : '100%'
+}
+
+function hideOverlay(container){
+    if(container){
+        container.style.top = getOverlayHiddenTop(container)
+    }
+}
+
+function enableOverlayTabbing(containerSelector){
+    if(containerSelector === '#newsContainer'){
+        updateOverlayAccessibility('news')
+        return
+    }
+    if(containerSelector === '#schematicsContainer'){
+        updateOverlayAccessibility('schematics')
+        return
+    }
+    updateOverlayAccessibility('landing')
+}
+
+function resetOverlayTabbing(){
+    updateOverlayAccessibility('landing')
+}
+
+updateOverlayAccessibility('landing')
 
 // Bind news button.
 document.getElementById('newsButton').onclick = () => {
     // Toggle tabbing.
     if(newsActive){
-        $('#landingContainer *').removeAttr('tabindex')
-        $('#newsContainer *').attr('tabindex', '-1')
+        resetOverlayTabbing()
+        slide_(newsContainer, false)
+        newsActive = false
     } else {
-        $('#landingContainer *').attr('tabindex', '-1')
-        $('#newsContainer, #newsContainer *, #lower, #lower #center *').removeAttr('tabindex')
+        if(schematicsActive){
+            schematicsActive = false
+            hideOverlay(schematicsContainer)
+            if(typeof closeSchematicDetail === 'function'){
+                closeSchematicDetail()
+            }
+        }
+        enableOverlayTabbing('#newsContainer')
         if(newsAlertShown){
             $('#newsButtonAlert').fadeOut(2000)
             newsAlertShown = false
             ConfigManager.setNewsCacheDismissed(true)
             ConfigManager.save()
         }
+        slide_(newsContainer, true)
+        newsActive = true
+        ensureNewsInitialized().catch((err) => {
+            loggerLanding.warn('Failed to initialize news.', err)
+        })
     }
-    slide_(!newsActive)
-    newsActive = !newsActive
+}
+
+// Bind schematics button.
+document.getElementById('schematicsButton').onclick = async () => {
+    if(schematicsActive){
+        if(typeof closeSchematicDetail === 'function'){
+            closeSchematicDetail()
+        }
+        resetOverlayTabbing()
+        slide_(schematicsContainer, false)
+        schematicsActive = false
+        logOverlayState('schematicsContainer(close)', schematicsContainer)
+    } else {
+        if(newsActive){
+            newsActive = false
+            hideOverlay(newsContainer)
+        }
+        enableOverlayTabbing('#schematicsContainer')
+        slide_(schematicsContainer, true)
+        schematicsActive = true
+        logOverlayState('schematicsContainer(open)', schematicsContainer)
+        try {
+            await ensureSchematicsReady()
+            if(schematicsActive && typeof updateCommunityView === 'function'){
+                updateCommunityView()
+            }
+        } catch (err) {
+            loggerLanding.warn('Failed to initialize schematics UI.', err)
+            resetOverlayTabbing()
+            slide_(schematicsContainer, false)
+            schematicsActive = false
+        }
+    }
 }
 
 // Array to store article meta.
@@ -758,7 +1106,9 @@ function setNewsLoading(val){
 // Bind retry button.
 newsErrorRetry.onclick = () => {
     $('#newsErrorFailed').fadeOut(250, () => {
-        initNews()
+        ensureNewsInitialized({ force: true }).catch((err) => {
+            loggerLanding.warn('Failed to reload news from retry action.', err)
+        })
         $('#newsErrorLoading').fadeIn(250)
     })
 }
@@ -781,7 +1131,7 @@ function reloadNews(){
     return new Promise((resolve, reject) => {
         $('#newsContent').fadeOut(250, () => {
             $('#newsErrorLoading').fadeIn(250)
-            initNews().then(() => {
+            ensureNewsInitialized({ force: true }).then(() => {
                 resolve()
             })
         })
@@ -919,7 +1269,7 @@ document.addEventListener('keydown', (e) => {
         // if(e.key === 'ArrowDown'){
         //     document.getElementById('newsButton').click()
         // }
-    } else {
+    } else if(!schematicsActive) {
         if(getCurrentView() === VIEWS.landing){
             if(e.key === 'ArrowUp'){
                 document.getElementById('newsButton').click()
@@ -986,12 +1336,13 @@ async function loadNews(){
                     comments = comments + ' Comment' + (comments === '1' ? '' : 's')
 
                     // Fix relative links in content.
-                    let content = el.find('content\\:encoded').text()
-                    let regex = /src="(?!http:\/\/|https:\/\/)(.+?)"/g
-                    let matches
-                    while((matches = regex.exec(content))){
-                        content = content.replace(`"${matches[1]}"`, `"${newsHost + matches[1]}"`)
-                    }
+                    const content = el.find('content\\:encoded').text().replace(
+                        /src="(?!https?:\/\/|\/\/|data:)(.+?)"/g,
+                        (_match, assetPath) => {
+                            const normalizedPath = String(assetPath || '').replace(/^\/+/, '')
+                            return `src="${newsHost}${normalizedPath}"`
+                        }
+                    )
 
                     let link   = el.find('link').text()
                     let title  = el.find('title').text()
@@ -1024,3 +1375,7 @@ async function loadNews(){
 
     return await promise
 }
+
+// Signal that all landing-page functions referenced by uibinder.js are ready.
+window.heliosLandingReady = true
+window.dispatchEvent(new Event('helios:landing-ready'))

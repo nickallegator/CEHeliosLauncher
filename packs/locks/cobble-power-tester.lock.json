@@ -1,0 +1,420 @@
+{
+    "schemaVersion": 1,
+    "pack": {
+        "id": "Cobble-Power-1.21.1",
+        "name": "Cobble Power Test (Minecraft 1.21.1)",
+        "version": "1.0.0-test.4",
+        "minecraftVersion": "1.21.1",
+        "loader": {
+            "type": "neoforge",
+            "version": "21.1.77"
+        },
+        "futureModuleId": "net.allegator.cobblepower:cobblepower:<version>"
+    },
+    "artifacts": [
+        {
+            "id": "net.neoforged:neoforge:21.1.77:installer@jar",
+            "name": "NeoForge 21.1.77 (installer)",
+            "version": "21.1.77",
+            "type": "NeoForge",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "direct",
+                "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.77/neoforge-21.1.77-installer.jar"
+            },
+            "integrity": {
+                "size": 6802724,
+                "md5": "29297402db021df86fec2c1bd8279444",
+                "sha256": "359b4d488e68cf86569c20a4a422511b4299aa2af8accf38f36f436f35e49562"
+            }
+        },
+        {
+            "id": "com.cobblemon:neoforge:1.6.0+1.21.1-HEAD-f77af7c",
+            "name": "Cobblemon 1.6.0 (f77af7c)",
+            "version": "1.6.0+1.21.1-HEAD-f77af7c",
+            "type": "ForgeMod",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "direct",
+                "url": "https://maven.impactdev.net/repository/development/com/cobblemon/neoforge/1.6.0+1.21.1-SNAPSHOT/neoforge-1.6.0+1.21.1-20241224.223204-283.jar"
+            },
+            "integrity": {
+                "size": 112777781,
+                "md5": "6ab6ab8a559e40eaaaea7b5b8ff80280",
+                "sha256": "dd34d387a98133456ad415ab134889898bd57d00971ab85335188e54001c2f74"
+            },
+            "provenance": {
+                "license": "MPL-2.0",
+                "sourceUrl": "https://gitlab.com/cable-mc/cobblemon/-/tree/f77af7c9545cda9f1f60507fd688e2d419654d19",
+                "commit": "f77af7c9545cda9f1f60507fd688e2d419654d19",
+                "mirrorTarget": "https://helios-files.geekcorner.eu.org/servers/Cobble-Power-1.21.1/forgemods/required/cobblemon-neoforge-1.6.0+1.21.1-HEAD-f77af7c.jar",
+                "notice": "packs/notices/cobblemon-f77af7c.md"
+            }
+        },
+        {
+            "id": "thedarkcolour:kfflang-neoforge:5.3.0",
+            "name": "Kotlin for Forge Language Provider 5.3.0",
+            "version": "5.3.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://thedarkcolour.github.io/KotlinForForge/thedarkcolour/kfflang-neoforge/5.3.0/kfflang-neoforge-5.3.0.jar",
+                "coordinate": "thedarkcolour:kfflang-neoforge:5.3.0"
+            },
+            "integrity": {
+                "size": 20421,
+                "md5": "7f622f8bacf5b0a95df140246d074dc6",
+                "sha256": "176015a5766e2e64e8d4eaf28b3a571851dee0e93756f1f906ba68aa872643b8"
+            }
+        },
+        {
+            "id": "thedarkcolour:kfflib-neoforge:5.3.0",
+            "name": "Kotlin for Forge API 5.3.0",
+            "version": "5.3.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://thedarkcolour.github.io/KotlinForForge/thedarkcolour/kfflib-neoforge/5.3.0/kfflib-neoforge-5.3.0.jar",
+                "coordinate": "thedarkcolour:kfflib-neoforge:5.3.0"
+            },
+            "integrity": {
+                "size": 38834,
+                "md5": "ced93bd12a2c0c3bb714b38423e0c997",
+                "sha256": "d3c1eade063e62a285e12f415aa0a77762533ef77748601e22d167513d05fd9d"
+            }
+        },
+        {
+            "id": "thedarkcolour:kffmod-neoforge:5.3.0",
+            "name": "Kotlin for Forge Mod 5.3.0",
+            "version": "5.3.0",
+            "type": "ForgeMod",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://thedarkcolour.github.io/KotlinForForge/thedarkcolour/kffmod-neoforge/5.3.0/kffmod-neoforge-5.3.0.jar",
+                "coordinate": "thedarkcolour:kffmod-neoforge:5.3.0"
+            },
+            "integrity": {
+                "size": 69633,
+                "md5": "0a4a4bb9baab76469af703698276aff3",
+                "sha256": "569f377d2aec24d803a5ed891d4612a501ffad3187772ec957e1b239375a9a59"
+            }
+        },
+        {
+            "id": "org.jetbrains:annotations:13.0",
+            "name": "JetBrains Annotations 13.0",
+            "version": "13.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar",
+                "coordinate": "org.jetbrains:annotations:13.0"
+            },
+            "integrity": {
+                "size": 17536,
+                "md5": "f4fb462172517b46b6cd90003508515a",
+                "sha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlin:kotlin-stdlib:2.0.0",
+            "name": "Kotlin Standard Library 2.0.0",
+            "version": "2.0.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.0.0/kotlin-stdlib-2.0.0.jar",
+                "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:2.0.0"
+            },
+            "integrity": {
+                "size": 1729731,
+                "md5": "13af6aba9109c07c47de3e7f344993ca",
+                "sha256": "240938c4aab8e73e888703e3e7d3f87383ffe5bd536d6d5e3c100d4cd0379fcf"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.0",
+            "name": "Kotlin Standard Library JDK 7 2.0.0",
+            "version": "2.0.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/2.0.0/kotlin-stdlib-jdk7-2.0.0.jar",
+                "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.0"
+            },
+            "integrity": {
+                "size": 961,
+                "md5": "605454b5a645a0b30e0bce6c7a7ba502",
+                "sha256": "dd958064f946b01f745365c2efa11e4c5812a22e26b6caa4433f207fb5b4a5c5"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0",
+            "name": "Kotlin Standard Library JDK 8 2.0.0",
+            "version": "2.0.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.0.0/kotlin-stdlib-jdk8-2.0.0.jar",
+                "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0"
+            },
+            "integrity": {
+                "size": 967,
+                "md5": "21a34c03cad865ee2586e967bf0b029a",
+                "sha256": "92035a0fa8b97a97bb430d30ba03e5ad51f4cfa839cf1559e55245cba735aa94"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlin:kotlin-reflect:2.0.0",
+            "name": "Kotlin Reflection 2.0.0",
+            "version": "2.0.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/2.0.0/kotlin-reflect-2.0.0.jar",
+                "coordinate": "org.jetbrains.kotlin:kotlin-reflect:2.0.0"
+            },
+            "integrity": {
+                "size": 3056424,
+                "md5": "02186288923641939caf2013d51a7aba",
+                "sha256": "111bd906921937f76da17760641116d04b57a7a12fcf980efe7c6767f45179f0"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1",
+            "name": "Kotlin Coroutines Core 1.8.1",
+            "version": "1.8.1",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.8.1/kotlinx-coroutines-core-jvm-1.8.1.jar",
+                "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1"
+            },
+            "integrity": {
+                "size": 1546991,
+                "md5": "c477c52e713d7633276652efdcaee272",
+                "sha256": "f3d4f5de1c391bbcc20f3b3435ccbac013521e76b6902d7d59635ec15c1f797e"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1",
+            "name": "Kotlin Coroutines JDK 8 1.8.1",
+            "version": "1.8.1",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-jdk8/1.8.1/kotlinx-coroutines-jdk8-1.8.1.jar",
+                "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1"
+            },
+            "integrity": {
+                "size": 953,
+                "md5": "79f80ad14a1f5fc53b6f676621ff0035",
+                "sha256": "d8cfb4c363c91c773353b115bd4a6b5a04608e7916fe235d3a9d87efcb996c01"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.0",
+            "name": "Kotlin Serialization Core 1.7.0",
+            "version": "1.7.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.7.0/kotlinx-serialization-core-jvm-1.7.0.jar",
+                "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.0"
+            },
+            "integrity": {
+                "size": 388334,
+                "md5": "dbc773059028db0536cad1a4b8530d29",
+                "sha256": "1903a21a3fdc9c610eb54cf93aed81b142a687709d3b3b35ad54f962ea93c578"
+            }
+        },
+        {
+            "id": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.7.0",
+            "name": "Kotlin Serialization JSON 1.7.0",
+            "version": "1.7.0",
+            "type": "Library",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.7.0/kotlinx-serialization-json-jvm-1.7.0.jar",
+                "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.7.0"
+            },
+            "integrity": {
+                "size": 266911,
+                "md5": "e1852d7c657774810a08e812c34434d3",
+                "sha256": "bc5fb7ba6985a62c4cc2d95940a751d87597f12428fe37feea4bdc6ce996d67c"
+            }
+        },
+        {
+            "id": "software.bernie.geckolib:geckolib-neoforge-1.21.1:4.7.3",
+            "name": "GeckoLib 4.7.3",
+            "version": "4.7.3",
+            "type": "ForgeMod",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/software/bernie/geckolib/geckolib-neoforge-1.21.1/4.7.3/geckolib-neoforge-1.21.1-4.7.3.jar",
+                "coordinate": "software.bernie.geckolib:geckolib-neoforge-1.21.1:4.7.3"
+            },
+            "integrity": {
+                "size": 583525,
+                "md5": "c7c70d598de2d8768f75557b958e2efb",
+                "sha256": "56c3fab1f3d4a09a7fce5399fa8b94dd11f08f816133856ec94fdba5eb975564"
+            }
+        },
+        {
+            "id": "net.allegator.cobblepower:cobblepower:1.0.0",
+            "name": "Cobble Power 1.0.0",
+            "version": "1.0.0",
+            "type": "ForgeMod",
+            "role": "required",
+            "side": "both",
+            "required": true,
+            "defaultEnabled": true,
+            "source": {
+                "type": "direct",
+                "url": "https://bundled.cobblepower.invalid/cobblepower-1.0.0.jar"
+            },
+            "integrity": {
+                "size": 15574419,
+                "md5": "f968a46d857f33f1465d853bc627d896",
+                "sha256": "89997fd3e8d7bc53e36fc3396892547c5e545f596ff5775274c38ccfb36231a5"
+            }
+        },
+        {
+            "id": "curse.maven:jade-324717:6011258",
+            "name": "Jade 15.9.2",
+            "version": "15.9.2+neoforge",
+            "type": "ForgeMod",
+            "role": "optional",
+            "side": "both",
+            "required": false,
+            "defaultEnabled": true,
+            "source": {
+                "type": "cursemaven",
+                "url": "https://www.cursemaven.com/curse/maven/jade-324717/6011258/jade-324717-6011258.jar",
+                "coordinate": "curse.maven:jade-324717:6011258"
+            },
+            "integrity": {
+                "size": 719614,
+                "md5": "c00a9d4893980c1b2451e6d1f7b73d18",
+                "sha256": "ca844d4744bced70d85cbcd010d3d039616f08be034eed60aaab5dcce3a3e857"
+            }
+        },
+        {
+            "id": "mezz.jei:jei-1.21.1-neoforge:19.27.0.336",
+            "name": "Just Enough Items 19.27.0.336",
+            "version": "19.27.0.336",
+            "type": "ForgeMod",
+            "role": "optional",
+            "side": "client",
+            "required": false,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://maven.blamejared.com/mezz/jei/jei-1.21.1-neoforge/19.27.0.336/jei-1.21.1-neoforge-19.27.0.336.jar",
+                "coordinate": "mezz.jei:jei-1.21.1-neoforge:19.27.0.336"
+            },
+            "integrity": {
+                "size": 1529192,
+                "md5": "d3da422d1a44e31af8a8d036b3d338f7",
+                "sha256": "2b6d84df11ab2bb94a75be8bac6790bfbb2c0112a1622cd5f5f234468a196721"
+            }
+        },
+        {
+            "id": "curse.maven:farmers-delight-398521:6917256",
+            "name": "Farmer's Delight 1.2.9",
+            "version": "1.2.9",
+            "type": "ForgeMod",
+            "role": "optional",
+            "side": "both",
+            "required": false,
+            "defaultEnabled": true,
+            "source": {
+                "type": "cursemaven",
+                "url": "https://www.cursemaven.com/curse/maven/farmers-delight-398521/6917256/farmers-delight-398521-6917256.jar",
+                "coordinate": "curse.maven:farmers-delight-398521:6917256"
+            },
+            "integrity": {
+                "size": 2964387,
+                "md5": "7c500c9525ee5e872f14ccd1db21ee15",
+                "sha256": "bdc8dea5ea3f1ee81494a4587a6aef88976d942294a8ceddc3287cf0436bfd4f"
+            }
+        },
+        {
+            "id": "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1",
+            "name": "Curios API 9.5.1",
+            "version": "9.5.1+1.21.1",
+            "type": "ForgeMod",
+            "role": "optional",
+            "side": "both",
+            "required": false,
+            "defaultEnabled": true,
+            "source": {
+                "type": "maven",
+                "url": "https://maven.theillusivec4.top/top/theillusivec4/curios/curios-neoforge/9.5.1+1.21.1/curios-neoforge-9.5.1+1.21.1.jar",
+                "coordinate": "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
+            },
+            "integrity": {
+                "size": 410690,
+                "md5": "e8f0a3574264bb202c153b90293dc84c",
+                "sha256": "a45df2125c26219974aba7507ffc9afe7b83acc941a386af3faacb1cc0056fde"
+            }
+        }
+    ]
+}

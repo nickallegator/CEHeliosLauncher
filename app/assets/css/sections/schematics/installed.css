@@ -1,0 +1,80 @@
+#schematicsInstalledPanel {
+    z-index: calc(var(--landing-overlay-z) + 3);
+}
+#schematicsInstalledCard {
+    width: min(720px, 92vw);
+    max-height: min(80vh, 760px);
+}
+#schematicsInstalledHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+#schematicsInstalledHeading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.schematicsInstalledEyebrow {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+#schematicsInstalledTitle {
+    margin: 0;
+    font-family: 'Avenir Medium';
+    font-size: 20px;
+    letter-spacing: 0.5px;
+}
+#schematicsInstalledSubtitle {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    max-width: 420px;
+}
+#schematicsInstalledActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+#schematicsInstalledBody {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.schematicsInstalledList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.schematicsInstalledItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.schematicsInstalledMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.schematicsInstalledName {
+    font-size: 12px;
+    color: #fff;
+}
+.schematicsInstalledDate {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+}

@@ -1,3 +1,5 @@
+const { MSFT_OPCODE: LOGIN_OPTIONS_MSFT_OPCODE } = require('./assets/js/ipcconstants')
+
 const loginOptionsCancelContainer = document.getElementById('loginOptionCancelContainer')
 const loginOptionMicrosoft = document.getElementById('loginOptionMicrosoft')
 const loginOptionMojang = document.getElementById('loginOptionMojang')
@@ -18,10 +20,11 @@ function loginOptionsCancelEnabled(val){
     }
 }
 
-loginOptionMicrosoft.onclick = (e) => {
+loginOptionMicrosoft.onclick = async (e) => {
+    await ensureSettingsScriptLoaded()
     switchView(getCurrentView(), VIEWS.waiting, 500, 500, () => {
         ipcRenderer.send(
-            MSFT_OPCODE.OPEN_LOGIN,
+            LOGIN_OPTIONS_MSFT_OPCODE.OPEN_LOGIN,
             loginOptionsViewOnLoginSuccess,
             loginOptionsViewOnLoginCancel
         )

@@ -9,6 +9,7 @@ const os                    = require('os')
 const path                  = require('path')
 
 const ConfigManager            = require('./configmanager')
+const AccessManager            = require('./accessmanager')
 
 const logger = LoggerUtil.getLogger('ProcessBuilder')
 
@@ -38,6 +39,7 @@ class ProcessBuilder {
 
         this.usingLiteLoader = false
         this.usingFabricLoader = false
+        this.usingNeoForgeLoader = false
         this.llPath = null
     }
     
@@ -52,6 +54,8 @@ class ProcessBuilder {
         logger.info('Using liteloader:', this.usingLiteLoader)
         this.usingFabricLoader = this.server.modules.some(mdl => mdl.rawModule.type === Type.Fabric)
         logger.info('Using fabric loader:', this.usingFabricLoader)
+        this.usingNeoForgeLoader = this.server.modules.some(mdl => mdl.rawModule.type === Type.NeoForge)
+        logger.info('Using neoforge loader:', this.usingNeoForgeLoader)
         const modObj = this.resolveModConfiguration(ConfigManager.getModConfiguration(this.server.rawServer.id).mods, this.server.modules)
         
         // Mod list below 1.13
@@ -149,6 +153,9 @@ class ProcessBuilder {
      */
     setupLiteLoader(){
         for(let ll of this.server.modules){
+            if(!AccessManager.hasAccess(ll.rawModule.access)){
+                continue
+            }
             if(ll.rawModule.type === Type.LiteLoader){
                 if(!ll.getRequired().value){
                     const modCfg = ConfigManager.getModConfiguration(this.server.rawServer.id).mods
@@ -177,18 +184,26 @@ class ProcessBuilder {
      * @returns {{fMods: Array.<Object>, lMods: Array.<Object>}} An object which contains
      * a list of enabled forge mods and litemods.
      */
-    resolveModConfiguration(modCfg, mdls){
+    resolveModConfiguration(modCfg, mdls, parentLocked = false){
         let fMods = []
         let lMods = []
+        const cfg = modCfg || {}
 
         for(let mdl of mdls){
+            const access = mdl.rawModule.access
+            const isLocked = parentLocked || (access != null && !AccessManager.hasAccess(access))
+            if(isLocked){
+                continue
+            }
             const type = mdl.rawModule.type
             if(type === Type.ForgeMod || type === Type.LiteMod || type === Type.LiteLoader || type === Type.FabricMod){
                 const o = !mdl.getRequired().value
-                const e = ProcessBuilder.isModEnabled(modCfg[mdl.getVersionlessMavenIdentifier()], mdl.getRequired())
+                const cfgEntry = cfg[mdl.getVersionlessMavenIdentifier()]
+                const e = ProcessBuilder.isModEnabled(cfgEntry, mdl.getRequired())
                 if(!o || (o && e)){
                     if(mdl.subModules.length > 0){
-                        const v = this.resolveModConfiguration(modCfg[mdl.getVersionlessMavenIdentifier()].mods, mdl.subModules)
+                        const childMods = typeof cfgEntry === 'object' ? cfgEntry.mods : {}
+                        const v = this.resolveModConfiguration(childMods, mdl.subModules, isLocked)
                         fMods = fMods.concat(v.fMods)
                         lMods = lMods.concat(v.lMods)
                         if(type === Type.LiteLoader){
@@ -675,7 +690,8 @@ class ProcessBuilder {
     classpathArg(mods, tempNativePath){
         let cpArgs = []
 
-        if(!mcVersionAtLeast('1.17', this.server.rawServer.minecraftVersion) || this.usingFabricLoader) {
+        const hasNeoForgePatchedJar = this.usingNeoForgeLoader && this._hasNeoForgePatchedJar()
+        if(!mcVersionAtLeast('1.17', this.server.rawServer.minecraftVersion) || this.usingFabricLoader || (this.usingNeoForgeLoader && !hasNeoForgePatchedJar)) {
             // Add the version.jar to the classpath.
             // Must not be added to the classpath for Forge 1.17+.
             const version = this.vanillaManifest.id
@@ -690,13 +706,16 @@ class ProcessBuilder {
         // Resolve the Mojang declared libraries.
         const mojangLibs = this._resolveMojangLibraries(tempNativePath)
 
+        // Resolve modloader-specific libraries (NeoForge).
+        const modLoaderLibs = this.usingNeoForgeLoader ? this._resolveModLoaderLibraries() : {}
+
         // Resolve the server declared libraries.
         const servLibs = this._resolveServerLibraries(mods)
 
         // Merge libraries, server libs with the same
         // maven identifier will override the mojang ones.
         // Ex. 1.7.10 forge overrides mojang's guava with newer version.
-        const finalLibs = {...mojangLibs, ...servLibs}
+        const finalLibs = {...mojangLibs, ...modLoaderLibs, ...servLibs}
         cpArgs = cpArgs.concat(Object.values(finalLibs))
 
         this._processClassPathList(cpArgs)
@@ -836,10 +855,19 @@ class ProcessBuilder {
         const mdls = this.server.modules
         let libs = {}
 
-        // Locate Forge/Fabric/Libraries
+        // Locate Forge/Fabric/NeoForge/Libraries
         for(let mdl of mdls){
+            if(!AccessManager.hasAccess(mdl.rawModule.access)){
+                continue
+            }
             const type = mdl.rawModule.type
-            if(type === Type.ForgeHosted || type === Type.Fabric || type === Type.Library){
+            if(type === Type.ForgeHosted || type === Type.Fabric || type === Type.NeoForge || type === Type.Library){
+                if(type === Type.NeoForge && this.usingNeoForgeLoader){
+                    const mdlPath = mdl.getPath()
+                    if(mdlPath.endsWith('-installer.jar')){
+                        continue
+                    }
+                }
                 libs[mdl.getVersionlessMavenIdentifier()] = mdl.getPath()
                 if(mdl.subModules.length > 0){
                     const res = this._resolveModuleLibraries(mdl)
@@ -865,12 +893,17 @@ class ProcessBuilder {
      * @param {Object} mdl A module object from the server distro index.
      * @returns {{[id: string]: string}} An object containing the paths of each library this module requires.
      */
-    _resolveModuleLibraries(mdl){
-        if(!mdl.subModules.length > 0){
+    _resolveModuleLibraries(mdl, parentLocked = false){
+        const access = mdl.rawModule.access
+        const isLocked = parentLocked || (access != null && !AccessManager.hasAccess(access))
+        if(isLocked || !mdl.subModules.length > 0){
             return {}
         }
         let libs = {}
         for(let sm of mdl.subModules){
+            if(!AccessManager.hasAccess(sm.rawModule.access)){
+                continue
+            }
             if(sm.rawModule.type === Type.Library){
 
                 if(sm.rawModule.classpath ?? true) {
@@ -880,11 +913,45 @@ class ProcessBuilder {
             // If this module has submodules, we need to resolve the libraries for those.
             // To avoid unnecessary recursive calls, base case is checked here.
             if(mdl.subModules.length > 0){
-                const res = this._resolveModuleLibraries(sm)
+                const res = this._resolveModuleLibraries(sm, isLocked)
                 libs = {...libs, ...res}
             }
         }
         return libs
+    }
+
+    /**
+     * Resolve libraries declared by the modloader version manifest.
+     * Currently used for NeoForge.
+     */
+    _resolveModLoaderLibraries(){
+        const libs = {}
+        if(this.modManifest?.libraries == null){
+            return libs
+        }
+
+        for(const lib of this.modManifest.libraries){
+            if(!isLibraryCompatible(lib.rules, lib.natives)){
+                continue
+            }
+            const artifact = lib?.downloads?.artifact
+            if(artifact?.path == null){
+                continue
+            }
+            const versionIndependentId = lib.name.substring(0, lib.name.lastIndexOf(':'))
+            libs[versionIndependentId] = path.join(this.libPath, artifact.path)
+        }
+
+        return libs
+    }
+
+    _hasNeoForgePatchedJar(){
+        if(this.modManifest?.libraries == null){
+            return false
+        }
+        return this.modManifest.libraries.some(lib => {
+            return typeof lib?.name === 'string' && lib.name.includes(':neoforge:') && lib.name.endsWith(':client')
+        })
     }
 
 }

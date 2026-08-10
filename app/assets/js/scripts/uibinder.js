@@ -5,13 +5,57 @@
 // Requirements
 const path          = require('path')
 const { Type }      = require('helios-distribution-types')
+const { LoggerUtil: LoggerUtilUI } = require('helios-core')
 
 const AuthManager   = require('./assets/js/authmanager')
 const ConfigManager = require('./assets/js/configmanager')
 const { DistroAPI } = require('./assets/js/distromanager')
+const bundledTesterBuild = require('./assets/js/testerchannel').isTesterBuild()
+
+const isDevDistro = process.env.HELIOS_DISTRO_DEV === '1'
+const isLocalDistro = isDevDistro || bundledTesterBuild
+const loggerUIBinder = LoggerUtilUI.getLogger('UIBinder')
+const debugLog = (...args) => {
+    const msg = args.map(v => (typeof v === 'string' ? v : JSON.stringify(v))).join(' ')
+    if(isDevDistro){
+        console.log('[UIBinder]', ...args)
+    }
+    loggerUIBinder.info(msg)
+}
 
 let rscShouldLoad = false
 let fatalStartupError = false
+let distroEventHandled = false
+let mainUIInitializationPromise = null
+
+const LANDING_READY_EVENT = 'helios:landing-ready'
+const LANDING_READY_TIMEOUT_MS = 15000
+
+/**
+ * Wait until landing.js has finished defining the functions used by this
+ * binder. The distribution can finish loading while the document is still
+ * being parsed, so document.readyState alone is not a sufficient readiness
+ * signal.
+ */
+function waitForLandingReady(){
+    if(window.heliosLandingReady === true){
+        return Promise.resolve()
+    }
+
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            window.removeEventListener(LANDING_READY_EVENT, onReady)
+            reject(new Error('Landing UI did not initialize within the expected time.'))
+        }, LANDING_READY_TIMEOUT_MS)
+
+        const onReady = () => {
+            clearTimeout(timeout)
+            resolve()
+        }
+
+        window.addEventListener(LANDING_READY_EVENT, onReady, { once: true })
+    })
+}
 
 // Mapping of each view to their container IDs.
 const VIEWS = {
@@ -58,13 +102,14 @@ function getCurrentView(){
 }
 
 async function showMainUI(data){
+    await waitForLandingReady()
+    debugLog('showMainUI start')
 
-    if(!isDev){
+    if(!isDev && !testerBuild){
         loggerAutoUpdater.info('Initializing..')
         ipcRenderer.send('autoUpdateAction', 'initAutoUpdater', ConfigManager.getAllowPrerelease())
     }
 
-    await prepareSettings(true)
     updateSelectedServer(data.getServerById(ConfigManager.getSelectedServer()))
     refreshServerStatus()
     setTimeout(() => {
@@ -103,10 +148,23 @@ async function showMainUI(data){
         }, 250)
         
     }, 750)
-    // Disable tabbing to the news container.
-    initNews().then(() => {
-        $('#newsContainer *').attr('tabindex', '-1')
-    })
+    debugLog('showMainUI end')
+}
+
+/**
+ * Initialize the main UI exactly once. All startup paths (IPC, ready-state,
+ * and the development fallback) converge here so they cannot race each other.
+ */
+async function initializeMainUI(data){
+    if(mainUIInitializationPromise == null){
+        mainUIInitializationPromise = showMainUI(data).catch(err => {
+            fatalStartupError = true
+            loggerUIBinder.error('Failed to initialize the main UI.', err)
+            showFatalStartupError()
+        })
+    }
+
+    await mainUIInitializationPromise
 }
 
 function showFatalStartupError(){
@@ -135,7 +193,9 @@ function showFatalStartupError(){
 function onDistroRefresh(data){
     updateSelectedServer(data.getServerById(ConfigManager.getSelectedServer()))
     refreshServerStatus()
-    initNews()
+    if(typeof refreshNewsIfInitialized === 'function'){
+        refreshNewsIfInitialized()
+    }
     syncModConfigurations(data)
     ensureJavaSettings(data)
 }
@@ -398,6 +458,15 @@ async function validateSelectedAccount(){
             })
             toggleOverlay(true, accLen > 0)
         } else {
+            try {
+                const ChannelManager = require('./assets/js/channelmanager')
+                if(ChannelManager.isRemoteChannel()) {
+                    const refreshed = await ChannelManager.refreshAuthorizedDistribution({ allowOffline: true })
+                    if(refreshed?.distribution) onDistroRefresh(refreshed.distribution)
+                }
+            } catch(err) {
+                loggerUIBinder.warn('Unable to refresh tester channel authorization after account validation.', err.message || err)
+            }
             return true
         }
     } else {
@@ -426,7 +495,7 @@ document.addEventListener('readystatechange', async () => {
             rscShouldLoad = false
             if(!fatalStartupError){
                 const data = await DistroAPI.getDistribution()
-                await showMainUI(data)
+                await initializeMainUI(data)
             } else {
                 showFatalStartupError()
             }
@@ -437,12 +506,17 @@ document.addEventListener('readystatechange', async () => {
 
 // Actions that must be performed after the distribution index is downloaded.
 ipcRenderer.on('distributionIndexDone', async (event, res) => {
+    if(distroEventHandled){
+        return
+    }
+    distroEventHandled = true
+    debugLog('distributionIndexDone', res, 'readyState', document.readyState)
     if(res) {
         const data = await DistroAPI.getDistribution()
         syncModConfigurations(data)
         ensureJavaSettings(data)
         if(document.readyState === 'interactive' || document.readyState === 'complete'){
-            await showMainUI(data)
+            await initializeMainUI(data)
         } else {
             rscShouldLoad = true
         }
@@ -455,6 +529,39 @@ ipcRenderer.on('distributionIndexDone', async (event, res) => {
         }
     }
 })
+
+// The preload can complete before this page script is evaluated. Announce
+// listener readiness so the main process can replay an already-cached result.
+ipcRenderer.send('distributionIndexReady')
+
+// Local-distribution fallback for development and self-contained tester builds.
+if(isLocalDistro) {
+    setTimeout(async () => {
+        if(distroEventHandled) {
+            return
+        }
+        debugLog('distributionIndexDone missed, falling back to direct load')
+        try {
+            const data = await DistroAPI.getDistribution()
+            syncModConfigurations(data)
+            ensureJavaSettings(data)
+            if(document.readyState === 'interactive' || document.readyState === 'complete'){
+                await initializeMainUI(data)
+            } else {
+                rscShouldLoad = true
+            }
+        } catch (err) {
+            debugLog('fallback distro load failed')
+            console.error('[UIBinder] fallback distro load failed', err)
+            fatalStartupError = true
+            if(document.readyState === 'interactive' || document.readyState === 'complete'){
+                showFatalStartupError()
+            } else {
+                rscShouldLoad = true
+            }
+        }
+    }, 250)
+}
 
 // Util for development
 async function devModeToggle() {

@@ -1,0 +1,103 @@
+<div id="schematicsUpload" class="schematicsModalRoot" aria-hidden="true">
+    <div id="schematicsUploadScrim" class="schematicsModalScrim"></div>
+    <div id="schematicsUploadPanel" class="schematicsModalPanel" role="dialog" aria-modal="true" aria-labelledby="schematicsUploadTitle" tabindex="-1">
+        <div id="schematicsUploadHeader">
+            <div id="schematicsUploadHeading">
+                <div id="schematicsUploadEyebrow">Creator Tools</div>
+                <h2 id="schematicsUploadTitle">Upload Schematic</h2>
+                <div id="schematicsUploadSubtitle">Share a build with the community. JSON schematics only for now.</div>
+            </div>
+            <div id="schematicsUploadActions">
+                <button id="schematicsUploadClose" type="button" class="schematicsDetailButton">Close</button>
+            </div>
+        </div>
+        <div id="schematicsUploadBody">
+            <div id="schematicsUploadDropzone" role="button" tabindex="0">
+                <div class="schematicsUploadDropIcon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3v12"/>
+                        <path d="m7 8 5-5 5 5"/>
+                        <path d="M5 21h14"/>
+                    </svg>
+                </div>
+                <div class="schematicsUploadDropText">Drop a schematic JSON here or browse</div>
+                <div class="schematicsUploadDropHint">Max 5MB Â· .json format</div>
+                <input id="schematicsUploadInput" type="file" accept=".json,application/json" />
+            </div>
+            <div id="schematicsUploadMeta">
+                <div class="schematicsUploadSection">
+                    <div class="schematicsUploadSectionTitle">Details</div>
+                    <label class="schematicsUploadField">
+                        <span>Title</span>
+                        <input id="schematicsUploadTitleInput" type="text" placeholder="e.g. Crimson Keep" maxlength="80" />
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Description</span>
+                        <textarea id="schematicsUploadDescriptionInput" placeholder="Describe the build, requirements, and tips." maxlength="600"></textarea>
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Tags</span>
+                        <input id="schematicsUploadTagsInput" type="text" placeholder="castle, survival, redstone" />
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Visibility</span>
+                        <select id="schematicsUploadVisibility">
+                            <option value="public">Public</option>
+                            <option value="unlisted">Unlisted</option>
+                            <option value="private">Private</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="schematicsUploadSection schematicsUploadPreviewSection">
+                    <div class="schematicsUploadSectionTitle">Preview</div>
+                    <div id="schematicsUploadPreview">
+                        <canvas id="schematicsUploadCanvas" aria-label="Schematic preview"></canvas>
+                        <svg class="schematicsUploadPreviewIcon" viewBox="0 0 48 48" aria-hidden="true" focusable="false" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M24 6 8 14v20l16 8 16-8V14L24 6z"/>
+                            <path d="M8 14l16 8 16-8"/>
+                            <path d="M24 22v20"/>
+                        </svg>
+                        <div class="schematicMeshOverlay" aria-hidden="true">
+                            <div class="schematicMeshSpinner"></div>
+                            <div class="schematicMeshLabel">Building mesh...</div>
+                        </div>
+                    </div>
+                    <div id="schematicsUploadBlocks">
+                        <div class="schematicsUploadBlockHeader">
+                            <span class="schematicsUploadBlockTitle">Blocks</span>
+                            <span id="schematicsUploadBlocksTotal" class="schematicsUploadBlockTotal">--</span>
+                        </div>
+                        <div id="schematicsUploadBlocksList" class="schematicsUploadBlockList"></div>
+                    </div>
+                    <div class="schematicsUploadStats">
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">File</span>
+                            <span id="schematicsUploadFileName" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Blocks</span>
+                            <span id="schematicsUploadBlockCount" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Palette</span>
+                            <span id="schematicsUploadPaletteCount" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Bounds</span>
+                            <span id="schematicsUploadBounds" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Hash</span>
+                            <span id="schematicsUploadHash" class="schematicsUploadStatValue">--</span>
+                        </div>
+                    </div>
+                    <div id="schematicsUploadWarnings"></div>
+                    <div id="schematicsUploadStatus">Select a schematic to begin.</div>
+                    <div id="schematicsUploadSubmitRow">
+                        <button id="schematicsUploadSubmit" type="button" class="schematicsDetailButton primary" disabled>Upload</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

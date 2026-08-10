@@ -1,4 +1,17 @@
 <div id="landingContainer" style="display: none;">
+    <div id="topActions">
+        <button id="newsButton">
+            <!--<img src="assets/images/icons/arrow.svg" id="newsButtonSVG"/>-->
+            <div id="newsButtonAlert" style="display: none;"></div>
+            &#10;<span id="newsButtonText"><%- lang('landing.newsButton') %></span>
+            <svg id="newsButtonSVG" viewBox="0 0 24.87 13.97">
+                <defs>
+                    <style>.arrowLine{fill:none;stroke:#FFF;stroke-width:2px;}</style>
+                </defs>
+                <polyline class="arrowLine" points="0.71 13.26 12.56 1.41 24.16 13.02"/>
+            </svg>
+        </button>
+    </div>
     <div id="upper">
         <div id="left">
             <div id="image_seal_container">
@@ -86,6 +99,20 @@
                                 </svg>
                             </a>
                         </div>
+                        <div class="mediaContainer" id="patreonContainer">
+                            <a href="<%- lang('landing.mediaPatreonURL') %>" class="mediaPatreonButton" id="patreonURL" aria-label="<%- lang('landing.mediaPatreonText') %>">
+                                <svg id="patreonSVG" class="patreonSVG" viewBox="0 0 512 512" aria-hidden="true" focusable="false" fill-rule="evenodd" clip-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2">
+                                    <g transform="matrix(.47407 0 0 .47407 .383 .422)">
+                                        <clipPath id="prefix__a">
+                                            <path d="M0 0h1080v1080H0z"/>
+                                        </clipPath>
+                                        <g clip-path="url(#prefix__a)">
+                                            <path d="M1033.05 324.45c-.19-137.9-107.59-250.92-233.6-291.7-156.48-50.64-362.86-43.3-512.28 27.2-181.1 85.46-237.99 272.66-240.11 459.36-1.74 153.5 13.58 557.79 241.62 560.67 169.44 2.15 194.67-216.18 273.07-321.33 55.78-74.81 127.6-95.94 216.01-117.82 151.95-37.61 255.51-157.53 255.29-316.38z" fill="currentColor" fill-rule="nonzero"/>
+                                        </g>
+                                    </g>
+                                </svg>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -124,16 +151,17 @@
         <div id="center">
             <div class="bot_wrapper">
                 <div id="content">
-                    <button id="newsButton">
-                        <!--<img src="assets/images/icons/arrow.svg" id="newsButtonSVG"/>-->
-                        <div id="newsButtonAlert" style="display: none;"></div>
-                        <svg id="newsButtonSVG" viewBox="0 0 24.87 13.97">
+                    <button id="schematicsButton">
+                        <svg id="schematicsButtonSVG" viewBox="0 0 24 24">
                             <defs>
-                                <style>.arrowLine{fill:none;stroke:#FFF;stroke-width:2px;}</style>
+                                <style>.schematicTile{fill:none;stroke:#FFF;stroke-width:1.6px;}</style>
                             </defs>
-                            <polyline class="arrowLine" points="0.71 13.26 12.56 1.41 24.16 13.02"/>
+                            <rect class="schematicTile" x="3.25" y="3.25" width="7" height="7" rx="1.2"/>
+                            <rect class="schematicTile" x="13.75" y="3.25" width="7" height="7" rx="1.2"/>
+                            <rect class="schematicTile" x="3.25" y="13.75" width="7" height="7" rx="1.2"/>
+                            <rect class="schematicTile" x="13.75" y="13.75" width="7" height="7" rx="1.2"/>
                         </svg>
-                        &#10;<span id="newsButtonText"><%- lang('landing.newsButton') %></span>
+                        &#10;<span id="schematicsButtonText"><%- lang('landing.schematicsButton') %></span>
                     </button>
                 </div>
             </div>
@@ -158,63 +186,10 @@
             </div>
         </div>
     </div>
-    <div id="newsContainer">
-        <div id="newsContent" article="-1" style="display: none;">
-            <div id="newsStatusContainer">
-                <div id="newsStatusContent">
-                    <div id="newsTitleContainer">
-                        <a id="newsArticleTitle" href="#">Lorem Ipsum</a>
-                    </div>
-                    <div id="newsMetaContainer">
-                        <div id="newsArticleDateWrapper">
-                            <span id="newsArticleDate">Mar 15, 44 BC, 9:14 AM</span>
-                        </div>
-                        <div id="newsArticleAuthorWrapper">
-                            <span id="newsArticleAuthor">by Cicero</span>
-                        </div>
-                        <a href="#" id="newsArticleComments">0 Comments</a>
-                    </div>
-                </div>
-                <div id="newsNavigationContainer">
-                    <button id="newsNavigateLeft">
-                        <svg id="newsNavigationLeftSVG" viewBox="0 0 24.87 13.97">
-                            <defs>
-                                <style>.arrowLine{fill:none;stroke:#FFF;stroke-width:2px;transition: 0.25s ease;}</style>
-                            </defs>
-                            <polyline class="arrowLine" points="0.71 13.26 12.56 1.41 24.16 13.02"/>
-                        </svg>
-                    </button>
-                    <span id="newsNavigationStatus"><%- lang('landing.newsNavigationStatus', { currentPage: 1, totalPages: 1 }) %></span>
-                    <button id="newsNavigateRight">
-                        <svg id="newsNavigationRightSVG" viewBox="0 0 24.87 13.97">
-                            <defs>
-                                <style>.arrowLine{fill:none;stroke:#FFF;stroke-width:2px;transition: 0.25s ease;}</style>
-                            </defs>
-                            <polyline class="arrowLine" points="0.71 13.26 12.56 1.41 24.16 13.02"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div id="newsArticleContainer">
-                <div id="newsArticleContent">
-                    <div id="newsArticleContentScrollable">
-                        <!-- Article Content -->
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="newsErrorContainer">
-            <div id="newsErrorLoading">
-                <span id="nELoadSpan" class="newsErrorContent"><%- lang('landing.newsErrorLoadSpan') %></span>
-            </div>
-            <div id="newsErrorFailed" style="display: none;">
-                <span id="nEFailedSpan" class="newsErrorContent"><%- lang('landing.newsErrorFailedSpan') %></span>
-                <button id="newsErrorRetry"><%- lang('landing.newsErrorRetryButton') %></button>
-            </div>
-            <div id="newsErrorNone" style="display: none;">
-                <span id="nENoneSpan" class="newsErrorContent"><%- lang('landing.newsErrorNoneSpan') %></span>
-            </div>
-        </div>
-    </div>
-    <script src="./assets/js/scripts/landing.js"></script>
+    <%- include('partials/landing/news.ejs') %>
+    <%- include('partials/landing/community.ejs') %>
 </div>
+    <%- include('partials/landing/installed.ejs') %>
+    <script src="./assets/js/scripts/landing/modals.js" defer></script>
+    <script src="./assets/js/scripts/landing/schematics/dom.js" defer></script>
+    <script src="./assets/js/scripts/landing.js" defer></script>

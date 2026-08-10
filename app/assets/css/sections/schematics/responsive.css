@@ -1,0 +1,73 @@
+@media (max-width: 1100px) {
+    #schematicsUploadMeta,
+    #schematicsEditMeta {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 1100px) {
+    #schematicsContent {
+        height: 100%;
+        padding: 20px 28px 22px;
+    }
+
+    #schematicsHeader {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    #schematicsActionGroup {
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    #schematicsControls {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    #schematicsSearchInput,
+    #schematicsSortSelect,
+    #schematicsCategorySelect,
+    #schematicsCollectionsSearchInput,
+    #schematicsCollectionsSortSelect,
+    #schematicsDifficultySelect,
+    #schematicsTagsInput,
+    #schematicsCreatorInput {
+        width: 100%;
+        min-width: 0;
+    }
+
+    #schematicsSubtitle {
+        max-width: 100%;
+    }
+
+    #schematicsDetailHeader {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #schematicsDetailShareMenu {
+        right: auto;
+        left: 0;
+        width: min(280px, 86vw);
+    }
+
+    #schematicsDetailBody {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            'preview'
+            'blocks'
+            'mods'
+            'stats';
+        grid-template-rows: auto;
+    }
+
+    #schematicsDetailPreview {
+        min-height: 260px;
+    }
+
+    #schematicsDetailBlocks,
+    #schematicsDetailMods {
+        max-height: 340px;
+    }
+}

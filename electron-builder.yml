@@ -8,7 +8,9 @@ asar: true
 compression: 'maximum'
 
 files:
-  - '!{dist,.gitignore,.vscode,docs,dev-app-update.yml,.nvmrc,eslint.config.mjs}'
+  # Development, publishing, backend, and secret-bearing files must never be
+  # embedded in a launcher installer.
+  - '!{dist,.gitignore,.vscode,.github,docs,backend,tests,scripts,packs,patches,deps,dev-app-update.yml,.nvmrc,eslint.config.mjs}'
 
 extraResources:
   - 'libraries'

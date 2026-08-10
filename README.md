@@ -106,6 +106,104 @@ This section details the setup of a basic developmentment environment.
 
 ---
 
+### Schematics Core (Shared Module)
+
+`libraries/schematics-core` is a runtime-agnostic helper for parsing and normalizing schematics. It has no DOM or renderer dependencies and is designed to be reused by both the launcher and a future web app.
+
+**Usage Example**
+
+```console
+node libraries/schematics-core/example.js
+```
+
+**Run Tests**
+
+```console
+npm run test:schematics-core
+```
+
+---
+
+### Schematics Cache Rebuild (Debugging)
+
+If you need to force a rebuild of the schematics texture atlas/cache on the next launch, run:
+
+```console
+npm run start:rebuild-schematics-cache
+```
+
+This clears the schematics cache once on startup and then proceeds with a normal launch.
+
+---
+
+### Testing
+
+Smoke tests (no UI):
+
+```console
+npm run test:smoke
+```
+
+Run all available tests (backend + renderer + E2E):
+
+```console
+npm run test:all
+```
+
+Backend API tests:
+
+```console
+npm run test:backend
+```
+
+Renderer smoke tests (module import only):
+
+```console
+set RUN_RENDERER_TESTS=1 && npm run test:renderer
+```
+
+E2E tests are scaffolded in `tests/e2e` (see `tests/e2e/README.md`).
+
+Install Playwright browsers once:
+
+```console
+npm run test:e2e:install
+```
+
+Run E2E smoke tests:
+
+```console
+npm run test:e2e
+```
+
+---
+
+### Backend Database (Docker Postgres)
+
+The backend uses a single `DATABASE_URL` (loaded from `backend/.env`) for Patreon auth + schematics data. When the schema changes, re-run `backend/schema.sql` against that same database.
+
+**Current Docker setup**
+
+The active Postgres container is:
+
+```
+cehelios-postgres
+```
+
+It publishes port `5433` on the host.
+
+**Schema update (Docker)**
+
+From `backend/`:
+
+```console
+docker exec -i cehelios-postgres psql -U postgres -d cehelios < schema.sql
+```
+
+If your `DATABASE_URL` uses a different database/user, swap `-d` / `-U` accordingly.
+
+---
+
 **Build Installers**
 
 To build for your current platform.

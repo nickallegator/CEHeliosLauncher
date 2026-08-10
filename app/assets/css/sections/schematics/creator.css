@@ -1,0 +1,173 @@
+#schematicsSearchInput,
+#schematicsSortSelect,
+#schematicsCategorySelect,
+#schematicsCollectionsSearchInput,
+#schematicsCollectionsSortSelect,
+#schematicsTagsInput,
+#schematicsCreatorInput {
+    min-width: 190px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-family: 'Avenir Book';
+    color: #ffffff;
+    background: rgba(8, 10, 12, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
+}
+#schematicsSearchInput::placeholder,
+#schematicsCollectionsSearchInput::placeholder,
+#schematicsTagsInput::placeholder,
+#schematicsCreatorInput::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+#schematicsSearchInput:focus,
+#schematicsSortSelect:focus,
+#schematicsCategorySelect:focus,
+#schematicsCollectionsSearchInput:focus,
+#schematicsCollectionsSortSelect:focus,
+#schematicsDifficultySelect:focus,
+#schematicsTagsInput:focus,
+#schematicsCreatorInput:focus {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0px 0px 12px rgba(255, 255, 255, 0.18);
+}
+#schematicsTagsInput,
+#schematicsCreatorInput {
+    min-width: 160px;
+}
+#schematicsCreatorsBrowseView {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 12px;
+}
+#schematicsCreatorsBrowseView[hidden],
+#schematicsBrowseCreatorView[hidden] {
+    display: none;
+}
+.schematicCreator {
+    color: rgba(255, 255, 255, 0.6);
+}
+.schematicsCreatorHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 20px 24px 0px;
+}
+.schematicsCreatorProfile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.schematicsCreatorAvatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Avenir Medium';
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.schematicsCreatorHeading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.schematicsCreatorEyebrow {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+#schematicsCreatorTitle {
+    margin: 0;
+    font-family: 'Avenir Medium';
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+#schematicsCreatorCount {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+}
+.schematicsCreatorActions {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.schematicsCreatorControl {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+#schematicsCreatorSort {
+    min-width: 170px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-family: 'Avenir Book';
+    color: #ffffff;
+    background: rgba(8, 10, 12, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+#schematicsCreatorSort:focus {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0px 0px 12px rgba(255, 255, 255, 0.18);
+}
+.schematicsCreatorGrid {
+    padding: 22px 28px 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 210px);
+    gap: 16px;
+    overflow-y: auto;
+    justify-content: flex-start;
+}
+#schematicsCreatorsGrid,
+#schematicsCreatorGrid {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.schematicsCreatorCollections {
+    padding: 16px 28px 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.schematicsCreatorCollectionsHeader {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+.schematicsCreatorCollectionsList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.schematicCreatorButton {
+    background: none;
+    border: none;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+.schematicCreatorButton:hover,
+.schematicCreatorButton:focus {
+    color: rgba(255, 255, 255, 0.95);
+    text-decoration: underline;
+    outline: none;
+}

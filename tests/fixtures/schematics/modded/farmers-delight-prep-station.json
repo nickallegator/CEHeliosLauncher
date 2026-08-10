@@ -1,0 +1,22 @@
+{
+  "name": "Farmer's Delight Prep Station Test",
+  "category": "test",
+  "icon": "farmersdelight:cutting_board",
+  "blocks": [
+    { "pos": [0, 0, 0], "block": "minecraft:stone_bricks" },
+    { "pos": [1, 0, 0], "block": "minecraft:stone_bricks" },
+    { "pos": [2, 0, 0], "block": "minecraft:stone_bricks" },
+    { "pos": [0, 0, 1], "block": "minecraft:stone_bricks" },
+    { "pos": [1, 0, 1], "block": "minecraft:stone_bricks" },
+    { "pos": [2, 0, 1], "block": "minecraft:stone_bricks" },
+    { "pos": [0, 0, 2], "block": "minecraft:stone_bricks" },
+    { "pos": [1, 0, 2], "block": "minecraft:stone_bricks" },
+    { "pos": [2, 0, 2], "block": "minecraft:stone_bricks" },
+    { "pos": [1, 1, 0], "block": "minecraft:barrel" },
+    { "pos": [0, 1, 1], "block": "farmersdelight:skillet" },
+    { "pos": [1, 1, 1], "block": "farmersdelight:cutting_board" },
+    { "pos": [2, 1, 1], "block": "farmersdelight:cooking_pot" },
+    { "pos": [1, 1, 2], "block": "farmersdelight:stove" },
+    { "pos": [1, 2, 1], "block": "minecraft:torch" }
+  ]
+}

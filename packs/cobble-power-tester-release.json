@@ -1,0 +1,19 @@
+{
+    "schemaVersion": 1,
+    "channelId": "cobble-power-test",
+    "channelName": "Cobble Power Test Launcher",
+    "launcherVersion": "2.2.1-test.4",
+    "profileVersion": "1.0.0-test.4",
+    "profileName": "Cobble Power Test (Minecraft 1.21.1)",
+    "profileDescription": "Private Cobble Power 1.0.0 test profile for Minecraft 1.21.1 and NeoForge 21.1.77.",
+    "mod": {
+        "id": "net.allegator.cobblepower:cobblepower:1.0.0",
+        "name": "Cobble Power 1.0.0",
+        "version": "1.0.0",
+        "sourcePath": "../cobblepower_server/mods/cobblepower-1.0.0.jar",
+        "publicUrl": "https://bundled.cobblepower.invalid/cobblepower-1.0.0.jar",
+        "expectedSize": 15574419,
+        "expectedMd5": "f968a46d857f33f1465d853bc627d896",
+        "expectedSha256": "89997fd3e8d7bc53e36fc3396892547c5e545f596ff5775274c38ccfb36231a5"
+    }
+}

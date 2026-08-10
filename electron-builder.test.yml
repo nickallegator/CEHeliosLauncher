@@ -1,0 +1,24 @@
+extends: './electron-builder.yml'
+
+appId: 'net.allegator.cobblepower.launcher.test'
+productName: 'Cobble Power Test Launcher'
+executableName: 'Cobble Power Test Launcher'
+artifactName: 'Cobble-Power-Test-Launcher-setup-${version}.${ext}'
+copyright: 'Copyright © 2026 Allegator'
+
+extraMetadata:
+  version: '2.2.1-test.4'
+  productName: 'Cobble Power Test Launcher'
+
+extraResources:
+  - from: 'dist/tester-staging/tester'
+    to: 'tester'
+
+win:
+  target:
+    - target: 'nsis'
+      arch: 'x64'
+
+directories:
+  buildResources: 'build'
+  output: 'dist/tester-output'

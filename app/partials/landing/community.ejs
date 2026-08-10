@@ -1,0 +1,254 @@
+<div id="schematicsContainer">
+        <div id="schematicsContent">
+            <div id="schematicsHeader">
+                <div id="schematicsTitleGroup">
+                    <div id="schematicsEyebrow"><%- lang('landing.schematicsEyebrow') %></div>
+                    <div id="schematicsTitle"><%- lang('landing.schematicsTitle') %></div>
+                    <div id="schematicsSubtitle"><%- lang('landing.schematicsSubtitle') %></div>
+                </div>
+            </div>
+            <div id="schematicsActionGroup">
+                <div id="schematicsControlsRow">
+                    <div id="schematicsCategoryRow" class="schematicsCategoryRow">
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel"><%- lang('landing.schematicsCategoryLabel') %></span>
+                            <select id="schematicsCategorySelect" aria-label="<%- lang('landing.schematicsCategoryLabel') %>">
+                                <option value="schematics">Schematics</option>
+                                <option value="collections">Collections</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="schematicsControls">
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel"><%- lang('landing.schematicsSearchLabel') %></span>
+                            <div class="schematicsSearchRow">
+                                <input id="schematicsSearchInput" type="search" placeholder="<%- lang('landing.schematicsSearchPlaceholder') %>" aria-label="<%- lang('landing.schematicsSearchLabel') %>" spellcheck="false" autocomplete="off"/>
+                                <button id="schematicsFilterToggle" type="button" class="schematicsIconButton" aria-label="Filters">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                            <div class="schematicsControlGroup">
+                                <span class="schematicsControlLabel"><%- lang('landing.schematicsSortLabel') %></span>
+                                <select id="schematicsSortSelect" aria-label="<%- lang('landing.schematicsSortLabel') %>">
+                                    <option value="likes-desc"><%- lang('landing.schematicsSortLikesDesc') %></option>
+                                    <option value="likes-asc"><%- lang('landing.schematicsSortLikesAsc') %></option>
+                                    <option value="release-desc"><%- lang('landing.schematicsSortReleaseDesc') %></option>
+                                    <option value="release-asc"><%- lang('landing.schematicsSortReleaseAsc') %></option>
+                                </select>
+                            </div>
+                        <div id="schematicsFiltersPanel" class="schematicsFiltersPanel" hidden>
+                            <div class="schematicsFiltersHeader">
+                                <span class="schematicsFiltersTitle">Filters</span>
+                                <button id="schematicsFiltersClose" type="button" class="schematicsMiniButton">Close</button>
+                            </div>
+                            <div class="schematicsFiltersBody">
+                                <label class="schematicsFilterField">
+                                    <span>Tags</span>
+                                    <input id="schematicsTagsInput" type="text" placeholder="comma separated" aria-label="Tag filter" spellcheck="false" autocomplete="off"/>
+                                </label>
+                                <label class="schematicsFilterField">
+                                    <span>Creator</span>
+                                    <input id="schematicsCreatorInput" type="text" placeholder="username" aria-label="Creator filter" spellcheck="false" autocomplete="off"/>
+                                </label>
+                                <label class="schematicsFilterField schematicsFilterToggle">
+                                    <span>Installed only</span>
+                                    <input id="schematicsInstalledToggle" type="checkbox" />
+                                </label>
+                                <label class="schematicsFilterField schematicsFilterToggle">
+                                    <span>My uploads</span>
+                                    <input id="schematicsMineToggle" type="checkbox" />
+                                </label>
+                            </div>
+                        </div>
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel"><%- lang('landing.schematicsManageLabel') %></span>
+                            <button id="schematicsManageInstalledButton" type="button" class="schematicsMiniButton">Manage</button>
+                        </div>
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel">Upload</span>
+                            <button id="schematicsUploadButton" type="button" class="schematicsMiniButton primary">Upload Schematic</button>
+                        </div>
+                        <div id="schematicsAdminControlGroup" class="schematicsControlGroup" hidden>
+                            <span class="schematicsControlLabel">Admin</span>
+                            <button id="schematicsAdminToolsButton" type="button" class="schematicsMiniButton">Thumbnail Tools</button>
+                        </div>
+                    </div>
+                    <div id="schematicsCollectionsControls">
+                        <div class="schematicsControlGroup schematicsControlMeta">
+                            <span class="schematicsControlLabel">Collections</span>
+                            <span id="schematicsCollectionsBrowseCount" class="schematicsMetaValue">0</span>
+                        </div>
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel">Search</span>
+                            <div class="schematicsSearchRow">
+                                <input id="schematicsCollectionsSearchInput" type="search" placeholder="Search collections" aria-label="Search collections" spellcheck="false" autocomplete="off"/>
+                                <button id="schematicsCollectionsFilterToggle" type="button" class="schematicsIconButton" aria-label="Collection filters">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel">Sort</span>
+                            <select id="schematicsCollectionsSortSelect" aria-label="Sort collections">
+                                <option value="updated">Recently updated</option>
+                                <option value="items">Most schematics</option>
+                                <option value="name">Name</option>
+                            </select>
+                        </div>
+                        <div id="schematicsCollectionsFiltersPanel" class="schematicsFiltersPanel" hidden>
+                            <div class="schematicsFiltersHeader">
+                                <span class="schematicsFiltersTitle">Filters</span>
+                                <button id="schematicsCollectionsFiltersClose" type="button" class="schematicsMiniButton">Close</button>
+                            </div>
+                            <div class="schematicsFiltersBody">
+                                <label class="schematicsFilterField">
+                                    <span>Creator</span>
+                                    <input id="schematicsCollectionsCreatorInput" type="text" placeholder="username" aria-label="Collection creator filter" spellcheck="false" autocomplete="off"/>
+                                </label>
+                                <label class="schematicsFilterField schematicsFilterToggle">
+                                    <span>My collections</span>
+                                    <input id="schematicsCollectionsMineToggle" type="checkbox" />
+                                </label>
+                            </div>
+                        </div>
+                        <div class="schematicsControlGroup">
+                            <span class="schematicsControlLabel">Create</span>
+                            <button id="schematicsCollectionsCreateButton" type="button" class="schematicsMiniButton primary">New Collection</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="schematicsBrowseSchematicsView" role="tabpanel">
+                <div id="schematicsScroll">
+                    <div id="schematicsGrid" role="list"></div>
+                </div>
+                <div class="schematicsPagerBottom">
+                    <div class="schematicsPagerControls">
+                        <button id="schematicsPagePrev" type="button" class="schematicsMiniButton">Prev</button>
+                        <span id="schematicsPageStatus" class="schematicsPagerStatus">1 / 1</span>
+                        <button id="schematicsPageNext" type="button" class="schematicsMiniButton">Next</button>
+                    </div>
+                </div>
+            </div>
+            <div id="schematicsBrowseCollectionsView" role="tabpanel" hidden>
+                <div id="schematicsCollectionsBrowseList" class="schematicsCollectionsBrowseList" role="list"></div>
+                <div class="schematicsPagerBottom">
+                    <div class="schematicsPagerControls">
+                        <button id="schematicsCollectionsPagePrev" type="button" class="schematicsMiniButton">Prev</button>
+                        <span id="schematicsCollectionsPageStatus" class="schematicsPagerStatus">1 / 1</span>
+                        <button id="schematicsCollectionsPageNext" type="button" class="schematicsMiniButton">Next</button>
+                    </div>
+                </div>
+            </div>
+            <div id="schematicsCreatorsBrowseView" role="tabpanel" hidden>
+                <div id="schematicsCreatorsGrid" class="schematicsCreatorGrid" role="list"></div>
+            </div>
+            <div id="schematicsBrowseCreatorView" role="tabpanel" hidden>
+                <div class="schematicsCreatorHeader">
+                    <div class="schematicsCreatorProfile">
+                        <div id="schematicsCreatorAvatar" class="schematicsCreatorAvatar">C</div>
+                        <div class="schematicsCreatorHeading">
+                            <div class="schematicsCreatorEyebrow">Creator</div>
+                            <h2 id="schematicsCreatorTitle">Creator</h2>
+                            <div id="schematicsCreatorCount">0 creations</div>
+                        </div>
+                    </div>
+                    <div class="schematicsCreatorActions">
+                        <div class="schematicsCreatorControl">
+                            <span class="schematicsControlLabel">Sort</span>
+                            <select id="schematicsCreatorSort" aria-label="Sort creator schematics">
+                                <option value="likes-desc">Likes (High to Low)</option>
+                                <option value="likes-asc">Likes (Low to High)</option>
+                                <option value="release-desc">Newest</option>
+                                <option value="release-asc">Oldest</option>
+                                <option value="name-asc">Name (A-Z)</option>
+                                <option value="name-desc">Name (Z-A)</option>
+                            </select>
+                        </div>
+                        <div class="schematicsCreatorControl schematicsPager">
+                            <span class="schematicsControlLabel">Page</span>
+                            <div class="schematicsPagerControls">
+                                <button id="schematicsCreatorPagePrev" type="button" class="schematicsMiniButton">Prev</button>
+                                <span id="schematicsCreatorPageStatus" class="schematicsPagerStatus">1 / 1</span>
+                                <button id="schematicsCreatorPageNext" type="button" class="schematicsMiniButton">Next</button>
+                            </div>
+                        </div>
+                        <button id="schematicsCreatorClose" type="button" class="schematicsDetailButton">Back</button>
+                    </div>
+                </div>
+                <div id="schematicsCreatorCollections" class="schematicsCreatorCollections" aria-label="Creator collections">
+                    <div class="schematicsCreatorCollectionsHeader">
+                        <span>Collections</span>
+                    </div>
+                    <div id="schematicsCreatorCollectionsList" class="schematicsCreatorCollectionsList"></div>
+                </div>
+                <div id="schematicsCreatorGrid" class="schematicsCreatorGrid" role="list"></div>
+            </div>
+            <%- include('community/modals/detail.ejs') %>
+            <%- include('community/modals/admin-tools.ejs') %>
+            <%- include('community/modals/collections-browse-detail.ejs') %>
+            <div id="schematicsCollectionsPanel" aria-hidden="true">
+                <div id="schematicsCollectionsScrim"></div>
+                <div id="schematicsCollectionsCard" role="dialog" aria-modal="true" aria-labelledby="schematicsCollectionsTitle">
+                    <div class="schematicsCollectionsHeader">
+                        <div class="schematicsCollectionsHeading">
+                            <div class="schematicsCollectionsEyebrow">Collections</div>
+                            <h2 id="schematicsCollectionsTitle">Schematic Collections</h2>
+                            <div id="schematicsCollectionsCount">0 collections</div>
+                        </div>
+                        <div class="schematicsCollectionsActions">
+                            <div class="schematicsCollectionsTabs">
+                                <button id="schematicsCollectionsTabPublic" type="button" class="schematicsMiniButton">Public</button>
+                                <button id="schematicsCollectionsTabMine" type="button" class="schematicsMiniButton">My collections</button>
+                            </div>
+                            <button id="schematicsCollectionsNew" type="button" class="schematicsDetailButton">New Collection</button>
+                            <button id="schematicsCollectionsClose" type="button" class="schematicsDetailButton">Close</button>
+                        </div>
+                    </div>
+                    <div id="schematicsCollectionsCreate" class="schematicsCollectionsCreate" hidden>
+                        <div class="schematicsDetailEditRow">
+                            <label for="schematicsCollectionsName">Name</label>
+                            <input id="schematicsCollectionsName" type="text" maxlength="80" />
+                        </div>
+                        <div class="schematicsDetailEditRow">
+                            <label for="schematicsCollectionsDescription">Description</label>
+                            <textarea id="schematicsCollectionsDescription" rows="3" maxlength="800"></textarea>
+                        </div>
+                        <div class="schematicsDetailEditRow">
+                            <label for="schematicsCollectionsVisibility">Visibility</label>
+                            <select id="schematicsCollectionsVisibility">
+                                <option value="public">Public</option>
+                                <option value="unlisted">Unlisted</option>
+                                <option value="private">Private</option>
+                            </select>
+                        </div>
+                        <div class="schematicsDetailEditActions">
+                            <button id="schematicsCollectionsCreateSave" type="button" class="schematicsDetailButton primary">Create</button>
+                            <button id="schematicsCollectionsCreateCancel" type="button" class="schematicsDetailButton">Cancel</button>
+                        </div>
+                    </div>
+                    <div id="schematicsCollectionsList" class="schematicsCollectionsList" role="list"></div>
+                    <div id="schematicsCollectionsDetail" class="schematicsCollectionsDetail" hidden>
+                        <div class="schematicsCollectionsDetailHeader">
+                            <div class="schematicsCollectionsDetailHeading">
+                                <h3 id="schematicsCollectionsDetailTitle">Collection</h3>
+                                <div id="schematicsCollectionsDetailMeta">0 schematics</div>
+                            </div>
+                            <div class="schematicsCollectionsDetailActions">
+                                <button id="schematicsCollectionsDetailBack" type="button" class="schematicsMiniButton">Back</button>
+                                <button id="schematicsCollectionsDetailDelete" type="button" class="schematicsMiniButton">Delete</button>
+                            </div>
+                        </div>
+                        <div id="schematicsCollectionsDetailGrid" class="schematicsCreatorGrid" role="list"></div>
+                    </div>
+                </div>
+            </div>
+            <%- include('community/modals/upload.ejs') %>
+            <%- include('community/modals/edit.ejs') %>
+        </div>
+    </div>

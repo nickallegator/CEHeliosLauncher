@@ -1,0 +1,27 @@
+{
+    "version": "1.0.0",
+    "rss": "https://helios-files.geekcorner.eu.org/rss.xml",
+    "servers": [
+        {
+            "id": "Cobble-Power-1.21.1",
+            "name": "Cobble Power Test (Authorization Required)",
+            "description": "Sign in with an approved Microsoft account to load the private test channel.",
+            "icon": "https://raw.githubusercontent.com/dscalzi/HeliosLauncher/master/build/icon.png",
+            "version": "bootstrap",
+            "address": "localhost:25565",
+            "minecraftVersion": "1.21.1",
+            "mainServer": true,
+            "autoconnect": false,
+            "javaOptions": {
+                "distribution": "TEMURIN",
+                "supported": "21.x",
+                "suggestedMajor": 21,
+                "ram": {
+                    "minimum": 4096,
+                    "recommended": 6144
+                }
+            },
+            "modules": []
+        }
+    ]
+}

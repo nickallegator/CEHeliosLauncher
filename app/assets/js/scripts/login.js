@@ -196,7 +196,11 @@ loginButton.addEventListener('click', () => {
             switchView(VIEWS.login, loginViewOnSuccess, 500, 500, async () => {
                 // Temporary workaround
                 if(loginViewOnSuccess === VIEWS.settings){
-                    await prepareSettings()
+                    if(typeof ensureSettingsReady === 'function'){
+                        await ensureSettingsReady()
+                    } else if(typeof prepareSettings === 'function'){
+                        await prepareSettings()
+                    }
                 }
                 loginViewOnSuccess = VIEWS.landing // Reset this for good measure.
                 loginCancelEnabled(false) // Reset this for good measure.
