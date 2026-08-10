@@ -1,0 +1,65 @@
+<div id="schematicsAdminModal" class="schematicsModalRoot" aria-hidden="true">
+    <div id="schematicsAdminScrim" class="schematicsModalScrim"></div>
+    <div id="schematicsAdminPanel" class="schematicsModalPanel schematicsAdminPanel" role="dialog" aria-modal="true" aria-labelledby="schematicsAdminTitle" tabindex="-1">
+        <div class="schematicsAdminHeader">
+            <div class="schematicsAdminHeading">
+                <div class="schematicsAdminEyebrow">Admin</div>
+                <h2 id="schematicsAdminTitle">Thumbnail Regeneration</h2>
+                <div class="schematicsAdminSubtitle">Regenerate missing thumbnails in batches.</div>
+            </div>
+            <div class="schematicsAdminActions">
+                <button id="schematicsAdminClose" type="button" class="schematicsDetailButton">Close</button>
+            </div>
+        </div>
+        <div class="schematicsAdminBody">
+            <div class="schematicsAdminForm">
+                <label class="schematicsAdminField">
+                    <span>IDs (optional)</span>
+                    <input id="schematicsAdminIds" type="text" placeholder="uuid, uuid" spellcheck="false" autocomplete="off"/>
+                </label>
+                <div class="schematicsAdminRow">
+                    <label class="schematicsAdminField">
+                        <span>Limit</span>
+                        <input id="schematicsAdminLimit" type="number" min="1" max="100" value="25"/>
+                    </label>
+                    <label class="schematicsAdminField">
+                        <span>Offset</span>
+                        <input id="schematicsAdminOffset" type="number" min="0" value="0"/>
+                    </label>
+                </div>
+                <label class="schematicsAdminField">
+                    <span>Labels</span>
+                    <input id="schematicsAdminLabels" type="text" placeholder="tiny, medium" spellcheck="false" autocomplete="off"/>
+                </label>
+                <label class="schematicsAdminField">
+                    <span>Mimes</span>
+                    <input id="schematicsAdminMimes" type="text" placeholder="image/webp, image/png" spellcheck="false" autocomplete="off"/>
+                </label>
+                <div class="schematicsAdminToggles">
+                    <label class="schematicsAdminToggle">
+                        <input id="schematicsAdminVerifyObjects" type="checkbox" checked/>
+                        <span>Verify objects</span>
+                    </label>
+                    <label class="schematicsAdminToggle">
+                        <input id="schematicsAdminRepair" type="checkbox" checked/>
+                        <span>Repair stale DB rows</span>
+                    </label>
+                    <label class="schematicsAdminToggle">
+                        <input id="schematicsAdminIncludeExisting" type="checkbox"/>
+                        <span>Include existing</span>
+                    </label>
+                </div>
+                <div class="schematicsAdminFooter">
+                    <button id="schematicsAdminRun" type="button" class="schematicsDetailButton primary">Run</button>
+                    <span id="schematicsAdminStatus" class="schematicsAdminStatus">Ready.</span>
+                </div>
+            </div>
+            <div class="schematicsAdminResults">
+                <div class="schematicsAdminResultsHeader">
+                    <span>Results</span>
+                </div>
+                <div id="schematicsAdminResults" class="schematicsAdminResultsList"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,157 @@
+name: Promote Cobble Power Test Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mod_tag:
+        description: Immutable mod release tag, for example v1.0.1-test.1
+        required: true
+        type: string
+      pack_version:
+        description: Launcher pack version
+        required: true
+        type: string
+      expected_previous_release:
+        description: Current release ID; leave empty only for the first promotion
+        required: false
+        type: string
+
+concurrency:
+  group: cobblepower-test-promotion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.prepare.outputs.release_id }}
+      prepared_dir: ${{ steps.prepare.outputs.prepared_dir }}
+    steps:
+      - name: Checkout launcher repository
+        uses: actions/checkout@v4
+
+      - name: Checkout tagged mod source
+        uses: actions/checkout@v4
+        with:
+          repository: nickallegator/Cobble-Power-1.21.X
+          ref: ${{ inputs.mod_tag }}
+          token: ${{ secrets.COBBLEPOWER_CROSS_REPO_TOKEN }}
+          path: mod-source
+          fetch-depth: 1
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bootstrap pinned Helios dependencies
+        run: node scripts/bootstrap-dependencies.js
+
+      - name: Build pinned Helios dependencies
+        run: node scripts/build-file-dependencies.js
+
+      - name: Install launcher dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download immutable mod release
+        env:
+          GH_TOKEN: ${{ secrets.COBBLEPOWER_CROSS_REPO_TOKEN }}
+          MOD_TAG: ${{ inputs.mod_tag }}
+        run: |
+          mkdir -p release-asset
+          gh release download "$MOD_TAG" --repo nickallegator/Cobble-Power-1.21.X --dir release-asset
+          (cd release-asset && sha256sum --check SHA256SUMS.txt)
+
+      - name: Prepare deterministic release
+        id: prepare
+        env:
+          MOD_TAG: ${{ inputs.mod_tag }}
+          PACK_VERSION: ${{ inputs.pack_version }}
+          EXPECTED_PREVIOUS: ${{ inputs.expected_previous_release }}
+        run: |
+          MOD_VERSION="${MOD_TAG#v}"
+          MOD_JAR="release-asset/cobblepower-${MOD_VERSION}.jar"
+          SOURCE_COMMIT="$(git -C mod-source rev-parse HEAD)"
+          RELEASE_ID="cobble-power-${MOD_VERSION}"
+          EXTRA_ARGS=()
+          if [ -n "$EXPECTED_PREVIOUS" ]; then EXTRA_ARGS+=(--expected-previous "$EXPECTED_PREVIOUS"); fi
+          npm run releases -- prepare \
+            --mod "$MOD_JAR" \
+            --mod-version "$MOD_VERSION" \
+            --pack-version "$PACK_VERSION" \
+            --source-repository "https://github.com/nickallegator/Cobble-Power-1.21.X" \
+            --source-tag "$MOD_TAG" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-repo mod-source \
+            --release-id "$RELEASE_ID" \
+            --output "dist/release-prepared/$RELEASE_ID" \
+            "${EXTRA_ARGS[@]}"
+          echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
+          echo "prepared_dir=dist/release-prepared/$RELEASE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Publish review summary
+        env:
+          PREPARED_DIR: ${{ steps.prepare.outputs.prepared_dir }}
+        run: |
+          echo '## Cobble Power test release prepared' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat "$PREPARED_DIR/release.json" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload prepared release for approval
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobblepower-${{ steps.prepare.outputs.release_id }}
+          path: ${{ steps.prepare.outputs.prepared_dir }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-and-promote:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: cobblepower-test
+    steps:
+      - name: Checkout launcher repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bootstrap pinned Helios dependencies
+        run: node scripts/bootstrap-dependencies.js
+
+      - name: Build pinned Helios dependencies
+        run: node scripts/build-file-dependencies.js
+
+      - name: Install launcher dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download approved prepared release
+        uses: actions/download-artifact@v4
+        with:
+          name: cobblepower-${{ needs.prepare.outputs.release_id }}
+          path: prepared-release
+
+      - name: Publish, verify, and promote
+        env:
+          RELEASES_STORAGE_ENDPOINT: ${{ secrets.RELEASES_STORAGE_ENDPOINT }}
+          RELEASES_STORAGE_BUCKET: ${{ secrets.RELEASES_STORAGE_BUCKET }}
+          RELEASES_STORAGE_REGION: auto
+          RELEASES_STORAGE_ACCESS_KEY_ID: ${{ secrets.RELEASES_STORAGE_ACCESS_KEY_ID }}
+          RELEASES_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.RELEASES_STORAGE_SECRET_ACCESS_KEY }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+          EXPECTED_PREVIOUS: ${{ inputs.expected_previous_release }}
+        run: |
+          npm run releases -- publish --prepared prepared-release
+          npm run releases -- verify --release-id "$RELEASE_ID" --channel test
+          PROMOTE_ARGS=()
+          if [ -n "$EXPECTED_PREVIOUS" ]; then PROMOTE_ARGS+=(--expected-previous "$EXPECTED_PREVIOUS"); fi
+          npm run releases -- promote --release-id "$RELEASE_ID" --channel test "${PROMOTE_ARGS[@]}"
+          npm run releases -- verify --channel test

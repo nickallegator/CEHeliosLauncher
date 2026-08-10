@@ -1,3 +1,6 @@
+@import url('./sections/news.css');
+@import url('./sections/community.css');
+
 /* Github Code Highlighting. */
 @import "../../../node_modules/github-syntax-dark/lib/github-dark.css";
 
@@ -20,6 +23,10 @@
 @font-face {
     font-family: 'Ringbearer';
     src: url('../fonts/Ringbearer.ttf');
+}
+
+:root {
+    --landing-overlay-z: 900;
 }
 
 /*******************************************************************************
@@ -1513,6 +1520,41 @@ input:checked + .toggleSwitchSlider:before {
     column-gap: 5px;
 }
 
+/* Patreon access section. */
+#settingsPatreonAccessActions {
+    display: flex;
+    column-gap: 10px;
+    align-items: center;
+}
+#settingsPatreonAccessStatus {
+    display: flex;
+    align-items: center;
+    padding: 6px 0px 2px 0px;
+    column-gap: 8px;
+}
+#settingsPatreonAccessAvatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: none;
+}
+#settingsPatreonAccessStatusText {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+}
+#settingsPatreonAccessDesc {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+}
+#settingsPatreonAccessDesc.is-warning {
+    color: #e14112;
+}
+#settingsPatreonAccessDesc.is-warning a {
+    color: #ffb199;
+    text-decoration: underline;
+}
+
 /* Settings add account button styles. */
 .settingsAddAuthAccount {
     background: none;
@@ -1710,6 +1752,28 @@ input:checked + .toggleSwitchSlider:before {
     padding-bottom: 25px;
 }
 
+/* Gated access notice on mods tab. */
+#settingsAccessContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    padding: 10px 12px;
+    margin-bottom: 15px;
+}
+#settingsAccessActions {
+    display: flex;
+    align-items: center;
+    column-gap: 10px;
+}
+#settingsAccessText {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
 /* Main content containers for mod elements. */
 #settingsReqModsContent,
 #settingsOptModsContent,
@@ -1776,6 +1840,25 @@ input:checked + .toggleSwitchSlider:before {
 /* Set the status color of an enabled mod. */
 .settingsBaseMod[enabled] > .settingsModContent > .settingsModMainWrapper > .settingsModStatus {
     background-color: rgb(165, 195, 37);
+}
+
+/* Locked mods (gated access). */
+.settingsBaseMod[locked] > .settingsModContent {
+    opacity: 0.55;
+}
+.settingsBaseMod[locked] > .settingsModContent > .settingsModMainWrapper > .settingsModStatus {
+    background-color: #e14112;
+}
+.settingsBaseMod[locked] .toggleSwitch {
+    filter: grayscale(60%) brightness(60%);
+    pointer-events: none;
+}
+.settingsModAccessBadge {
+    margin-top: 4px;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #e14112;
 }
 
 /* Add opacity to submods of a disabled mod. */
@@ -2471,6 +2554,8 @@ input:checked + .toggleSwitchSlider:before {
     display: inline-flex;
     width: 70%;
     height: 100%;
+    justify-content: center;
+    align-items: flex-start;
 }
 #landingContainer > #upper > #right {
     display: inline-flex;
@@ -2513,7 +2598,11 @@ input:checked + .toggleSwitchSlider:before {
     position: relative;
     z-index: 500;
     transition: top 2s ease;
-    top: 10px;
+    top: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
 }
 #landingContainer > #lower > #right {
     position: relative;
@@ -2524,323 +2613,15 @@ input:checked + .toggleSwitchSlider:before {
     display: inline-flex;
 }
 
-/*******************************************************************************
- *                                                                             *
- * Landing View (News Styles)                                                  *
- *                                                                             *
- ******************************************************************************/
-
-/* Main container. */
-#newsContainer {
-    position: absolute;
-    top: 100%;
-    height: 100%;
-    width: 100%;
-    transition: top 2s ease;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-}
-
-/* News content container. */
-#newsContent {
-    height: 82vh;
-    width: 100%;
-    display: flex;
-    -webkit-user-select: initial;
-    position: relative;
-}
-
-/* Drop shadow displayed when content is scrolled out of view. */
-#newsContent:before {
-    content: '';
-    background: linear-gradient(rgba(0, 0, 0, 0.25), transparent);
-    width: 100%;
-    height: 5px;
-    position: absolute;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-}
-#newsContent[scrolled]:before {
-    opacity: 1;
-}
-
-/* News article status container (left). */
-#newsStatusContainer {
-    width: calc(30% - 60px);
-    height: calc(100% - 30px);
-    padding: 15px 15px 15px 45px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
-}
-
-/* News status content. */
-#newsStatusContent {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-}
-
-/* News title wrapper. */
-#newsTitleContainer {
-    display: flex;
-    max-width: 90%;
-}
-
-/* News article title styles. */
-#newsArticleTitle {
-    font-size: 18px;
-    font-weight: bold;
-    font-family: 'Avenir Medium';
-    color: white;
-    text-decoration: none;
-    transition: 0.25s ease;
-    outline: none;
-    text-align: right;
-}
-#newsArticleTitle:hover,
-#newsArticleTitle:focus {
-    text-shadow: 0px 0px 20px white;
-}
-#newsArticleTitle:active {
-    color: #c7c7c7;
-    text-shadow: 0px 0px 20px #c7c7c7;
-}
-
-/* News meta container. */
-#newsMetaContainer {
-    display: flex;
-    flex-direction: column;
-}
-
-/* Date and author wrappers. */
-#newsArticleDateWrapper,
-#newsArticleAuthorWrapper {
-    display: flex;
-    justify-content: flex-end;
-}
-
-/* Date and author shared styles. */
-#newsArticleDate,
-#newsArticleAuthor {
-    display: inline-block;
-    font-size: 10px;
-    padding: 0px 5px;
-    font-weight: bold;
-    border-radius: 2px;
-}
-
-/* Date styles. */
-#newsArticleDate {
-    background: white;
-    color: black;
-    margin-top: 5px;
-}
-
-/* Author styles. */
-#newsArticleAuthor {
-    background: #a02d2a;
-}
-
-/* News article comments styles. */
-#newsArticleComments {
-    margin-top: 5px;
-    display: inline-block;
-    font-size: 10px;
-    color: #ffffff;
-    text-decoration: none;
-    transition: 0.25s ease;
-    outline: none;
-    text-align: right;
-}
-#newsArticleComments:focus,
-#newsArticleComments:hover {
-    color: #e0e0e0;
-}
-#newsArticleComments:active {
-    color: #c7c7c7;
-}
-
-/* Article content container (right). */
-#newsArticleContainer {
-    width: calc(100% - 25px);
-    height: 100%;
-    margin: 0px 0px 0px 25px;
-}
-
-/* Article content styles. */
-#newsArticleContentScrollable {
-    font-size: 12px;
-    overflow-y: scroll;
-    height: 100%;
-    padding: 0px 15px 0px 15px;
-}
-#newsArticleContentScrollable img,
-#newsArticleContentScrollable iframe {
-    max-width: 95%;
-    display: block;
-    margin: 0 auto;
-}
-#newsArticleContentScrollable a {
-    color: rgba(202, 202, 202, 0.75);
-    transition: 0.25s ease;
-    outline: none;
-}
-#newsArticleContentScrollable a:hover,
-#newsArticleContentScrollable a:focus {
-    color: rgba(255, 255, 255, 0.75);
-}
-#newsArticleContentScrollable a:active {
-    color: rgba(165, 165, 165, 0.75);
-}
-#newsArticleContentScrollable::-webkit-scrollbar {
-    width: 2px;
-}
-#newsArticleContentScrollable::-webkit-scrollbar-track {
-    display: none;
-}
-#newsArticleContentScrollable::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.50);
-}
-.bbCodeSpoilerButton {
-    background: none;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    font-size: 16px;
-    transition: 0.25s ease;
-    width: 100%;
-    border-bottom: 1px solid white;
-    padding-bottom: 15px;
-}
-.bbCodeSpoilerButton:hover,
-.bbCodeSpoilerButton:focus {
-    text-shadow: 0px 0px 20px #ffffff, 0px 0px 20px #ffffff, 0px 0px 20px #ffffff;
-}
-.bbCodeSpoilerButton:active {
-    color: #c7c7c7;
-    text-shadow: 0px 0px 20px #c7c7c7, 0px 0px 20px #c7c7c7, 0px 0px 20px #c7c7c7;
-}
-.bbCodeSpoilerText {
-    display: none;
-    padding: 15px 0px;
-    border-bottom: 1px solid white;
+#landingContainer[data-overlay="news"] > #upper,
+#landingContainer[data-overlay="news"] > #lower,
+#landingContainer[data-overlay="schematics"] > #upper {
+    pointer-events: none;
 }
 
 
-#newsArticleContentWrapper {
-    width: 80%;
-}
-
-.newsArticleSpacerTop {
-    height: 15px;
-}
-
-/* Div to add spacing at the end of a news article. */
-.newsArticleSpacerBot {
-    height: 30px;
-}
-
-/* News navigation container. */
-#newsNavigationContainer {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 10px;
-    -webkit-user-select: none;
-    position: absolute;
-    bottom: 15px;
-    right: 0px;
-}
-
-/* Navigation status span. */
-#newsNavigationStatus {
-    font-size: 12px;
-    margin: 0px 15px;
-}
-
-/* Left and right navigation button styles. */
-#newsNavigateLeft,
-#newsNavigateRight {
-    background: none;
-    border: none;
-    outline: none;
-    height: 20px;
-    cursor: pointer;
-}
-#newsNavigateLeft:hover #newsNavigationLeftSVG,
-#newsNavigateLeft:focus #newsNavigationLeftSVG,
-#newsNavigateRight:hover #newsNavigationRightSVG,
-#newsNavigateRight:focus #newsNavigationRightSVG {
-    -webkit-filter: drop-shadow(0px 0px 2px #fff);
-}
-#newsNavigateLeft:active #newsNavigationLeftSVG .arrowLine,
-#newsNavigateRight:active #newsNavigationRightSVG .arrowLine {
-    stroke: #c7c7c7;
-}
-#newsNavigateLeft:active #newsNavigationLeftSVG,
-#newsNavigateRight:active #newsNavigationRightSVG {
-    -webkit-filter: drop-shadow(0px 0px 2px #c7c7c7);
-}
-#newsNavigateLeft:disabled #newsNavigationLeftSVG .arrowLine,
-#newsNavigateRight:disabled #newsNavigationRightSVG .arrowLine {
-    stroke: rgba(255, 255, 255, 0.75);
-}
-#newsNavigationLeftSVG {
-    transform: rotate(-90deg);
-    width: 15px;
-}
-#newsNavigationRightSVG {
-    transform: rotate(90deg);
-    width: 15px;
-}
-
-/* News error (message) container. */
-#newsErrorContainer {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    flex-direction: column;
-    justify-content: center;
-}
-#newsErrorFailed {
-    display: flex;
-    align-items: center;
-    flex-direction: column;
-    justify-content: center;
-}
-
-/* News error content (message). */
-.newsErrorContent {
-    font-size: 20px;
-}
-#newsErrorLoading {
-    display: flex;
-    width: 168.92px;
-}
-#nELoadSpan {
-    white-space: pre;
-}
-/* News error retry button styles. */
-#newsErrorRetry {
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    background: none;
-    border: none;
-    outline: none;
-    transition: 0.25s ease;
-}
-#newsErrorRetry:focus,
-#newsErrorRetry:hover {
-    text-shadow: 0px 0px 20px white;
-}
-#newsErrorRetry:active {
-    color: #c7c7c7;
-    text-shadow: 0px 0px 20px #c7c7c7;
+#landingContainer[data-overlay="schematics"] > #lower > #center #content {
+    z-index: calc(var(--landing-overlay-z) + 1);
 }
 
 /*******************************************************************************
@@ -3173,6 +2954,40 @@ input:checked + .toggleSwitchSlider:before {
     fill: #657ac4;
 }
 
+/* Patreon button under Discord. */
+#patreonContainer {
+    margin-top: 6px;
+}
+.mediaPatreonButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0px;
+    border: none;
+    text-decoration: none;
+    background: none;
+    color: #ffffff;
+    transition: 0.25s ease;
+    outline: none;
+}
+.patreonSVG {
+    width: 25px;
+    height: 12px;
+    fill: currentColor;
+    flex-shrink: 0;
+    transition: 0.25s ease;
+}
+.mediaPatreonButton:hover,
+.mediaPatreonButton:focus {
+    outline: none;
+    color: #e14112;
+}
+.mediaPatreonButton:hover .patreonSVG,
+.mediaPatreonButton:focus .patreonSVG,
+.mediaPatreonButton:active .patreonSVG {
+    height: 20px;
+}
+
 /*******************************************************************************
  *                                                                             *
  * Landing View (Bottom Styles)                                                *
@@ -3322,33 +3137,71 @@ input:checked + .toggleSwitchSlider:before {
 * Landing View (Bottom Styles) | Center Content
 * * */
 
-/* Button which opens the news view. */
-#newsButton {
+/* Top action container for the news button. */
+#topActions {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    z-index: calc(var(--landing-overlay-z) + 1);
+    transition: top 2s ease;
+    pointer-events: none;
+}
+
+#topActions > * {
+    pointer-events: auto;
+}
+
+/* Button which opens the news or schematics view. */
+#newsButton,
+#schematicsButton {
     background: none;
     border: none;
     cursor: pointer;
     outline: none;
+    position: relative;
+}
+#newsButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
 }
 #newsButton:hover #newsButtonText,
-#newsButton:focus #newsButtonText {
+#newsButton:focus #newsButtonText,
+#schematicsButton:hover #schematicsButtonText,
+#schematicsButton:focus #schematicsButtonText {
     text-shadow: 0px 0px 20px #fff, 0px 0px 20px #fff;
 }
-#newsButton:active {
+#newsButton:active,
+#schematicsButton:active {
     color: #c7c7c7;
     text-shadow: 0px 0px 20px #c7c7c7, 0px 0px 20px #c7c7c7;
 }
 
 #newsButton:hover #newsButtonSVG,
-#newsButton:focus #newsButtonSVG {
+#newsButton:focus #newsButtonSVG,
+#schematicsButton:hover #schematicsButtonSVG,
+#schematicsButton:focus #schematicsButtonSVG {
     -webkit-filter: drop-shadow(0px 0px 2px #fff);
 }
 #newsButton:active #newsButtonSVG .arrowLine {
+    stroke: #c7c7c7;
+}
+#schematicsButton:active #schematicsButtonSVG .schematicTile {
     stroke: #c7c7c7;
 }
 #newsButton:active #newsButtonSVG {
     -webkit-filter: drop-shadow(0px 0px 2px #c7c7c7);
 }
 #newsButton:disabled #newsButtonSVG .arrowLine {
+    stroke: rgba(255, 255, 255, 0.75);
+}
+#schematicsButton:disabled #schematicsButtonSVG .schematicTile {
     stroke: rgba(255, 255, 255, 0.75);
 }
 
@@ -3366,20 +3219,36 @@ input:checked + .toggleSwitchSlider:before {
 /* Arrow image which floats above the news button. */
 #newsButtonSVG {
     height: 11px;
-    margin-left: -2px;
+    margin-left: 0px;
+    transition: 0.25s ease;
+    transform: rotate(180deg);
+}
+
+/* Grid icon which floats above the schematics button. */
+#schematicsButtonSVG {
+    height: 11px;
+    margin-left: -1px;
     transition: 0.25s ease;
 }
 
-/* Span which contains the news button text. */
-#newsButtonText {
+/* Span which contains the news or schematics button text. */
+#newsButtonText,
+#schematicsButtonText {
     color: white;
     font-weight: 900;
     letter-spacing: 2px;
     text-shadow: 0px 0px 0px #bebcbb;
     font-size: 11px;
-    line-height: 30px;
     display: flex;
     transition: 0.25s ease;
+}
+
+#newsButtonText {
+    line-height: 14px;
+}
+
+#schematicsButtonText {
+    line-height: 30px;
 }
 
 /* * *
@@ -3692,6 +3561,14 @@ input:checked + .toggleSwitchSlider:before {
     cursor: default;
     opacity: 1.0;
 }
+.serverListing[locked] {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.serverListing[locked]:hover,
+.serverListing[locked]:focus {
+    opacity: 0.35;
+}
 .serverListing:hover,
 .serverListing:focus {
     outline: none;
@@ -3802,6 +3679,13 @@ input:checked + .toggleSwitchSlider:before {
     font-size: 10px;
     line-height: 12px;
     padding: 0px 5px;
+}
+.serverListingRequirement {
+    color: #e14112;
+    font-size: 10px;
+    line-height: 12px;
+    padding: 0px 5px;
+    font-weight: bold;
 }
 
 /* Star which indicates the default (main) server. */

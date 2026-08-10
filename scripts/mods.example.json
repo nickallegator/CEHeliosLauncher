@@ -1,0 +1,39 @@
+﻿{
+  "mods": [
+    {
+      "name": "Cobblemon 1.7.2",
+      "projectId": "cobblemon-687131",
+      "fileId": "7521670",
+      "type": "ForgeMod",
+      "source": "cursemaven",
+      "access": {
+        "provider": "patreon",
+        "entitlement": "dev",
+        "label": "Patreon Required"
+      }
+    },
+    {
+      "name": "Kotlin for Forge 6.1.0 (NeoForge)",
+      "projectId": "kotlin-for-forge-351264",
+      "fileId": "7471238",
+      "type": "ForgeMod",
+      "source": "cursemaven"
+    },
+    {
+      "name": "Fabric API (example, Modrinth)",
+      "versionId": "H7eL6V8k",
+      "type": "FabricMod",
+      "source": "modrinth"
+    },
+    {
+      "name": "Example Maven Mod",
+      "group": "org.example",
+      "artifact": "example-mod",
+      "version": "1.2.3",
+      "classifier": "universal",
+      "extension": "jar",
+      "type": "ForgeMod",
+      "source": "maven"
+    }
+  ]
+}

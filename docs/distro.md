@@ -74,6 +74,27 @@ Global settings for [Discord Rich Presence](https://discordapp.com/developers/do
 
 A URL to a RSS feed. Used for loading news.
 
+### `DistroIndex.access: AccessConfig`
+
+**OPTIONAL**
+
+Config for gated content providers. The launcher uses this to know where to start OAuth and where to request entitlements.
+
+**Example**
+```JSON
+{
+    "access": {
+        "apiBaseUrl": "https://api.example.com",
+        "authUrl": "https://api.example.com/auth/patreon/start",
+        "providers": {
+            "patreon": {
+                "campaignId": "1234567890"
+            }
+        }
+    }
+}
+```
+
 ---
 
 ## Server Object
@@ -337,6 +358,24 @@ Only applicable for modules of type:
 * `LiteMod`
 * `LiteLoader`
 
+### `Module.access: ModuleAccess`
+
+**OPTIONAL**
+
+If present, the module is gated behind an entitlement (ex: Patreon tier). The launcher will show a lock badge and skip downloading the file unless the user has the entitlement.
+
+**Example**
+```JSON
+{
+    "access": {
+        "provider": "patreon",
+        "entitlement": "dev",
+        "label": "Patreon Required",
+        "url": "https://patreon.com/YourPage"
+    }
+}
+```
+
 
 ### `Module.artifact: Artifact`
 
@@ -361,6 +400,7 @@ The resolved/provided paths are appended to a base path depending on the module'
 | ---- | ---- |
 | `ForgeHosted` | ({`commonDirectory`}/libraries/{`path` OR resolved}) |
 | `Fabric` | ({`commonDirectory`}/libraries/{`path` OR resolved}) |
+| `NeoForge` | ({`commonDirectory`}/libraries/{`path` OR resolved}) |
 | `LiteLoader` | ({`commonDirectory`}/libraries/{`path` OR resolved}) |
 | `Library` | ({`commonDirectory`}/libraries/{`path` OR resolved}) |
 | `ForgeMod` | ({`commonDirectory`}/modstore/{`path` OR resolved}) |
@@ -476,6 +516,39 @@ Ex.
 ```
 
 Fabric works similarly to Forge 1.13+.
+
+---
+
+### NeoForge
+
+The module type `NeoForge` represents the NeoForge mod loader. This type is intended for Minecraft 1.20.1+ (and 1.21.1+). It follows the same general launch pattern as Forge 1.13+ (ModLauncher). The module should point at the NeoForge installer or a hosted loader jar and must provide a `VersionManifest` submodule unless the launcher implements installer processing.
+
+Ex.
+
+```json
+{
+    "id": "net.neoforged:neoforge:21.1.0",
+    "name": "NeoForge 21.1.0",
+    "type": "NeoForge",
+    "artifact": {
+        "size": 1234567,
+        "MD5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "url": "https://example.com/maven/net/neoforged/neoforge/21.1.0/neoforge-21.1.0-installer.jar"
+    },
+    "subModules": [
+        {
+            "id": "1.21.1-neoforge-21.1.0",
+            "name": "NeoForge (version.json)",
+            "type": "VersionManifest",
+            "artifact": {
+                "size": 2345,
+                "MD5": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "url": "https://example.com/versions/1.21.1-neoforge-21.1.0/1.21.1-neoforge-21.1.0.json"
+            }
+        }
+    ]
+}
+```
 
 ---
 

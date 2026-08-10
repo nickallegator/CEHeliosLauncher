@@ -68,6 +68,27 @@
                     <!-- Mojang auth accounts populated here. -->
                 </div>
             </div>
+            <div class="settingsAuthAccountTypeContainer" id="settingsPatreonAccessContainer">
+                <div class="settingsAuthAccountTypeHeader">
+                    <div class="settingsAuthAccountTypeHeaderLeft">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 512 512">
+                            <path fill="#ff424d" d="M488.874 154.73c-.09-65.34-50.92-118.86-110.6-139.06-74.08-25.13-171.61-21.49-242.31 13.62-85.61 42.8-112.4 136.65-113.41 230.09-.83 76.88 6.42 279.5 114.13 281.0 80.1 1.08 92.02-108.32 129.03-160.97 26.38-37.48 60.37-48.1 102.18-59.06 71.9-18.85 120.87-78.95 120.78-165.62z"/>
+                        </svg>
+                        <span><%- lang('settings.patreonAccessTitle') %></span>
+                    </div>
+                    <div class="settingsAuthAccountTypeHeaderRight">
+                        <div id="settingsPatreonAccessActions">
+                            <button class="settingsAddAuthAccount" id="settingsPatreonConnectButton"><%- lang('settings.patreonAccessConnect') %></button>
+                            <button class="settingsAddAuthAccount" id="settingsPatreonDisconnectButton"><%- lang('settings.patreonAccessDisconnect') %></button>
+                        </div>
+                    </div>
+                </div>
+                <div id="settingsPatreonAccessStatus">
+                    <img id="settingsPatreonAccessAvatar" alt="" src="" />
+                    <span id="settingsPatreonAccessStatusText"><%- lang('settings.patreonAccessStatusUnknown') %></span>
+                </div>
+                <div id="settingsPatreonAccessDesc"><%- lang('settings.patreonAccessDesc') %></div>
+            </div>
         </div>
         <div id="settingsTabMinecraft" class="settingsTab" style="display: none;">
             <div class="settingsTabHeader">
@@ -130,6 +151,15 @@
                     <div class="settingsSwitchServerContent">
                         <button class="settingsSwitchServerButton"><%- lang('settings.switchServerButton') %></button>
                     </div>
+                </div>
+            </div>
+            <div id="settingsAccessContainer" style="display: none;">
+                <div id="settingsAccessContent">
+                    <span id="settingsAccessText"><%- lang('settings.accessRequiredNotice') %></span>
+                </div>
+                <div id="settingsAccessActions">
+                    <button class="settingsAddAuthAccount" id="settingsAccessConnectButton"><%- lang('settings.accessConnectButton') %></button>
+                    <button class="settingsAddAuthAccount" id="settingsAccessPasteButton"><%- lang('settings.accessPasteTokenButton') %></button>
                 </div>
             </div>
             <div id="settingsModsContainer">
@@ -389,5 +419,4 @@
             </div>
         </div>
     </div>
-    <script src="./assets/js/scripts/settings.js"></script>
 </div>

@@ -1,0 +1,28 @@
+{
+  "name": "Farmer's Delight Kitchen Test",
+  "category": "test",
+  "icon": "farmersdelight:stove",
+  "blocks": [
+    { "pos": [0, 0, 0], "block": "minecraft:spruce_planks" },
+    { "pos": [1, 0, 0], "block": "minecraft:spruce_planks" },
+    { "pos": [2, 0, 0], "block": "minecraft:spruce_planks" },
+    { "pos": [3, 0, 0], "block": "minecraft:spruce_planks" },
+    { "pos": [0, 0, 1], "block": "minecraft:spruce_planks" },
+    { "pos": [1, 0, 1], "block": "minecraft:spruce_planks" },
+    { "pos": [2, 0, 1], "block": "minecraft:spruce_planks" },
+    { "pos": [3, 0, 1], "block": "minecraft:spruce_planks" },
+    { "pos": [0, 0, 2], "block": "minecraft:spruce_planks" },
+    { "pos": [1, 0, 2], "block": "minecraft:spruce_planks" },
+    { "pos": [2, 0, 2], "block": "minecraft:spruce_planks" },
+    { "pos": [3, 0, 2], "block": "minecraft:spruce_planks" },
+    { "pos": [0, 0, 3], "block": "minecraft:spruce_planks" },
+    { "pos": [1, 0, 3], "block": "minecraft:spruce_planks" },
+    { "pos": [2, 0, 3], "block": "minecraft:spruce_planks" },
+    { "pos": [3, 0, 3], "block": "minecraft:spruce_planks" },
+    { "pos": [1, 1, 1], "block": "farmersdelight:stove" },
+    { "pos": [2, 1, 1], "block": "farmersdelight:cooking_pot" },
+    { "pos": [1, 1, 2], "block": "farmersdelight:cutting_board" },
+    { "pos": [2, 1, 2], "block": "farmersdelight:skillet" },
+    { "pos": [0, 1, 0], "block": "minecraft:lantern" }
+  ]
+}

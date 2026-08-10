@@ -2,12 +2,13 @@ const fs   = require('fs-extra')
 const { LoggerUtil } = require('helios-core')
 const os   = require('os')
 const path = require('path')
+const { isTesterBuild } = require('./testerchannel')
 
 const logger = LoggerUtil.getLogger('ConfigManager')
 
 const sysRoot = process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + '/Library/Application Support' : process.env.HOME)
 
-const dataPath = path.join(sysRoot, '.helioslauncher')
+const dataPath = path.join(sysRoot, isTesterBuild() ? '.cobblepower-test-launcher' : '.helioslauncher')
 
 const launcherDir = require('@electron/remote').app.getPath('userData')
 
@@ -86,7 +87,10 @@ const DEFAULT_CONFIG = {
         },
         launcher: {
             allowPrerelease: false,
-            dataDirectory: dataPath
+            dataDirectory: dataPath,
+            schematics: {
+                autoDownloadModAssets: null
+            }
         }
     },
     newsCache: {
@@ -99,18 +103,75 @@ const DEFAULT_CONFIG = {
     selectedAccount: null,
     authenticationDatabase: {},
     modConfigurations: [],
-    javaConfig: {}
+    javaConfig: {},
+    access: {
+        sessionToken: null,
+        sessionExpiresAt: null,
+        entitlements: [],
+        lastSync: null,
+        channelGrant: {
+            channel: null,
+            releaseId: null,
+            authorizedAt: null
+        },
+        profile: {
+            displayName: null,
+            avatarUrl: null
+        }
+    }
 }
 
 let config = null
+let saveTimer = null
+let saveQueue = Promise.resolve()
+const CONFIG_SAVE_DEBOUNCE_MS = 180
 
 // Persistance Utility Functions
 
 /**
  * Save the current configuration to a file.
  */
-exports.save = function(){
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 4), 'UTF-8')
+function queueConfigWrite(snapshot){
+    saveQueue = saveQueue
+        .then(async () => {
+            await fs.ensureDir(path.dirname(configPath))
+            await fs.writeFile(configPath, snapshot, 'UTF-8')
+        })
+        .catch((err) => {
+            logger.error('Failed to save configuration.', err)
+        })
+}
+
+exports.save = function(options = {}){
+    if(config == null){
+        return
+    }
+    const immediate = Boolean(options?.immediate)
+    if(saveTimer){
+        clearTimeout(saveTimer)
+        saveTimer = null
+    }
+    const snapshot = JSON.stringify(config, null, 4)
+    if(immediate){
+        queueConfigWrite(snapshot)
+        return
+    }
+    saveTimer = setTimeout(() => {
+        saveTimer = null
+        queueConfigWrite(snapshot)
+    }, CONFIG_SAVE_DEBOUNCE_MS)
+}
+
+exports.flush = async function(){
+    if(config == null){
+        return
+    }
+    if(saveTimer){
+        clearTimeout(saveTimer)
+        saveTimer = null
+        queueConfigWrite(JSON.stringify(config, null, 4))
+    }
+    await saveQueue
 }
 
 /**
@@ -119,36 +180,36 @@ exports.save = function(){
  * be generated. Note that "resolved" values default to null and will
  * need to be externally assigned.
  */
-exports.load = function(){
+exports.load = async function(){
     let doLoad = true
 
-    if(!fs.existsSync(configPath)){
+    if(!await fs.pathExists(configPath)){
         // Create all parent directories.
-        fs.ensureDirSync(path.join(configPath, '..'))
-        if(fs.existsSync(configPathLEGACY)){
-            fs.moveSync(configPathLEGACY, configPath)
+        await fs.ensureDir(path.join(configPath, '..'))
+        if(await fs.pathExists(configPathLEGACY)){
+            await fs.move(configPathLEGACY, configPath)
         } else {
             doLoad = false
             config = DEFAULT_CONFIG
-            exports.save()
+            await fs.writeFile(configPath, JSON.stringify(config, null, 4), 'UTF-8')
         }
     }
     if(doLoad){
         let doValidate = false
         try {
-            config = JSON.parse(fs.readFileSync(configPath, 'UTF-8'))
+            config = JSON.parse(await fs.readFile(configPath, 'UTF-8'))
             doValidate = true
         } catch (err){
             logger.error(err)
             logger.info('Configuration file contains malformed JSON or is corrupt.')
             logger.info('Generating a new configuration file.')
-            fs.ensureDirSync(path.join(configPath, '..'))
+            await fs.ensureDir(path.join(configPath, '..'))
             config = DEFAULT_CONFIG
-            exports.save()
+            await fs.writeFile(configPath, JSON.stringify(config, null, 4), 'UTF-8')
         }
         if(doValidate){
             config = validateKeySet(DEFAULT_CONFIG, config)
-            exports.save()
+            await fs.writeFile(configPath, JSON.stringify(config, null, 4), 'UTF-8')
         }
     }
     logger.info('Successfully Loaded')
@@ -503,6 +564,98 @@ exports.setModConfiguration = function(serverid, configuration){
     cfgs.push(configuration)
 }
 
+/**
+ * Retrieve the access session token (backend-issued).
+ * 
+ * @returns {string | null} The session token.
+ */
+exports.getAccessSessionToken = function(){
+    return config.access.sessionToken
+}
+
+/**
+ * Set the access session token.
+ * 
+ * @param {string | null} token The new session token.
+ */
+exports.setAccessSessionToken = function(token){
+    config.access.sessionToken = token
+}
+
+exports.getAccessSessionExpiresAt = function(){
+    return config.access.sessionExpiresAt
+}
+
+exports.setAccessSessionExpiresAt = function(timestamp){
+    config.access.sessionExpiresAt = timestamp || null
+}
+
+/**
+ * Retrieve the access entitlements list.
+ * 
+ * @returns {Array.<string>} Array of entitlements.
+ */
+exports.getAccessEntitlements = function(){
+    return config.access.entitlements
+}
+
+/**
+ * Set the access entitlements list.
+ * 
+ * @param {Array.<string>} entitlements Array of entitlements.
+ */
+exports.setAccessEntitlements = function(entitlements){
+    config.access.entitlements = entitlements
+}
+
+/**
+ * Retrieve the last entitlement sync timestamp.
+ * 
+ * @returns {string | null} ISO timestamp.
+ */
+exports.getAccessLastSync = function(){
+    return config.access.lastSync
+}
+
+/**
+ * Set the last entitlement sync timestamp.
+ * 
+ * @param {string | null} timestamp ISO timestamp.
+ */
+exports.setAccessLastSync = function(timestamp){
+    config.access.lastSync = timestamp
+}
+
+exports.getAccessChannelGrant = function(){
+    return config.access.channelGrant
+}
+
+exports.setAccessChannelGrant = function(grant){
+    config.access.channelGrant = {
+        channel: grant?.channel || null,
+        releaseId: grant?.releaseId || null,
+        authorizedAt: grant?.authorizedAt || null
+    }
+}
+
+/**
+ * Retrieve the access profile data.
+ * 
+ * @returns {{displayName: string | null}} Profile object.
+ */
+exports.getAccessProfile = function(){
+    return config.access.profile
+}
+
+/**
+ * Set the access profile data.
+ * 
+ * @param {{displayName: string | null}} profile Profile object.
+ */
+exports.setAccessProfile = function(profile){
+    config.access.profile = profile
+}
+
 // User Configurable Settings
 
 // Java Settings
@@ -790,4 +943,36 @@ exports.getAllowPrerelease = function(def = false){
  */
 exports.setAllowPrerelease = function(allowPrerelease){
     config.settings.launcher.allowPrerelease = allowPrerelease
+}
+
+/**
+ * Check whether the launcher should auto-download mod assets for schematic previews.
+ * Returns null when the user has not been prompted yet.
+ *
+ * @param {boolean} def Optional. If true, the default value will be returned.
+ * @returns {boolean|null} Whether auto-download is enabled.
+ */
+exports.getSchematicsModAssetsAutoDownload = function(def = false){
+    if(def){
+        return DEFAULT_CONFIG.settings.launcher.schematics.autoDownloadModAssets
+    }
+    return config.settings.launcher.schematics?.autoDownloadModAssets ?? null
+}
+
+/**
+ * Set whether the launcher should auto-download mod assets for schematic previews.
+ *
+ * @param {boolean|null} value The new value.
+ */
+exports.setSchematicsModAssetsAutoDownload = function(value){
+    if(!config.settings.launcher.schematics){
+        config.settings.launcher.schematics = { autoDownloadModAssets: null }
+    }
+    if(value === true){
+        config.settings.launcher.schematics.autoDownloadModAssets = true
+    } else if(value === false){
+        config.settings.launcher.schematics.autoDownloadModAssets = false
+    } else {
+        config.settings.launcher.schematics.autoDownloadModAssets = null
+    }
 }

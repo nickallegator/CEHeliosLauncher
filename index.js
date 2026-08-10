@@ -6,12 +6,15 @@ const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
 const autoUpdater                       = require('electron-updater').autoUpdater
 const ejse                              = require('ejs-electron')
 const fs                                = require('fs')
+const http                              = require('http')
 const isDev                             = require('./app/assets/js/isdev')
 const path                              = require('path')
 const semver                            = require('semver')
 const { pathToFileURL }                 = require('url')
 const { AZURE_CLIENT_ID, MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR, SHELL_OPCODE } = require('./app/assets/js/ipcconstants')
 const LangLoader                        = require('./app/assets/js/langloader')
+const { MICROSOFT_AUTH_REDIRECT_URI, parseMicrosoftAuthRedirect } = require('./app/assets/js/microsoftauthredirect')
+const { isTesterBuild }                 = require('./app/assets/js/testerchannel')
 
 // Setup Lang
 LangLoader.setupLanguage()
@@ -52,6 +55,12 @@ function initAutoUpdater(event, data) {
 
 // Open channel to listen for update actions.
 ipcMain.on('autoUpdateAction', (event, arg, data) => {
+    if(isTesterBuild()){
+        if(arg === 'initAutoUpdater'){
+            event.sender.send('autoUpdateNotification', 'update-not-available')
+        }
+        return
+    }
     switch(arg){
         case 'initAutoUpdater':
             console.log('Initializing auto updater.')
@@ -84,9 +93,91 @@ ipcMain.on('autoUpdateAction', (event, arg, data) => {
             break
     }
 })
-// Redirect distribution index event from preloader to renderer.
+// Cache distribution results by renderer so a fast local preload cannot race
+// the page listener. The renderer explicitly announces when its listener is
+// ready and receives the latest result if the preload already completed.
+const distributionIndexResults = new Map()
+const distributionIndexCleanupAttached = new Set()
+
+function trackDistributionRenderer(sender) {
+    if(distributionIndexCleanupAttached.has(sender.id)){
+        return
+    }
+    distributionIndexCleanupAttached.add(sender.id)
+    sender.once('destroyed', () => {
+        distributionIndexResults.delete(sender.id)
+        distributionIndexCleanupAttached.delete(sender.id)
+    })
+}
+
 ipcMain.on('distributionIndexDone', (event, res) => {
+    trackDistributionRenderer(event.sender)
+    distributionIndexResults.set(event.sender.id, res)
+    if(process.env.HELIOS_DISTRO_DEV === '1'){
+        console.log('[Main] distributionIndexDone', res)
+    }
     event.sender.send('distributionIndexDone', res)
+})
+
+ipcMain.on('distributionIndexReady', (event) => {
+    trackDistributionRenderer(event.sender)
+    if(distributionIndexResults.has(event.sender.id)){
+        event.sender.send('distributionIndexDone', distributionIndexResults.get(event.sender.id))
+    }
+})
+
+ipcMain.on('rendererError', (_event, payload) => {
+    console.error('[Renderer]', payload?.kind || 'error', payload?.message || payload)
+    if(payload?.stack) {
+        console.error(payload.stack)
+    }
+})
+
+let patreonAuthServer = null
+let patreonAuthPort = null
+ipcMain.handle('patreon:startAuthServer', async () => {
+    if(patreonAuthServer != null) {
+        try {
+            patreonAuthServer.close()
+        } catch (_err) {
+            // ignore
+        }
+        patreonAuthServer = null
+        patreonAuthPort = null
+    }
+
+    return new Promise((resolve, reject) => {
+        patreonAuthServer = http.createServer((req, res) => {
+            const url = new URL(req.url, 'http://127.0.0.1')
+            const token = url.searchParams.get('token')
+            if(token) {
+                console.log('[Patreon] received token')
+                if(win && !win.isDestroyed()) {
+                    win.webContents.send('patreon:token', token)
+                }
+                res.writeHead(200, { 'Content-Type': 'text/html' })
+                res.end('<html><body><h1>Patreon linked.</h1>You can close this window.</body></html>')
+                patreonAuthServer.close()
+                patreonAuthServer = null
+                patreonAuthPort = null
+                return
+            }
+            res.writeHead(400, { 'Content-Type': 'text/plain' })
+            res.end('Missing token.')
+        })
+
+        patreonAuthServer.on('error', (err) => {
+            console.error('[Patreon] auth server error', err)
+            reject(err)
+        })
+
+        patreonAuthServer.listen(0, '127.0.0.1', () => {
+            const address = patreonAuthServer.address()
+            patreonAuthPort = address.port
+            console.log('[Patreon] auth server listening', `127.0.0.1:${patreonAuthPort}`)
+            resolve(`http://127.0.0.1:${patreonAuthPort}/patreon/callback?token={token}`)
+        })
+    })
 })
 
 // Handle trash item.
@@ -104,12 +195,10 @@ ipcMain.handle(SHELL_OPCODE.TRASH_ITEM, async (event, ...args) => {
     }
 })
 
-// Disable hardware acceleration.
-// https://electronjs.org/docs/tutorial/offscreen-rendering
-app.disableHardwareAcceleration()
+if(process.env.HELIOS_DISABLE_HARDWARE_ACCELERATION === '1'){
+    app.disableHardwareAcceleration()
+}
 
-
-const REDIRECT_URI_PREFIX = 'https://login.microsoftonline.com/common/oauth2/nativeclient?'
 
 // Microsoft Auth Login
 let msftAuthWindow
@@ -144,14 +233,8 @@ ipcMain.on(MSFT_OPCODE.OPEN_LOGIN, (ipcEvent, ...arguments_) => {
     })
 
     msftAuthWindow.webContents.on('did-navigate', (_, uri) => {
-        if (uri.startsWith(REDIRECT_URI_PREFIX)) {
-            let queries = uri.substring(REDIRECT_URI_PREFIX.length).split('#', 1).toString().split('&')
-            let queryMap = {}
-
-            queries.forEach(query => {
-                const [name, value] = query.split('=')
-                queryMap[name] = decodeURI(value)
-            })
+        const queryMap = parseMicrosoftAuthRedirect(uri)
+        if (queryMap != null) {
 
             ipcEvent.reply(MSFT_OPCODE.REPLY_LOGIN, MSFT_REPLY_TYPE.SUCCESS, queryMap, msftAuthViewSuccess)
 
@@ -162,7 +245,7 @@ ipcMain.on(MSFT_OPCODE.OPEN_LOGIN, (ipcEvent, ...arguments_) => {
     })
 
     msftAuthWindow.removeMenu()
-    msftAuthWindow.loadURL(`https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=select_account&client_id=${AZURE_CLIENT_ID}&response_type=code&scope=XboxLive.signin%20offline_access&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient`)
+    msftAuthWindow.loadURL(`https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=select_account&client_id=${AZURE_CLIENT_ID}&response_type=code&scope=XboxLive.signin%20offline_access&redirect_uri=${encodeURIComponent(MICROSOFT_AUTH_REDIRECT_URI)}`)
 })
 
 // Microsoft Auth Logout

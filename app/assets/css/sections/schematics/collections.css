@@ -1,0 +1,179 @@
+#schematicsSearchInput,
+#schematicsSortSelect,
+#schematicsCategorySelect,
+#schematicsCollectionsSearchInput,
+#schematicsCollectionsSortSelect {
+    position: relative;
+    z-index: 12;
+    pointer-events: auto;
+}
+#schematicsCollectionsControls {
+    gap: 12px 16px;
+    justify-content: flex-end;
+}
+#schematicsCollectionsBrowseList {
+    padding-top: 0;
+    padding-right: 6px;
+    padding-bottom: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 210px);
+    gap: 16px;
+    justify-content: flex-start;
+    align-content: start;
+    align-items: start;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+.schematicsCollectionsBrowseDetail {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+}
+.schematicsCollectionsBrowseDetail[hidden] {
+    display: none;
+}
+#schematicsCollectionsBrowseDetailPanel {
+    width: min(1240px, 96%);
+    max-height: 92vh;
+}
+#schematicsCollectionsBrowseDetailPanel .schematicsCollectionsDetailHeader {
+    padding: 20px 24px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    align-items: flex-start;
+}
+#schematicsCollectionsBrowseDetailMeta {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+}
+.schematicsCollectionsBrowseDetailBody {
+    flex: 1;
+    overflow: auto;
+    padding: 18px 24px 24px;
+    min-height: 0;
+}
+#schematicsCollectionsBrowseDetailPanel .schematicsCreatorGrid {
+    padding: 0;
+    overflow: visible;
+}
+#schematicsCollectionsBrowseDetailGrid {
+    padding: 0;
+}
+#schematicsCollectionsPanel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.25s ease;
+    z-index: 7;
+}
+#schematicsCollectionsPanel[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+}
+#schematicsCollectionsScrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 6, 10, 0.75);
+    cursor: pointer;
+}
+#schematicsCollectionsCard {
+    position: relative;
+    z-index: 1;
+    width: min(1320px, 98%);
+    max-height: 98%;
+    overflow: hidden;
+    background: rgba(9, 12, 16, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow: 0px 28px 60px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    transform: translateY(16px) scale(0.98);
+    transition: transform 0.25s ease;
+}
+#schematicsCollectionsPanel[data-open="true"] #schematicsCollectionsCard {
+    transform: translateY(0px) scale(1);
+}
+.schematicsCollectionsHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 20px 24px 0px;
+}
+.schematicsCollectionsHeading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.schematicsCollectionsEyebrow {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+#schematicsCollectionsTitle {
+    margin: 0;
+    font-family: 'Avenir Medium';
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+#schematicsCollectionsCount {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+}
+.schematicsCollectionsActions {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.schematicsCollectionsTabs {
+    display: flex;
+    gap: 8px;
+}
+.schematicsCollectionsList {
+    padding: 22px 28px 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    align-content: start;
+    align-items: start;
+    overflow-y: auto;
+}
+.schematicsCollectionsCreate {
+    padding: 18px 28px 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.schematicsCollectionsDetail {
+    padding: 12px 28px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.schematicsCollectionsDetailHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+.schematicsCollectionsDetailHeading h3 {
+    margin: 0;
+    font-size: 16px;
+    font-family: 'Avenir Medium';
+}
+.schematicsCollectionsDetailActions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}

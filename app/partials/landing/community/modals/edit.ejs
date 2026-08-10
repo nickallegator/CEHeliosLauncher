@@ -1,0 +1,84 @@
+<div id="schematicsEdit" class="schematicsModalRoot" aria-hidden="true">
+    <div id="schematicsEditScrim" class="schematicsModalScrim"></div>
+    <div id="schematicsEditPanel" class="schematicsModalPanel" role="dialog" aria-modal="true" aria-labelledby="schematicsEditTitle" tabindex="-1">
+        <div id="schematicsEditHeader">
+            <div id="schematicsEditHeading">
+                <div id="schematicsEditEyebrow">Creator Tools</div>
+                <h2 id="schematicsEditTitle">Edit Schematic</h2>
+                <div id="schematicsEditSubtitle">Update your schematic metadata and visibility settings.</div>
+            </div>
+            <div id="schematicsEditActions">
+                <button id="schematicsEditClose" type="button" class="schematicsDetailButton">Close</button>
+            </div>
+        </div>
+        <div id="schematicsEditBody">
+            <div id="schematicsEditMeta">
+                <div class="schematicsUploadSection">
+                    <div class="schematicsUploadSectionTitle">Details</div>
+                    <label class="schematicsUploadField">
+                        <span>Title</span>
+                        <input id="schematicsEditNameInput" type="text" maxlength="80" />
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Description</span>
+                        <textarea id="schematicsEditDescriptionInput" maxlength="800"></textarea>
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Tags</span>
+                        <input id="schematicsEditTagsInput" type="text" placeholder="castle, survival, redstone" />
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Visibility</span>
+                        <select id="schematicsEditVisibility">
+                            <option value="public">Public</option>
+                            <option value="unlisted">Unlisted</option>
+                            <option value="private">Private</option>
+                        </select>
+                    </label>
+                    <label class="schematicsUploadField">
+                        <span>Version</span>
+                        <input id="schematicsEditVersionInput" type="text" />
+                    </label>
+                    <div id="schematicsEditStatus">Ready to edit.</div>
+                    <div id="schematicsEditSubmitRow">
+                        <button id="schematicsEditSubmit" type="button" class="schematicsDetailButton primary">Save Changes</button>
+                        <button id="schematicsEditCancel" type="button" class="schematicsDetailButton">Cancel</button>
+                    </div>
+                </div>
+                <div class="schematicsUploadSection schematicsUploadPreviewSection">
+                    <div class="schematicsUploadSectionTitle">Preview</div>
+                    <div id="schematicsEditPreview">
+                        <img id="schematicsEditPreviewImage" alt="Schematic preview" hidden />
+                        <svg class="schematicsUploadPreviewIcon" viewBox="0 0 48 48" aria-hidden="true" focusable="false" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M24 6 8 14v20l16 8 16-8V14L24 6z"/>
+                            <path d="M8 14l16 8 16-8"/>
+                            <path d="M24 22v20"/>
+                        </svg>
+                    </div>
+                    <div class="schematicsUploadStats">
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Creator</span>
+                            <span id="schematicsEditCreatorValue" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Release</span>
+                            <span id="schematicsEditReleaseValue" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Downloads</span>
+                            <span id="schematicsEditDownloadsValue" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Likes</span>
+                            <span id="schematicsEditLikesValue" class="schematicsUploadStatValue">--</span>
+                        </div>
+                        <div class="schematicsUploadStat">
+                            <span class="schematicsUploadStatLabel">Views</span>
+                            <span id="schematicsEditViewsValue" class="schematicsUploadStatValue">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

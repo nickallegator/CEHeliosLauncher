@@ -1,0 +1,94 @@
+diff --git a/lib/dl/DownloadEngine.ts b/lib/dl/DownloadEngine.ts
+index bbbf42e..a2863e8 100644
+--- a/lib/dl/DownloadEngine.ts
++++ b/lib/dl/DownloadEngine.ts
+@@ -11,6 +11,15 @@ import { sleep } from '../util/NodeUtil'
+ 
+ const log = LoggerUtil.getLogger('DownloadEngine')
+ 
++function redactUrl(value: string): string {
++    try {
++        const parsed = new URL(value)
++        return `${parsed.origin}${parsed.pathname}${parsed.search ? '?[redacted]' : ''}`
++    } catch(_err) {
++        return '[invalid URL]'
++    }
++}
++
+ export function getExpectedDownloadSize(assets: Asset[]): number {
+     return assets.map(({ size }) => size).reduce((acc, v) => acc + v, 0)
+ }
+@@ -60,7 +69,7 @@ export async function downloadFile(url: string, path: string, onProgress?: (prog
+         rethrow = false
+ 
+         if(retryCount > 0) {
+-            log.debug(`Retry attempt #${retryCount} for ${url}.`)
++            log.debug(`Retry attempt #${retryCount} for ${redactUrl(url)}.`)
+         }
+ 
+         try {
+@@ -102,9 +111,9 @@ export async function downloadFile(url: string, path: string, onProgress?: (prog
+ 
+     if(rethrow && error) {
+         if(retryCount > MAX_RETRIES) {
+-            log.error(`Maximum retries attempted for ${url}. Rethrowing exception.`)
++            log.error(`Maximum retries attempted for ${redactUrl(url)}. Rethrowing exception.`)
+         } else {
+-            log.error(`Unknown or unretryable exception thrown during request to ${url}. Rethrowing exception.`)
++            log.error(`Unknown or unretryable exception thrown during request to ${redactUrl(url)}. Rethrowing exception.`)
+         }
+         
+         throw error
+diff --git a/lib/dl/neoforge/NeoForgeInstaller.ts b/lib/dl/neoforge/NeoForgeInstaller.ts
+index e532764..4312e69 100644
+--- a/lib/dl/neoforge/NeoForgeInstaller.ts
++++ b/lib/dl/neoforge/NeoForgeInstaller.ts
+@@ -131,15 +131,15 @@ export class NeoForgeInstaller {
+             proc.stdout.setEncoding('utf8')
+             proc.stderr.setEncoding('utf8')
+ 
+-            proc.stdout.on('data', data => {
+-                data.trim().split('\n').forEach(line => {
++            proc.stdout.on('data', (data: string) => {
++                data.trim().split('\n').forEach((line: string) => {
+                     if(line.length > 0){
+                         this.logger.debug(line)
+                     }
+                 })
+             })
+-            proc.stderr.on('data', data => {
+-                data.trim().split('\n').forEach(line => {
++            proc.stderr.on('data', (data: string) => {
++                data.trim().split('\n').forEach((line: string) => {
+                     if(line.length > 0){
+                         this.logger.warn(line)
+                     }
+diff --git a/lib/dl/receivers/FullRepairReceiver.ts b/lib/dl/receivers/FullRepairReceiver.ts
+index 5abf916..e78ee20 100644
+--- a/lib/dl/receivers/FullRepairReceiver.ts
++++ b/lib/dl/receivers/FullRepairReceiver.ts
+@@ -11,6 +11,15 @@ import { HTTPError, ParseError, ReadError, RequestError, TimeoutError } from 'go
+ 
+ const log = LoggerUtil.getLogger('FullRepairReceiver')
+ 
++function redactUrl(value: string): string {
++    try {
++        const parsed = new URL(value)
++        return `${parsed.origin}${parsed.pathname}${parsed.search ? '?[redacted]' : ''}`
++    } catch(_err) {
++        return '[invalid URL]'
++    }
++}
++
+ export type FullRepairTransmission = ValidateTransmission | DownloadTransmission
+ 
+ export interface ValidateTransmission {
+@@ -71,7 +80,7 @@ export class FullRepairReceiver implements Receiver {
+     public async parseError(error: unknown): Promise<string | undefined> {
+         if(error instanceof RequestError) {
+             if(error?.request?.requestUrl) {
+-                log.debug(`Error during request to ${error.request.requestUrl}`)
++                log.debug(`Error during request to ${redactUrl(String(error.request.requestUrl))}`)
+             }
+ 
+             if(error instanceof HTTPError) {

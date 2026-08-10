@@ -1,0 +1,51 @@
+{
+  "mods": [
+    {
+      "name": "Cobblemon",
+      "source": "cursemaven",
+      "namespace": "cobblemon",
+      "projectId": "cobblemon-687131",
+      "fileId": "7521670",
+      "type": "ForgeMod"
+    },
+    {
+      "name": "Farmer's Delight (Modrinth)",
+      "source": "modrinth",
+      "namespace": "farmersdelight",
+      "projectId": "farmers-delight",
+      "type": "ForgeMod"
+    },
+    {
+      "name": "Kotlin For Forge",
+      "source": "cursemaven",
+      "namespace": "kotlinforforge",
+      "projectId": "kotlin-for-forge-351264",
+      "fileId": "6994056",
+      "type": "ForgeMod"
+    },
+    {
+      "name": "JEI",
+      "source": "cursemaven",
+      "namespace": "jei",
+      "projectId": "jei-238222",
+      "fileId": "7420587",
+      "type": "ForgeMod"
+    },
+    {
+      "name": "Jade",
+      "source": "cursemaven",
+      "namespace": "jade",
+      "projectId": "jade-324717",
+      "fileId": "7428884",
+      "type": "ForgeMod"
+    },
+    {
+      "name": "GeckoLib 4",
+      "source": "cursemaven",
+      "namespace": "geckolib",
+      "projectId": "geckolib-388172",
+      "fileId": "7415496",
+      "type": "ForgeMod"
+    }
+  ]
+}

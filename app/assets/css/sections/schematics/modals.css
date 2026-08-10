@@ -1,0 +1,219 @@
+.schematicsModalRoot {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    z-index: 740;
+}
+.schematicsModalRoot[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+}
+.schematicsModalScrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 8, 12, 0.75);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+}
+.schematicsModalPanel {
+    position: relative;
+    z-index: 1;
+    background: rgba(16, 18, 24, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(24px);
+    transition: transform 0.35s ease;
+}
+.schematicsModalRoot[data-open="true"] .schematicsModalPanel {
+    transform: translateY(0);
+}
+
+.schematicsAdminPanel {
+    width: min(880px, 92vw);
+    max-height: min(90vh, 840px);
+}
+
+.schematicsAdminHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 24px 0;
+}
+
+.schematicsAdminHeading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.schematicsAdminEyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(196, 214, 255, 0.7);
+}
+
+.schematicsAdminSubtitle {
+    color: rgba(220, 232, 255, 0.7);
+    font-size: 13px;
+}
+
+.schematicsAdminBody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    padding: 16px 24px 24px;
+}
+
+.schematicsAdminForm {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.schematicsAdminRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.schematicsAdminField {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(214, 228, 255, 0.7);
+}
+
+.schematicsAdminField input {
+    background: rgba(9, 14, 26, 0.85);
+    border: 1px solid rgba(96, 120, 180, 0.35);
+    border-radius: 10px;
+    color: #f2f7ff;
+    padding: 8px 10px;
+}
+
+.schematicsAdminToggles {
+    display: grid;
+    gap: 8px;
+}
+
+.schematicsAdminToggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: rgba(220, 232, 255, 0.8);
+}
+
+.schematicsAdminToggle input {
+    accent-color: #5aa2ff;
+}
+
+.schematicsAdminFooter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.schematicsAdminStatus {
+    font-size: 12px;
+    color: rgba(220, 232, 255, 0.7);
+}
+
+.schematicsAdminStatus[data-tone="error"] {
+    color: #ff9d9d;
+}
+
+.schematicsAdminStatus[data-tone="success"] {
+    color: #8fffd0;
+}
+
+.schematicsAdminResults {
+    background: rgba(9, 14, 26, 0.45);
+    border-radius: 12px;
+    padding: 14px;
+    border: 1px solid rgba(96, 120, 180, 0.2);
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.schematicsAdminResultsHeader {
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(196, 214, 255, 0.7);
+    margin-bottom: 10px;
+}
+
+.schematicsAdminResultsList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.schematicsAdminResultCard {
+    background: rgba(8, 12, 22, 0.75);
+    border-radius: 10px;
+    padding: 12px;
+    border: 1px solid rgba(100, 130, 190, 0.2);
+}
+
+.schematicsAdminResultHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.schematicsAdminResultTitle {
+    font-size: 13px;
+    color: #f4f7ff;
+    word-break: break-all;
+}
+
+.schematicsAdminResultMeta {
+    font-size: 11px;
+    color: rgba(180, 200, 240, 0.7);
+}
+
+.schematicsAdminResultList {
+    display: grid;
+    gap: 6px;
+}
+
+.schematicsAdminResultRow {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(210, 225, 255, 0.8);
+}
+
+.schematicsAdminResultRow.empty {
+    color: rgba(210, 225, 255, 0.5);
+    font-style: italic;
+}
+
+.schematicsAdminResultEmpty {
+    font-size: 12px;
+    color: rgba(210, 225, 255, 0.6);
+}
+
+@media (max-width: 900px) {
+    .schematicsAdminBody {
+        grid-template-columns: 1fr;
+    }
+}

@@ -34,16 +34,16 @@ exports.validateDir = function(dir) {
  * @returns {{fullName: string, name: string, ext: string, disabled: boolean}[]}
  * An array of objects storing metadata about each discovered mod.
  */
-exports.scanForDropinMods = function(modsDir, version) {
+exports.scanForDropinMods = async function(modsDir, version) {
     const modsDiscovered = []
-    if(fs.existsSync(modsDir)){
-        let modCandidates = fs.readdirSync(modsDir)
+    if(await fs.pathExists(modsDir)){
+        const modCandidates = await fs.readdir(modsDir)
         let verCandidates = []
         const versionDir = path.join(modsDir, version)
-        if(fs.existsSync(versionDir)){
-            verCandidates = fs.readdirSync(versionDir)
+        if(await fs.pathExists(versionDir)){
+            verCandidates = await fs.readdir(versionDir)
         }
-        for(let file of modCandidates){
+        for(const file of modCandidates){
             const match = MOD_REGEX.exec(file)
             if(match != null){
                 modsDiscovered.push({
@@ -54,7 +54,7 @@ exports.scanForDropinMods = function(modsDir, version) {
                 })
             }
         }
-        for(let file of verCandidates){
+        for(const file of verCandidates){
             const match = MOD_REGEX.exec(file)
             if(match != null){
                 modsDiscovered.push({
@@ -152,15 +152,15 @@ exports.isDropinModEnabled = function(fullName){
  * @returns {{fullName: string, name: string}[]}
  * An array of objects storing metadata about each discovered shaderpack.
  */
-exports.scanForShaderpacks = function(instanceDir){
+exports.scanForShaderpacks = async function(instanceDir){
     const shaderDir = path.join(instanceDir, SHADER_DIR)
     const packsDiscovered = [{
         fullName: 'OFF',
         name: 'Off (Default)'
     }]
-    if(fs.existsSync(shaderDir)){
-        let modCandidates = fs.readdirSync(shaderDir)
-        for(let file of modCandidates){
+    if(await fs.pathExists(shaderDir)){
+        const modCandidates = await fs.readdir(shaderDir)
+        for(const file of modCandidates){
             const match = SHADER_REGEX.exec(file)
             if(match != null){
                 packsDiscovered.push({
@@ -181,12 +181,12 @@ exports.scanForShaderpacks = function(instanceDir){
  * 
  * @returns {string} The file name of the enabled shaderpack.
  */
-exports.getEnabledShaderpack = function(instanceDir){
-    exports.validateDir(instanceDir)
+exports.getEnabledShaderpack = async function(instanceDir){
+    await fs.ensureDir(instanceDir)
 
     const optionsShaders = path.join(instanceDir, SHADER_CONFIG)
-    if(fs.existsSync(optionsShaders)){
-        const buf = fs.readFileSync(optionsShaders, {encoding: 'utf-8'})
+    if(await fs.pathExists(optionsShaders)){
+        const buf = await fs.readFile(optionsShaders, {encoding: 'utf-8'})
         const match = SHADER_OPTION.exec(buf)
         if(match != null){
             return match[1]
@@ -203,18 +203,18 @@ exports.getEnabledShaderpack = function(instanceDir){
  * @param {string} instanceDir The path to the server instance directory.
  * @param {string} pack the file name of the shaderpack.
  */
-exports.setEnabledShaderpack = function(instanceDir, pack){
-    exports.validateDir(instanceDir)
+exports.setEnabledShaderpack = async function(instanceDir, pack){
+    await fs.ensureDir(instanceDir)
 
     const optionsShaders = path.join(instanceDir, SHADER_CONFIG)
     let buf
-    if(fs.existsSync(optionsShaders)){
-        buf = fs.readFileSync(optionsShaders, {encoding: 'utf-8'})
+    if(await fs.pathExists(optionsShaders)){
+        buf = await fs.readFile(optionsShaders, {encoding: 'utf-8'})
         buf = buf.replace(SHADER_OPTION, `shaderPack=${pack}`)
     } else {
         buf = `shaderPack=${pack}`
     }
-    fs.writeFileSync(optionsShaders, buf, {encoding: 'utf-8'})
+    await fs.writeFile(optionsShaders, buf, {encoding: 'utf-8'})
 }
 
 /**

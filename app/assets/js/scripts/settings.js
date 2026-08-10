@@ -3,6 +3,7 @@ const os     = require('os')
 const semver = require('semver')
 
 const DropinModUtil  = require('./assets/js/dropinmodutil')
+const AccessManager  = require('./assets/js/accessmanager')
 const { MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR } = require('./assets/js/ipcconstants')
 
 const settingsState = {
@@ -233,6 +234,7 @@ function saveSettingsValues(){
 }
 
 let selectedSettingsTab = 'settingsTabAccount'
+let settingsInitialized = false
 
 /**
  * Modify the settings container UI when the scroll threshold reaches
@@ -321,17 +323,21 @@ function settingsSaveDisabled(v){
     settingsNavDone.disabled = v
 }
 
-function fullSettingsSave() {
+async function fullSettingsSave() {
     saveSettingsValues()
     saveModConfiguration()
     ConfigManager.save()
     saveDropinModConfiguration()
-    saveShaderpackSettings()
+    try {
+        await saveShaderpackSettings()
+    } catch (err) {
+        console.warn('Failed to persist shaderpack selection.', err)
+    }
 }
 
 /* Closes the settings view and saves all data. */
-settingsNavDone.onclick = () => {
-    fullSettingsSave()
+settingsNavDone.onclick = async () => {
+    await fullSettingsSave()
     switchView(getCurrentView(), VIEWS.landing)
 }
 
@@ -414,8 +420,13 @@ ipcRenderer.on(MSFT_OPCODE.REPLY_LOGIN, (_, ...arguments_) => {
             msftLoginLogger.info('Acquired authCode, proceeding with authentication.')
 
             const authCode = queryMap.code
-            AuthManager.addMicrosoftAccount(authCode).then(value => {
+            AuthManager.addMicrosoftAccount(authCode).then(async value => {
                 updateSelectedAccount(value)
+                const ChannelManager = require('./assets/js/channelmanager')
+                if(ChannelManager.isRemoteChannel()) {
+                    await ChannelManager.refreshAuthorizedDistribution({ forceExchange: true, allowOffline: false })
+                    onDistroRefresh(await DistroAPI.getDistribution())
+                }
                 switchView(getCurrentView(), viewOnClose, 500, 500, async () => {
                     await prepareSettings()
                 })
@@ -620,6 +631,11 @@ function refreshAuthAccountSelected(uuid){
 
 const settingsCurrentMicrosoftAccounts = document.getElementById('settingsCurrentMicrosoftAccounts')
 const settingsCurrentMojangAccounts = document.getElementById('settingsCurrentMojangAccounts')
+const settingsPatreonAccessStatusText = document.getElementById('settingsPatreonAccessStatusText')
+const settingsPatreonAccessDesc = document.getElementById('settingsPatreonAccessDesc')
+const settingsPatreonConnectButton = document.getElementById('settingsPatreonConnectButton')
+const settingsPatreonDisconnectButton = document.getElementById('settingsPatreonDisconnectButton')
+let patreonTokenListenerBound = false
 
 /**
  * Add auth account elements for each one stored in the authentication database.
@@ -681,6 +697,177 @@ function prepareAccountsTab() {
     populateAuthAccounts()
     bindAuthAccountSelect()
     bindAuthAccountLogOut()
+    bindPatreonAccess()
+}
+
+function setPatreonStatus(textKey) {
+    if(settingsPatreonAccessStatusText != null) {
+        settingsPatreonAccessStatusText.innerHTML = Lang.queryJS(textKey)
+    }
+}
+
+function setPatreonStatusText(text) {
+    if(settingsPatreonAccessStatusText != null) {
+        if(text) {
+            settingsPatreonAccessStatusText.innerHTML = text
+            settingsPatreonAccessStatusText.style.display = 'inline'
+        } else {
+            settingsPatreonAccessStatusText.innerHTML = ''
+            settingsPatreonAccessStatusText.style.display = 'none'
+        }
+    }
+}
+
+function setPatreonAccessDesc(isSupporter) {
+    if(settingsPatreonAccessDesc != null) {
+        const key = isSupporter ? 'settings.patreonAccessDescSupporter' : 'settings.patreonAccessDescNonSupporter'
+        settingsPatreonAccessDesc.innerHTML = Lang.queryJS(key)
+    }
+}
+
+function setPatreonAccessWarning(linkUrl) {
+    if(settingsPatreonAccessDesc != null) {
+        const linkHtml = linkUrl
+            ? `<a href="${linkUrl}" target="_blank" rel="noreferrer">` +
+                `${Lang.queryJS('settings.patreonAccessJoinLink')}` +
+              '</a>'
+            : Lang.queryJS('settings.patreonAccessJoinLink')
+        settingsPatreonAccessDesc.innerHTML = Lang.queryJS('settings.patreonAccessDescNotSupporter', { link: linkHtml })
+        settingsPatreonAccessDesc.classList.add('is-warning')
+    }
+}
+
+function clearPatreonAccessWarning() {
+    if(settingsPatreonAccessDesc != null) {
+        settingsPatreonAccessDesc.classList.remove('is-warning')
+    }
+}
+
+function setPatreonAvatar(url) {
+    const img = document.getElementById('settingsPatreonAccessAvatar')
+    if(img != null) {
+        if(url) {
+            img.src = url
+            img.style.display = 'inline-block'
+        } else {
+            img.src = ''
+            img.style.display = 'none'
+        }
+    }
+}
+
+function updatePatreonButtons(isLinked) {
+    if(settingsPatreonConnectButton != null) {
+        settingsPatreonConnectButton.style.display = isLinked ? 'none' : 'inline-block'
+    }
+    if(settingsPatreonDisconnectButton != null) {
+        settingsPatreonDisconnectButton.style.display = isLinked ? 'inline-block' : 'none'
+    }
+}
+
+async function bindPatreonAccess() {
+    if(settingsPatreonConnectButton == null || settingsPatreonDisconnectButton == null) {
+        return
+    }
+
+    if(!patreonTokenListenerBound) {
+        patreonTokenListenerBound = true
+        ipcRenderer.on('patreon:token', async (_event, token) => {
+            if(token) {
+                console.log('[Patreon] received token')
+                ipcRenderer.send('rendererError', { kind: 'info', message: '[Patreon] token received in renderer' })
+                AccessManager.setSessionToken(token)
+                setPatreonStatus('settings.patreonAccessStatusLinked')
+                updatePatreonButtons(true)
+                try {
+                    await refreshPatreonStatus()
+                } finally {
+                    const isSupporter = AccessManager.hasAccess({ provider: 'patreon', entitlement: 'supporter' })
+                    const membershipUrl = AccessManager.getMembershipUrl(cachedAccessDistro)
+                    const profile = AccessManager.getProfile()
+                    ipcRenderer.send('rendererError', { kind: 'info', message: `[Patreon] status update profile=${profile?.displayName || 'null'}` })
+                    if(profile?.displayName) {
+                        setPatreonStatusText(`${Lang.queryJS('settings.patreonAccessUsernameLabel')}: ${profile.displayName}`)
+                        setPatreonAvatar(profile?.avatarUrl || null)
+                    } else {
+                        setPatreonStatus('settings.patreonAccessStatusLinked')
+                        setPatreonAvatar(profile?.avatarUrl || null)
+                    }
+                    clearPatreonAccessWarning()
+                    if(isSupporter) {
+                        setPatreonAccessDesc(true)
+                    } else {
+                        setPatreonAccessWarning(membershipUrl)
+                    }
+                }
+            }
+        })
+    }
+
+    settingsPatreonConnectButton.onclick = async () => {
+        const distro = await DistroAPI.getDistribution()
+        cachedAccessDistro = distro
+        const authUrl = AccessManager.getAuthUrl(distro)
+        if(!authUrl) {
+            window.alert('Patreon auth URL not configured.')
+            return
+        }
+
+        setPatreonStatus('settings.patreonAccessStatusSyncing')
+        const redirectUrl = await startPatreonAuthServer()
+        console.log('[Patreon] local redirect', redirectUrl)
+        const url = new URL(authUrl)
+        url.searchParams.set('redirect', redirectUrl)
+        shell.openExternal(url.toString())
+    }
+
+    settingsPatreonDisconnectButton.onclick = () => {
+        AccessManager.clearSessionToken()
+        AccessManager.setEntitlements([])
+        setPatreonStatusText('')
+        setPatreonAvatar(null)
+        clearPatreonAccessWarning()
+        setPatreonAccessDesc(false)
+        updatePatreonButtons(false)
+    }
+
+    await refreshPatreonStatus()
+}
+
+async function refreshPatreonStatus() {
+    const token = AccessManager.getSessionToken()
+    if(!token) {
+        setPatreonStatusText('')
+        setPatreonAvatar(null)
+        clearPatreonAccessWarning()
+        setPatreonAccessDesc(false)
+        updatePatreonButtons(false)
+        return
+    }
+    setPatreonStatus('settings.patreonAccessStatusSyncing')
+    const distro = cachedAccessDistro || await DistroAPI.getDistribution()
+    await AccessManager.refreshProfile(distro)
+    const isSupporter = AccessManager.hasAccess({ provider: 'patreon', entitlement: 'supporter' })
+    const membershipUrl = AccessManager.getMembershipUrl(distro)
+    const profile = AccessManager.getProfile()
+    if(profile?.displayName) {
+        setPatreonStatusText(`${Lang.queryJS('settings.patreonAccessUsernameLabel')}: ${profile.displayName}`)
+        setPatreonAvatar(profile?.avatarUrl || null)
+    } else {
+        setPatreonStatus('settings.patreonAccessStatusLinked')
+        setPatreonAvatar(profile?.avatarUrl || null)
+    }
+    clearPatreonAccessWarning()
+    if(isSupporter) {
+        setPatreonAccessDesc(true)
+    } else {
+        setPatreonAccessWarning(membershipUrl)
+    }
+    updatePatreonButtons(true)
+}
+
+function startPatreonAuthServer() {
+    return ipcRenderer.invoke('patreon:startAuthServer')
 }
 
 /**
@@ -706,6 +893,10 @@ document.getElementById('settingsGameHeight').addEventListener('keydown', (e) =>
  */
 
 const settingsModsContainer = document.getElementById('settingsModsContainer')
+const settingsAccessContainer = document.getElementById('settingsAccessContainer')
+const settingsAccessConnectButton = document.getElementById('settingsAccessConnectButton')
+const settingsAccessPasteButton = document.getElementById('settingsAccessPasteButton')
+let cachedAccessDistro = null
 
 /**
  * Resolve and update the mods on the UI.
@@ -714,12 +905,50 @@ async function resolveModsForUI(){
     const serv = ConfigManager.getSelectedServer()
 
     const distro = await DistroAPI.getDistribution()
+    cachedAccessDistro = distro
+    await AccessManager.refreshEntitlements(distro)
     const servConf = ConfigManager.getModConfiguration(serv)
 
     const modStr = parseModulesForUI(distro.getServerById(serv).modules, false, servConf.mods)
 
     document.getElementById('settingsReqModsContent').innerHTML = modStr.reqMods
     document.getElementById('settingsOptModsContent').innerHTML = modStr.optMods
+    updateAccessBanner(modStr.lockedCount, distro)
+}
+
+function updateAccessBanner(lockedCount, distro){
+    if(settingsAccessContainer == null || settingsAccessConnectButton == null){
+        return
+    }
+
+    if(lockedCount > 0){
+        settingsAccessContainer.style.display = 'flex'
+        const authUrl = AccessManager.getAuthUrl(distro)
+        if(authUrl){
+            settingsAccessConnectButton.disabled = false
+            settingsAccessConnectButton.onclick = () => {
+                shell.openExternal(authUrl)
+            }
+        } else {
+            settingsAccessConnectButton.disabled = true
+            settingsAccessConnectButton.onclick = null
+        }
+        if(settingsAccessPasteButton != null){
+            settingsAccessPasteButton.disabled = false
+            settingsAccessPasteButton.onclick = async () => {
+                const token = prompt(Lang.queryJS('settings.accessPasteTokenPrompt'))
+                if(token && token.trim()){
+                    AccessManager.setSessionToken(token.trim())
+                    if(cachedAccessDistro){
+                        await AccessManager.refreshEntitlements(cachedAccessDistro)
+                    }
+                    await resolveModsForUI()
+                }
+            }
+        }
+    } else {
+        settingsAccessContainer.style.display = 'none'
+    }
 }
 
 /**
@@ -729,57 +958,82 @@ async function resolveModsForUI(){
  * @param {boolean} submodules Whether or not we are parsing submodules.
  * @param {Object} servConf The server configuration object for this module level.
  */
-function parseModulesForUI(mdls, submodules, servConf){
+function parseModulesForUI(mdls, submodules, servConf, parentLocked = false){
 
     let reqMods = ''
     let optMods = ''
+    let lockedCount = 0
 
     for(const mdl of mdls){
 
         if(mdl.rawModule.type === Type.ForgeMod || mdl.rawModule.type === Type.LiteMod || mdl.rawModule.type === Type.LiteLoader || mdl.rawModule.type === Type.FabricMod){
 
+            const access = mdl.rawModule.access
+            const isLocked = parentLocked || (access != null && !AccessManager.hasAccess(access))
+            const lockAttr = isLocked ? 'locked' : ''
+            const lockBadge = isLocked ? `<span class="settingsModAccessBadge">${access?.label || Lang.queryJS('settings.accessBadgePatreon')}</span>` : ''
+            if(isLocked){
+                lockedCount++
+            }
+
             if(mdl.getRequired().value){
 
-                reqMods += `<div id="${mdl.getVersionlessMavenIdentifier()}" class="settingsBaseMod settings${submodules ? 'Sub' : ''}Mod" enabled>
+                let subMarkup = ''
+                if(mdl.subModules.length > 0){
+                    const subResult = parseModulesForUI(mdl.subModules, true, servConf?.[mdl.getVersionlessMavenIdentifier()], isLocked)
+                    subMarkup = subResult.reqMods + subResult.optMods
+                    lockedCount += subResult.lockedCount
+                }
+
+                reqMods += `<div id="${mdl.getVersionlessMavenIdentifier()}" class="settingsBaseMod settings${submodules ? 'Sub' : ''}Mod" ${lockAttr} enabled>
                     <div class="settingsModContent">
                         <div class="settingsModMainWrapper">
                             <div class="settingsModStatus"></div>
                             <div class="settingsModDetails">
                                 <span class="settingsModName">${mdl.rawModule.name}</span>
                                 <span class="settingsModVersion">v${mdl.mavenComponents.version}</span>
+                                ${lockBadge}
                             </div>
                         </div>
                         <label class="toggleSwitch" reqmod>
-                            <input type="checkbox" checked>
+                            <input type="checkbox" checked ${isLocked ? 'disabled data-locked="true"' : ''}>
                             <span class="toggleSwitchSlider"></span>
                         </label>
                     </div>
                     ${mdl.subModules.length > 0 ? `<div class="settingsSubModContainer">
-                        ${Object.values(parseModulesForUI(mdl.subModules, true, servConf[mdl.getVersionlessMavenIdentifier()])).join('')}
+                        ${subMarkup}
                     </div>` : ''}
                 </div>`
 
             } else {
 
-                const conf = servConf[mdl.getVersionlessMavenIdentifier()]
+                const conf = servConf?.[mdl.getVersionlessMavenIdentifier()]
                 const val = typeof conf === 'object' ? conf.value : conf
 
-                optMods += `<div id="${mdl.getVersionlessMavenIdentifier()}" class="settingsBaseMod settings${submodules ? 'Sub' : ''}Mod" ${val ? 'enabled' : ''}>
+                let subMarkup = ''
+                if(mdl.subModules.length > 0){
+                    const subResult = parseModulesForUI(mdl.subModules, true, conf?.mods, isLocked)
+                    subMarkup = subResult.reqMods + subResult.optMods
+                    lockedCount += subResult.lockedCount
+                }
+
+                optMods += `<div id="${mdl.getVersionlessMavenIdentifier()}" class="settingsBaseMod settings${submodules ? 'Sub' : ''}Mod" ${lockAttr} ${val ? 'enabled' : ''}>
                     <div class="settingsModContent">
                         <div class="settingsModMainWrapper">
                             <div class="settingsModStatus"></div>
                             <div class="settingsModDetails">
                                 <span class="settingsModName">${mdl.rawModule.name}</span>
                                 <span class="settingsModVersion">v${mdl.mavenComponents.version}</span>
+                                ${lockBadge}
                             </div>
                         </div>
                         <label class="toggleSwitch">
-                            <input type="checkbox" formod="${mdl.getVersionlessMavenIdentifier()}" ${val ? 'checked' : ''}>
+                            <input type="checkbox" formod="${mdl.getVersionlessMavenIdentifier()}" ${val ? 'checked' : ''} ${isLocked ? 'disabled data-locked="true"' : ''}>
                             <span class="toggleSwitchSlider"></span>
                         </label>
                     </div>
                     ${mdl.subModules.length > 0 ? `<div class="settingsSubModContainer">
-                        ${Object.values(parseModulesForUI(mdl.subModules, true, conf.mods)).join('')}
+                        ${subMarkup}
                     </div>` : ''}
                 </div>`
 
@@ -789,7 +1043,8 @@ function parseModulesForUI(mdls, submodules, servConf){
 
     return {
         reqMods,
-        optMods
+        optMods,
+        lockedCount
     }
 
 }
@@ -830,7 +1085,7 @@ function saveModConfiguration(){
 function _saveModConfiguration(modConf){
     for(let m of Object.entries(modConf)){
         const tSwitch = settingsModsContainer.querySelectorAll(`[formod='${m[0]}']`)
-        if(!tSwitch[0].hasAttribute('dropin')){
+        if(!tSwitch[0].hasAttribute('dropin') && !tSwitch[0].hasAttribute('data-locked')){
             if(typeof m[1] === 'boolean'){
                 modConf[m[0]] = tSwitch[0].checked
             } else {
@@ -858,7 +1113,7 @@ let CACHE_DROPIN_MODS
 async function resolveDropinModsForUI(){
     const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
     CACHE_SETTINGS_MODS_DIR = path.join(ConfigManager.getInstanceDirectory(), serv.rawServer.id, 'mods')
-    CACHE_DROPIN_MODS = DropinModUtil.scanForDropinMods(CACHE_SETTINGS_MODS_DIR, serv.rawServer.minecraftVersion)
+    CACHE_DROPIN_MODS = await DropinModUtil.scanForDropinMods(CACHE_SETTINGS_MODS_DIR, serv.rawServer.minecraftVersion)
 
     let dropinMods = ''
 
@@ -972,7 +1227,7 @@ document.addEventListener('keydown', async (e) => {
     if(getCurrentView() === VIEWS.settings && selectedSettingsTab === 'settingsTabMods'){
         if(e.key === 'F5'){
             await reloadDropinMods()
-            saveShaderpackSettings()
+            await saveShaderpackSettings()
             await resolveShaderpacksForUI()
         }
     }
@@ -997,8 +1252,8 @@ let CACHE_SELECTED_SHADERPACK
 async function resolveShaderpacksForUI(){
     const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
     CACHE_SETTINGS_INSTANCE_DIR = path.join(ConfigManager.getInstanceDirectory(), serv.rawServer.id)
-    CACHE_SHADERPACKS = DropinModUtil.scanForShaderpacks(CACHE_SETTINGS_INSTANCE_DIR)
-    CACHE_SELECTED_SHADERPACK = DropinModUtil.getEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR)
+    CACHE_SHADERPACKS = await DropinModUtil.scanForShaderpacks(CACHE_SETTINGS_INSTANCE_DIR)
+    CACHE_SELECTED_SHADERPACK = await DropinModUtil.getEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR)
 
     setShadersOptions(CACHE_SHADERPACKS, CACHE_SELECTED_SHADERPACK)
 }
@@ -1026,14 +1281,14 @@ function setShadersOptions(arr, selected){
     }
 }
 
-function saveShaderpackSettings(){
+async function saveShaderpackSettings(){
     let sel = 'OFF'
     for(let opt of document.getElementById('settingsShadersOptions').childNodes){
         if(opt.hasAttribute('selected')){
             sel = opt.getAttribute('value')
         }
     }
-    DropinModUtil.setEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR, sel)
+    await DropinModUtil.setEnabledShaderpack(CACHE_SETTINGS_INSTANCE_DIR, sel)
 }
 
 function bindShaderpackButton() {
@@ -1060,7 +1315,7 @@ function bindShaderpackButton() {
         e.preventDefault()
 
         DropinModUtil.addShaderpacks(e.dataTransfer.files, CACHE_SETTINGS_INSTANCE_DIR)
-        saveShaderpackSettings()
+        await saveShaderpackSettings()
         await resolveShaderpacksForUI()
     }
 }
@@ -1337,6 +1592,10 @@ function populateMemoryStatus(){
  */
 async function populateJavaExecDetails(execPath){
     const server = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
+    if(server == null) {
+        settingsJavaExecDetails.innerHTML = Lang.queryJS('settings.java.invalidSelection')
+        return
+    }
 
     const details = await validateSelectedJvm(ensureJavaDirIsRoot(execPath), server.effectiveJavaOptions.supported)
 
@@ -1385,6 +1644,12 @@ function bindMinMaxRam(server) {
  */
 async function prepareJavaTab(){
     const server = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
+    if(server == null) {
+        populateMemoryStatus()
+        settingsJavaReqDesc.innerHTML = Lang.queryJS('settings.java.invalidSelection')
+        settingsJvmOptsLink.innerHTML = ''
+        return
+    }
     bindMinMaxRam(server)
     bindRangeSlider(server)
     populateMemoryStatus()
@@ -1566,11 +1831,13 @@ function prepareUpdateTab(data = null){
   * @param {boolean} first Whether or not it is the first load.
   */
 async function prepareSettings(first = false) {
-    if(first){
+    if(!settingsInitialized){
         setupSettingsTabs()
         initSettingsValidators()
         prepareUpdateTab()
-    } else {
+        settingsInitialized = true
+    }
+    if(!first){
         await prepareModsTab()
     }
     await initSettingsValues()
