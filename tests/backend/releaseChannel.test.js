@@ -15,7 +15,7 @@ const {
     validateObjectKey
 } = require('../../backend/src/services/releaseStorage')
 const { normalizeMinecraftUuid } = require('../../backend/src/services/store')
-const { buildMinecraftEntitlements } = require('../../backend/src/routes/minecraftAuth')
+const { buildMinecraftEntitlements, resolveMinecraftEntitlements } = require('../../backend/src/routes/minecraftAuth')
 const { injectSchematicsService } = require('../../backend/src/routes/releases')
 
 test('Minecraft UUIDs normalize consistently and reject invalid identities', () => {
@@ -26,6 +26,25 @@ test('Minecraft UUIDs normalize consistently and reject invalid identities', () 
 test('Minecraft authentication grants and revokes only the test-channel entitlement', () => {
     assert.deepEqual(buildMinecraftEntitlements(true), ['minecraft:player', 'cobblepower:test'])
     assert.deepEqual(buildMinecraftEntitlements(false), ['minecraft:player'])
+})
+
+test('Minecraft authentication preserves tester access in a schematic-only service', async () => {
+    const calls = []
+    const entitlements = await resolveMinecraftEntitlements('tester-uuid', {
+        requiredEntitlement: 'cobblepower:test',
+        store: {
+            isMinecraftTester: async uuid => {
+                calls.push(['tester', uuid])
+                return true
+            },
+            getMinecraftEntitlementGrants: async uuid => {
+                calls.push(['grants', uuid])
+                return ['schematics:admin']
+            }
+        }
+    })
+    assert.deepEqual(entitlements, ['minecraft:player', 'cobblepower:test', 'schematics:admin'])
+    assert.deepEqual(calls.sort(), [['grants', 'tester-uuid'], ['tester', 'tester-uuid']])
 })
 
 test('release pointer and R2 traversal validation rejects unsafe keys', () => {

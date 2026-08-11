@@ -47,6 +47,16 @@ function buildMinecraftEntitlements(activeTester, requiredEntitlement = config.r
     return Array.from(new Set([...values, ...grants].map(value => String(value).toLowerCase())))
 }
 
+async function resolveMinecraftEntitlements(providerUserId, dependencies = {}) {
+    const entitlementStore = dependencies.store || store
+    const requiredEntitlement = dependencies.requiredEntitlement || config.releases.requiredEntitlement
+    const [activeTester, grants] = await Promise.all([
+        entitlementStore.isMinecraftTester(providerUserId),
+        entitlementStore.getMinecraftEntitlementGrants(providerUserId)
+    ])
+    return buildMinecraftEntitlements(activeTester, requiredEntitlement, grants)
+}
+
 router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }), asyncRoute(async (req, res) => {
     const accessToken = typeof req.body?.accessToken === 'string' ? req.body.accessToken.trim() : ''
     if(!accessToken){
@@ -64,9 +74,11 @@ router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }),
     const displayName = profile.name || null
     const avatarUrl = extractAvatar(profile)
     const userId = await store.upsertUser('minecraft', providerUserId, displayName, avatarUrl)
-    const activeTester = config.releases.enabled && await store.isMinecraftTester(providerUserId)
-    const grants = await store.getMinecraftEntitlementGrants(providerUserId)
-    const minecraftEntitlements = buildMinecraftEntitlements(activeTester, config.releases.requiredEntitlement, grants)
+    // Authentication is shared by the independently deployed release and
+    // schematic services. Always resolve tester membership from the shared
+    // allowlist so signing in through a schematic-only service cannot revoke
+    // an otherwise valid release-channel entitlement.
+    const minecraftEntitlements = await resolveMinecraftEntitlements(providerUserId)
     await store.replaceEntitlements(userId, minecraftEntitlements, 'minecraft')
     const entitlements = await store.getEntitlements(userId)
     const session = await sessions.createSession(userId)
@@ -86,3 +98,4 @@ router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }),
 
 module.exports = router
 module.exports.buildMinecraftEntitlements = buildMinecraftEntitlements
+module.exports.resolveMinecraftEntitlements = resolveMinecraftEntitlements
