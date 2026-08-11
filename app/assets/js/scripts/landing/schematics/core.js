@@ -2,6 +2,17 @@
  * Schematics UI
  */
 
+var pathUtil = require('path')
+var {
+    SchematicApiClient,
+    SchematicApiError,
+    SchematicInstallManager,
+    loadCore,
+    moduleContainsCobblePower
+} = require('./assets/js/schematicmanager')
+var schematicsFormatCore = loadCore()
+var { normalizeJsonSchematic, parseCanonicalSchematic } = schematicsFormatCore
+
 const SCHEMATICS_DEBUG_MODELS = process.env.HELIOS_SCHEMATICS_DEBUG_MODELS === '1'
 const SCHEMATICS_DEBUG_BLOCKS = [
     'minecraft:torch',
@@ -385,7 +396,7 @@ const SCHEMATIC_SORTERS = {
     'release-asc': (a, b) => (getReleaseTimestamp(a) - getReleaseTimestamp(b)) || (getLikesValue(b) - getLikesValue(a)) || compareSchematicName(a, b)
 }
 
-const SCHEMATIC_INDEX = new Map(SCHEMATICS_FALLBACK.map(entry => [entry.id, entry]))
+const SCHEMATIC_INDEX = new Map()
 const SCHEMATIC_NORMALIZED_CACHE = new Map()
 const SCHEMATIC_DETAIL_CACHE = new Map()
 const SCHEMATICS_GRID_CARD_WIDTH = 210
@@ -620,6 +631,7 @@ function updateCommunityView(){
 let schematicsFetchController = null
 let schematicsFetchTimer = null
 let schematicsInstallIndex = new Map()
+let schematicsInstallManager = null
 let schematicsCommunitySection = 'content'
 let schematicsCommunityPreviousSection = 'content'
 let schematicsCommunityPreviousContentTab = 'schematics'
@@ -648,9 +660,9 @@ let schematicsCreatorsBrowseState = {
     error: null
 }
 
-  const SCHEMATICS_CACHE_DIR = pathUtil.join(ConfigManager.getLauncherDirectory(), 'schematics-cache')
-  const SCHEMATICS_INSTALL_DIR = pathUtil.join(SCHEMATICS_CACHE_DIR, 'installed')
-  const SCHEMATICS_INDEX_PATH = pathUtil.join(SCHEMATICS_CACHE_DIR, 'index.json')
+const SCHEMATICS_CACHE_DIR = pathUtil.join(ConfigManager.getLauncherDirectory(), 'schematics-cache')
+const SCHEMATICS_INSTALL_DIR = pathUtil.join(SCHEMATICS_CACHE_DIR, 'installed')
+const SCHEMATICS_INDEX_PATH = pathUtil.join(SCHEMATICS_CACHE_DIR, 'index.json')
 const SCHEMATICS_ATLAS_CACHE_DIR = pathUtil.join(SCHEMATICS_CACHE_DIR, 'atlas')
 const SCHEMATICS_ATLAS_CACHE_VERSION = 5
 const SCHEMATICS_REBUILD_CACHE = ['1', 'true', 'yes'].includes(String(process.env.SCHEMATICS_REBUILD_CACHE || '').toLowerCase())
@@ -700,6 +712,7 @@ const SCHEMATICS_UPLOAD_MAX_BYTES = 5 * 1024 * 1024
 let schematicsUploadState = {
     file: null,
     raw: null,
+    canonical: null,
     normalized: null,
     warnings: [],
     status: 'idle'
@@ -2301,6 +2314,18 @@ async function prepareTextureAtlasForSchematic(schematic, { skipAlphaAnalysis = 
 }
 
 function updateSchematicIndex(entries){
+    const incomingById = new Map(entries.filter(entry => entry?.id).map(entry => [entry.id, entry]))
+    const incomingIds = new Set(incomingById.keys())
+    for(const [id, current] of SCHEMATIC_INDEX){
+        const incoming = incomingById.get(id)
+        if(!incoming || incoming.revision?.sha256 !== current.revision?.sha256){
+            SCHEMATIC_NORMALIZED_CACHE.delete(id)
+            SCHEMATIC_DETAIL_CACHE.delete(id)
+        }
+    }
+    for(const id of SCHEMATIC_NORMALIZED_CACHE.keys()){
+        if(!incomingIds.has(id)) SCHEMATIC_NORMALIZED_CACHE.delete(id)
+    }
     SCHEMATIC_INDEX.clear()
     entries.forEach(entry => {
         if(entry?.id){
@@ -2311,13 +2336,13 @@ function updateSchematicIndex(entries){
 
 async function loadSchematicsInstallIndex(){
     try {
-        await fs.ensureDir(SCHEMATICS_CACHE_DIR)
-        if(await fs.pathExists(SCHEMATICS_INDEX_PATH)){
-            const data = await fs.readJson(SCHEMATICS_INDEX_PATH)
-            const items = Array.isArray(data?.items) ? data.items : []
-            schematicsInstallIndex = new Map(items.map(item => [item.id, item]))
-            renderSchematics()
-        }
+        schematicsInstallManager = new SchematicInstallManager({
+            instanceDirectory: ConfigManager.getInstanceDirectory(),
+            launcherDirectory: ConfigManager.getLauncherDirectory(),
+            core: schematicsFormatCore
+        })
+        schematicsInstallIndex = new Map(schematicsInstallManager.index.map(item => [item.key, item]))
+        renderSchematics()
     } catch (err) {
         loggerLanding.warn('Failed to load schematics install index.', err)
         schematicsInstallIndex = new Map()
@@ -2326,9 +2351,10 @@ async function loadSchematicsInstallIndex(){
 
 async function saveSchematicsInstallIndex(){
     try {
-        await fs.ensureDir(SCHEMATICS_CACHE_DIR)
-        const items = Array.from(schematicsInstallIndex.values())
-        await fs.writeJson(SCHEMATICS_INDEX_PATH, { items }, { spaces: 2 })
+        if(schematicsInstallManager){
+            schematicsInstallManager.index = Array.from(schematicsInstallIndex.values())
+            schematicsInstallManager.saveIndex()
+        }
     } catch (err) {
         loggerLanding.warn('Failed to save schematics install index.', err)
     }
@@ -2339,7 +2365,11 @@ function renderInstalledList(){
         return
     }
     schematicsInstalledList.innerHTML = ''
-    const items = Array.from(schematicsInstallIndex.values())
+    const account = ConfigManager.getSelectedAccount()
+    const profileId = ConfigManager.getSelectedServer()
+    const items = Array.from(schematicsInstallIndex.values()).filter(item =>
+        item.profileId === profileId && account?.uuid && item.playerUuid === schematicsFormatCore.normalizeUuid(account.uuid)
+    )
     if(items.length === 0){
         const empty = document.createElement('div')
         empty.className = 'schematicsGridMessage'
@@ -2371,7 +2401,7 @@ function renderInstalledList(){
         remove.className = 'schematicsMiniButton'
         remove.textContent = 'Remove'
         remove.addEventListener('click', () => {
-            removeInstalledSchematic({ id: item.id })
+            removeInstalledSchematic({ id: item.schematicId })
             renderInstalledList()
         })
 
@@ -2403,31 +2433,57 @@ function closeInstalledPanel(){
 }
 
 function getInstalledSchematic(id){
-    return schematicsInstallIndex.get(id) || null
+    const account = ConfigManager.getSelectedAccount()
+    const profileId = ConfigManager.getSelectedServer()
+    if(!schematicsInstallManager || !account?.uuid || !profileId || !id) return null
+    try {
+        return schematicsInstallManager.get(profileId, account.uuid, id)
+    } catch(_err) {
+        return null
+    }
+}
+
+async function resolveSchematicInstallContext(){
+    const account = ConfigManager.getSelectedAccount()
+    const profileId = ConfigManager.getSelectedServer()
+    if(!account?.uuid) throw new Error('Select a Microsoft account before installing a schematic.')
+    if(!profileId) throw new Error('Select a Cobble Power profile before installing a schematic.')
+    const distro = await DistroAPI.getDistribution()
+    const profile = distro?.getServerById(profileId)
+    if(!profile || !moduleContainsCobblePower(profile.modules)){
+        throw new Error('The selected profile does not contain Cobble Power.')
+    }
+    if(!schematicsInstallManager) await loadSchematicsInstallIndex()
+    return { account, profileId, profile }
 }
 
 function updateInstallButtonState(entry){
     if(!schematicsDetailInstall){
         return
     }
+    const account = ConfigManager.getSelectedAccount()
+    const profileId = ConfigManager.getSelectedServer()
     const installed = entry?.id ? getInstalledSchematic(entry.id) : null
-    schematicsDetailInstall.disabled = false
-    if(installed){
+    const state = installed && schematicsInstallManager
+        ? schematicsInstallManager.status(profileId, account.uuid, entry).state
+        : 'install'
+    schematicsDetailInstall.disabled = !account?.uuid || !profileId
+    if(state === 'installed'){
         schematicsDetailInstall.textContent = 'Installed'
         schematicsDetailInstall.classList.add('is-installed')
         if(schematicsDetailRemove){
             schematicsDetailRemove.style.display = 'inline-flex'
         }
     } else {
-        schematicsDetailInstall.textContent = 'Install'
+        schematicsDetailInstall.textContent = state === 'update' ? 'Update available' : (state === 'repair' ? 'Repair install' : 'Install')
         schematicsDetailInstall.classList.remove('is-installed')
         if(schematicsDetailRemove){
-            schematicsDetailRemove.style.display = 'none'
+            schematicsDetailRemove.style.display = installed ? 'inline-flex' : 'none'
         }
     }
 }
 
-  async function installSchematic(entry){
+async function installSchematicLegacy(entry){
     if(!entry || !entry.id || !schematicsDetailInstall){
         return
     }
@@ -2439,17 +2495,17 @@ function updateInstallButtonState(entry){
     schematicsDetailInstall.textContent = 'Downloading...'
 
     try {
-          let schematic = entry.schematic
-          if(!schematic){
-              const base = await resolveSchematicsApiBase()
-              if(!base){
-                  throw new Error('Schematics service not configured.')
-              }
-              await ensureSchematicsAuthSession(base)
-              const response = await fetch(`${base.replace(/\/+$/, '')}/v1/schematics/${encodeURIComponent(entry.id)}/download`, {
-                  method: 'GET',
-                  headers: { 'Accept': 'application/json', ...getSchematicsAuthHeaders() }
-              })
+        let schematic = entry.schematic
+        if(!schematic){
+            const base = await resolveSchematicsApiBase()
+            if(!base){
+                throw new Error('Schematics service not configured.')
+            }
+            await ensureSchematicsAuthSession(base)
+            const response = await fetch(`${base.replace(/\/+$/, '')}/v1/schematics/${encodeURIComponent(entry.id)}/download`, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json', ...getSchematicsAuthHeaders() }
+            })
             if(!response.ok){
                 throw new Error(`HTTP ${response.status}`)
             }
@@ -2475,8 +2531,8 @@ function updateInstallButtonState(entry){
         }
 
         await fs.ensureDir(SCHEMATICS_INSTALL_DIR)
-          const filePath = pathUtil.join(SCHEMATICS_INSTALL_DIR, `${entry.id}.json`)
-          await fs.writeJson(filePath, schematic, { spaces: 2 })
+        const filePath = pathUtil.join(SCHEMATICS_INSTALL_DIR, `${entry.id}.json`)
+        await fs.writeJson(filePath, schematic, { spaces: 2 })
         schematicsInstallIndex.set(entry.id, {
             id: entry.id,
             name: entry.name || schematic.name || 'Schematic',
@@ -2496,7 +2552,38 @@ function updateInstallButtonState(entry){
     }
 }
 
-async function removeInstalledSchematic(entry){
+async function installSchematic(entry){
+    if(!entry?.id || !schematicsDetailInstall) return
+    schematicsDetailInstall.disabled = true
+    schematicsDetailInstall.textContent = 'Downloading...'
+    try {
+        const context = await resolveSchematicInstallContext()
+        const detail = entry.revision ? entry : (await fetchSchematicDetail(entry.id) || entry)
+        if(!detail.revision?.sha256) throw new Error('The schematic revision metadata is missing.')
+        const canonical = await schematicApiRequest(`/v1/schematics/${encodeURIComponent(entry.id)}/download`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' }
+        })
+        const record = schematicsInstallManager.install({
+            profileId: context.profileId,
+            playerUuid: context.account.uuid,
+            entry: detail,
+            canonical,
+            confirmModified: filePath => window.confirm(`This schematic was modified locally:\n${filePath}\n\nReplace it with the community revision?`)
+        })
+        schematicsInstallIndex.set(record.key, record)
+        updateInstallButtonState(detail)
+        renderSchematics()
+    } catch(err) {
+        loggerLanding.warn('Failed to install schematic.', { message: String(err?.message || err).replace(/https?:\/\/[^\s]+/g, '[redacted-url]') })
+        schematicsDetailInstall.textContent = err?.code === 'locally_modified' ? 'Local changes kept' : 'Install failed'
+        setTimeout(() => updateInstallButtonState(entry), 1500)
+    } finally {
+        schematicsDetailInstall.disabled = false
+    }
+}
+
+async function removeInstalledSchematicLegacy(entry){
     if(!entry?.id){
         return
     }
@@ -2514,5 +2601,26 @@ async function removeInstalledSchematic(entry){
         renderSchematics()
     } catch (err) {
         loggerLanding.warn('Failed to remove installed schematic.', err)
+    }
+}
+
+async function removeInstalledSchematic(entry){
+    if(!entry?.id || !schematicsInstallManager) return
+    try {
+        const context = await resolveSchematicInstallContext()
+        const removed = schematicsInstallManager.remove({
+            profileId: context.profileId,
+            playerUuid: context.account.uuid,
+            schematicId: entry.id,
+            confirmModified: filePath => window.confirm(`This schematic was modified locally:\n${filePath}\n\nDelete the modified file?`)
+        })
+        if(removed){
+            schematicsInstallIndex = new Map(schematicsInstallManager.index.map(item => [item.key, item]))
+            updateInstallButtonState(entry)
+            renderInstalledList()
+            renderSchematics()
+        }
+    } catch(err) {
+        loggerLanding.warn('Failed to remove installed schematic.', { message: err?.message || String(err) })
     }
 }

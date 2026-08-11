@@ -10,6 +10,18 @@ const { createReleaseStorage } = require('../services/releaseStorage')
 const router = express.Router()
 const distributionLimit = createRateLimit({ windowMs: 60_000, limit: 30 })
 
+function injectSchematicsService(distribution, schematicsConfig = config.schematics) {
+    if(!schematicsConfig.publicApiUrl) return distribution
+    distribution.schematics = {
+        schemaVersion: 2,
+        enabled: true,
+        apiBaseUrl: schematicsConfig.publicApiUrl.replace(/\/+$/, ''),
+        features: schematicsConfig.features,
+        allowedVisibilities: ['public']
+    }
+    return distribution
+}
+
 router.get('/releases/channels/:channel/distribution', distributionLimit, requireSession, asyncRoute(async (req, res) => {
     if(!config.releases.enabled) {
         res.status(404).json({ error: 'not_found' })
@@ -29,6 +41,7 @@ router.get('/releases/channels/:channel/distribution', distributionLimit, requir
 
     const releaseStorage = createReleaseStorage()
     const result = await releaseStorage.getAuthorizedDistribution(req.params.channel)
+    injectSchematicsService(result.distribution)
     console.info('[audit] channel distribution issued', { requestId: req.requestId, userId: req.userId, channel: req.params.channel, releaseId: result.releaseId })
     res.set('Cache-Control', 'private, no-store')
     res.set('X-CobblePower-Release', result.releaseId)
@@ -36,3 +49,4 @@ router.get('/releases/channels/:channel/distribution', distributionLimit, requir
 }))
 
 module.exports = router
+module.exports.injectSchematicsService = injectSchematicsService

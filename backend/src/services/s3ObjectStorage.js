@@ -1,4 +1,4 @@
-const { S3Client, GetObjectCommand, HeadObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3')
+const { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 
 function validateSettings(settings, label = 'object storage') {
@@ -8,17 +8,34 @@ function validateSettings(settings, label = 'object storage') {
     }
 }
 
-function streamToBuffer(body) {
+async function streamToBuffer(body, maxBytes = null) {
     if(body == null) return Promise.resolve(Buffer.alloc(0))
-    if(typeof body.transformToByteArray === 'function') {
-        return body.transformToByteArray().then(bytes => Buffer.from(bytes))
-    }
-    return new Promise((resolve, reject) => {
+    const limit = Number.isFinite(Number(maxBytes)) ? Number(maxBytes) : null
+    if(typeof body[Symbol.asyncIterator] === 'function') {
         const chunks = []
-        body.on('data', chunk => chunks.push(Buffer.from(chunk)))
-        body.once('error', reject)
-        body.once('end', () => resolve(Buffer.concat(chunks)))
-    })
+        let received = 0
+        for await (const chunk of body) {
+            const value = Buffer.from(chunk)
+            received += value.length
+            if(limit != null && received > limit) {
+                if(typeof body.destroy === 'function') body.destroy()
+                const error = new Error(`Object exceeds the ${limit} byte limit.`)
+                error.code = 'OBJECT_TOO_LARGE'
+                throw error
+            }
+            chunks.push(value)
+        }
+        return Buffer.concat(chunks, received)
+    }
+    const bytes = typeof body.transformToByteArray === 'function'
+        ? Buffer.from(await body.transformToByteArray())
+        : Buffer.from(body)
+    if(limit != null && bytes.length > limit) {
+        const error = new Error(`Object exceeds the ${limit} byte limit.`)
+        error.code = 'OBJECT_TOO_LARGE'
+        throw error
+    }
+    return bytes
 }
 
 function createS3Client(settings, label = 'object storage') {
@@ -45,9 +62,9 @@ function createObjectStorage(settings, label = 'object storage') {
         async head(key) {
             return client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
         },
-        async getBuffer(key) {
+        async getBuffer(key, options = {}) {
             const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
-            return streamToBuffer(response.Body)
+            return streamToBuffer(response.Body, options.maxBytes)
         },
         async getJson(key) {
             const body = await this.getBuffer(key)
@@ -63,11 +80,27 @@ function createObjectStorage(settings, label = 'object storage') {
                 Metadata: options.metadata
             }))
         },
+        async delete(key) {
+            return client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+        },
+        async signPut(key, options = {}) {
+            const ttl = Number.isFinite(Number(options.expiresIn))
+                ? Number(options.expiresIn)
+                : Number(settings.putTtlSeconds) || 900
+            return getSignedUrl(client, new PutObjectCommand({
+                Bucket: bucket,
+                Key: key,
+                ContentType: options.contentType || 'application/octet-stream'
+            }), { expiresIn: ttl })
+        },
         async signGet(key, expiresIn = null) {
             const ttl = Number.isFinite(Number(expiresIn))
                 ? Number(expiresIn)
                 : Number(settings.getTtlSeconds) || 900
             return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: ttl })
+        },
+        async ready() {
+            return client.send(new HeadBucketCommand({ Bucket: bucket }))
         }
     }
 }

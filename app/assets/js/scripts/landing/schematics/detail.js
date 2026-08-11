@@ -1,6 +1,7 @@
 let schematicDetailOpen = false
 let schematicDetailActiveId = null
 let schematicDetailTaskToken = 0
+let schematicDetailController = null
 let schematicViewRecorded = new Set()
 let schematicDetailShareMenuOpen = false
 let schematicDetailShareEntry = null
@@ -158,6 +159,9 @@ async function openSchematicDetail(entry){
     schematicDetailOpen = true
     schematicDetailActiveId = entry.id || null
     const detailTaskToken = ++schematicDetailTaskToken
+    if(schematicDetailController) schematicDetailController.abort()
+    schematicDetailController = new AbortController()
+    const detailSignal = schematicDetailController.signal
 
     const applyDetail = (detailEntry) => {
         if(!detailEntry){
@@ -171,7 +175,7 @@ async function openSchematicDetail(entry){
         }
         if(schematicsDetailCreator){
             schematicsDetailCreator.textContent = detailEntry.creator ? `by ${detailEntry.creator}` : 'by --'
-            if(detailEntry.creator){
+            if(detailEntry.creator && schematicsFeatureEnabled('creators')){
                 schematicsDetailCreator.style.cursor = 'pointer'
                 schematicsDetailCreator.onclick = () => openCreatorPanel(detailEntry.creator)
             } else {
@@ -213,9 +217,6 @@ async function openSchematicDetail(entry){
         }
         if(schematicsDetailReport){
             schematicsDetailReport.style.display = isOwner ? 'none' : 'inline-flex'
-        }
-        if(schematicsDetailThumbRegen){
-            schematicsDetailThumbRegen.style.display = isOwner ? 'inline-flex' : 'none'
         }
         updateSchematicShareContext(detailEntry)
         updateInstallButtonState(detailEntry)
@@ -278,11 +279,6 @@ async function openSchematicDetail(entry){
             reportSchematic(entry)
         }
     }
-    if(schematicsDetailThumbRegen){
-        schematicsDetailThumbRegen.onclick = () => {
-            regenerateSchematicThumbnail(entry)
-        }
-    }
     updateInstallButtonState(entry)
 
     openModal(schematicsDetail, schematicsDetailPanel)
@@ -311,7 +307,7 @@ async function openSchematicDetail(entry){
                 })
         }
         if(!entry.blocks && !entry.schematic){
-            const detail = await fetchSchematicDetail(entry.id)
+            const detail = await fetchSchematicDetail(entry.id, { signal: detailSignal })
             if(detailTaskToken !== schematicDetailTaskToken || schematicDetailActiveId !== entry.id){
                 return
             }
@@ -320,7 +316,7 @@ async function openSchematicDetail(entry){
             }
             applyDetail(entry)
         }
-        const normalizedPromise = getNormalizedSchematic(entry)
+        const normalizedPromise = getNormalizedSchematic(entry, { signal: detailSignal })
         const resourceStackPromise = buildSchematicsResourceStack()
         const normalized = await normalizedPromise
         if(detailTaskToken !== schematicDetailTaskToken || schematicDetailActiveId !== entry.id){
@@ -374,6 +370,8 @@ function closeSchematicDetail(){
     schematicDetailOpen = false
     schematicDetailActiveId = null
     schematicDetailTaskToken += 1
+    if(schematicDetailController) schematicDetailController.abort()
+    schematicDetailController = null
     schematicDetailShareEntry = null
     closeSchematicShareMenu()
     closeModal(schematicsDetail)

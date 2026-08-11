@@ -1,4 +1,5 @@
 let schematicsUploadOpen = false
+let schematicsUploadTargetEntry = null
 
 function formatSchematicBytes(bytes){
     if(!Number.isFinite(bytes)){
@@ -46,6 +47,7 @@ function resetSchematicUpload(){
     schematicsUploadState = {
         file: null,
         raw: null,
+        canonical: null,
         normalized: null,
         warnings: [],
         status: 'idle'
@@ -109,7 +111,7 @@ async function handleSchematicUploadFile(file){
         updateSchematicUploadStatus('Reading schematic...', 'info')
         const text = await file.text()
         const raw = JSON.parse(text)
-        const { schematic, warnings } = await normalizeJsonSchematic(raw, {})
+        const { schematic, canonical, warnings } = await normalizeJsonSchematic(raw, { sourceBytes: file.size })
         if(schematicsUploadPreview){
             schematicsUploadPreview.setAttribute('data-rendered', 'false')
         }
@@ -118,6 +120,7 @@ async function handleSchematicUploadFile(file){
         schematicsUploadState = {
             file,
             raw,
+            canonical,
             normalized: schematic,
             warnings,
             status: 'ready'
@@ -189,7 +192,7 @@ async function handleSchematicUploadFile(file){
     }
 }
 
-function openSchematicUpload(){
+function openSchematicUpload(targetEntry = null){
     if(!schematicsUpload){
         return
     }
@@ -200,6 +203,16 @@ function openSchematicUpload(){
         closeSchematicDetail()
     }
     resetSchematicUpload()
+    schematicsUploadTargetEntry = targetEntry?.id ? targetEntry : null
+    if(schematicsUploadTargetEntry){
+        if(schematicsUploadTitleInput) schematicsUploadTitleInput.value = schematicsUploadTargetEntry.name || ''
+        if(schematicsUploadDescription) schematicsUploadDescription.value = schematicsUploadTargetEntry.description || ''
+        if(schematicsUploadTagsInput) schematicsUploadTagsInput.value = Array.isArray(schematicsUploadTargetEntry.tags) ? schematicsUploadTargetEntry.tags.join(', ') : ''
+        if(schematicsUploadSubmit) schematicsUploadSubmit.textContent = 'Publish Revision'
+        updateSchematicUploadStatus(`Select a replacement file for revision ${Number(schematicsUploadTargetEntry.revision?.number || 0) + 1}.`, 'info')
+    } else if(schematicsUploadSubmit){
+        schematicsUploadSubmit.textContent = 'Upload'
+    }
     schematicsUploadOpen = true
     openModal(schematicsUpload, schematicsUploadPanel)
     setUploadPreviewRendererActive(true)
@@ -210,6 +223,7 @@ function closeSchematicUpload(){
         return
     }
     schematicsUploadOpen = false
+    schematicsUploadTargetEntry = null
     closeModal(schematicsUpload)
     setUploadPreviewRendererActive(false)
 }
@@ -456,5 +470,85 @@ async function submitSchematicUpload(){
         if(schematicsUploadSubmit){
             schematicsUploadSubmit.disabled = false
         }
+    }
+}
+
+async function submitSchematicUploadV2(){
+    if(!schematicsUploadState?.normalized || !schematicsUploadState?.canonical){
+        updateSchematicUploadStatus('Please select a valid schematic before uploading.', 'error')
+        return
+    }
+    const title = schematicsUploadTitleInput?.value?.trim()
+    if(!title){
+        updateSchematicUploadStatus('Please provide a title for the schematic.', 'error')
+        return
+    }
+    const base = await resolveSchematicsApiBase()
+    if(!base){
+        updateSchematicUploadStatus('Schematics service is not configured.', 'error')
+        return
+    }
+    if(schematicsUploadSubmit) schematicsUploadSubmit.disabled = true
+    try {
+        await ensureSchematicsAuthSession(base)
+        if(!AccessGate.getSessionToken()) throw new Error('Sign in with Microsoft before publishing a schematic.')
+        updateSchematicUploadStatus('Capturing preview...', 'info')
+        const renderer = ensureUploadPreviewRenderer()
+        if(!await waitForRendererMesh(renderer, 4500)) throw new Error('The schematic preview did not finish rendering.')
+        const size = getUploadThumbnailSizes().medium
+        let previewBlob = await capturePreviewBlob(renderer, size.width, size.height, 'image/webp')
+        if(!previewBlob || previewBlob.type !== 'image/webp'){
+            previewBlob = await capturePreviewBlob(renderer, size.width, size.height, 'image/png')
+        }
+        if(!previewBlob) throw new Error('Unable to capture a schematic preview.')
+
+        updateSchematicUploadStatus('Requesting secure upload URLs...', 'info')
+        const session = await schematicApiRequest('/v1/schematics/uploads', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: title,
+                description: schematicsUploadDescription?.value?.trim() || '',
+                tags: schematicsUploadTagsInput?.value?.trim() || '',
+                visibility: 'public',
+                releaseVersion: schematicsUploadTargetEntry?.version || null,
+                previewMime: previewBlob.type || 'image/png',
+                targetSchematicId: schematicsUploadTargetEntry?.id || undefined
+            })
+        })
+        const schematicBlob = new Blob([JSON.stringify(schematicsUploadState.canonical)], { type: 'application/json' })
+        const uploads = [
+            { descriptor: session?.uploads?.schematic, body: schematicBlob },
+            { descriptor: session?.uploads?.preview, body: previewBlob }
+        ]
+        updateSchematicUploadStatus('Uploading validated source files...', 'info')
+        for(const upload of uploads){
+            if(!upload.descriptor?.uploadUrl) throw new Error('The service did not return a complete upload session.')
+            const response = await fetch(upload.descriptor.uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': upload.descriptor.mime },
+                body: upload.body
+            })
+            if(!response.ok) throw new Error(`R2 upload failed with HTTP ${response.status}.`)
+        }
+        updateSchematicUploadStatus('Validating and publishing...', 'info')
+        const published = await schematicApiRequest(`/v1/schematics/uploads/${encodeURIComponent(session.token)}/finalize`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: '{}'
+        })
+        const removed = Number(published?.sanitization?.blockEntityNbtRemoved || 0)
+        updateSchematicUploadStatus(
+            removed > 0 ? `Published safely. Removed block-entity NBT from ${removed} blocks.` : 'Upload published successfully.',
+            'success'
+        )
+        SCHEMATIC_DETAIL_CACHE.clear()
+        await fetchSchematicsList({ query: schematicsState.query, sortKey: schematicsState.sortKey, page: 1 })
+        closeSchematicUpload()
+    } catch(err) {
+        loggerLanding.warn('Failed to publish schematic.', { message: String(err?.message || err).replace(/https?:\/\/[^\s]+/g, '[redacted-url]') })
+        updateSchematicUploadStatus(err?.message || 'Upload failed due to a network error.', 'error')
+    } finally {
+        if(schematicsUploadSubmit) schematicsUploadSubmit.disabled = false
     }
 }

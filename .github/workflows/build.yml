@@ -3,7 +3,61 @@ name: Build
 on: push
 
 jobs:
+  schematics-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cobblepower
+          POSTGRES_PASSWORD: cobblepower
+          POSTGRES_DB: schematics_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cobblepower -d schematics_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install launcher and backend dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+      - name: Run launcher, release, renderer, and canonical-format smoke suites
+        run: |
+          npm run test:smoke
+          npm run test:schematics-core
+      - name: Start S3-compatible test storage
+        run: >-
+          docker run --detach --name schematic-minio -p 9000:9000
+          -e MINIO_ROOT_USER=cobblepower-test
+          -e MINIO_ROOT_PASSWORD=cobblepower-test-secret
+          minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1 server /data --address :9000
+      - name: Wait for test storage
+        run: |
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:9000/minio/health/live && exit 0
+            sleep 1
+          done
+          docker logs schematic-minio
+          exit 1
+      - name: Run mandatory schematic integration suite
+        env:
+          SCHEMATICS_INTEGRATION_REQUIRED: '1'
+          DATABASE_URL_TEST: postgresql://cobblepower:cobblepower@127.0.0.1:5432/schematics_ci
+          SCHEMATICS_INTEGRATION_STORAGE_ENDPOINT: http://127.0.0.1:9000
+          SCHEMATICS_INTEGRATION_STORAGE_BUCKET: cobblepower-schematics-test
+          SCHEMATICS_INTEGRATION_STORAGE_ACCESS_KEY_ID: cobblepower-test
+          SCHEMATICS_INTEGRATION_STORAGE_SECRET_ACCESS_KEY: cobblepower-test-secret
+        run: node --test tests/backend/schematicsIntegration.test.js
+
   release:
+    needs: schematics-integration
     runs-on: ${{ matrix.os }}
 
     permissions:

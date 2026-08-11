@@ -1,26 +1,38 @@
 let schematicsApiBaseLogged = false
+let schematicsServiceConfig = null
+let schematicsApiClient = null
+
+async function resolveSchematicsServiceConfig(){
+    const envBase = String(process.env.HELIOS_SCHEMATICS_API_URL || '').trim()
+    const distro = await DistroAPI.getDistribution()
+    const raw = distro?.rawDistribution?.schematics || {}
+    schematicsServiceConfig = {
+        schemaVersion: Number(raw.schemaVersion || 2),
+        enabled: envBase ? true : raw.enabled === true,
+        apiBaseUrl: (envBase || raw.apiBaseUrl || '').replace(/\/+$/, ''),
+        features: {
+            core: raw.features?.core !== false,
+            collections: raw.features?.collections === true,
+            creators: raw.features?.creators === true
+        },
+        allowedVisibilities: Array.isArray(raw.allowedVisibilities) ? raw.allowedVisibilities : ['public']
+    }
+    return schematicsServiceConfig
+}
+
+function schematicsFeatureEnabled(name){
+    return schematicsServiceConfig?.enabled === true && schematicsServiceConfig?.features?.[name] === true
+}
 
 async function resolveSchematicsApiBase(){
-    const envBase = process.env.HELIOS_SCHEMATICS_API_URL
-    if(envBase){
-        if(!schematicsApiBaseLogged && loggerLanding){
-            loggerLanding.info('[schematics] apiBase resolved from env.', { apiBaseUrl: envBase })
-            schematicsApiBaseLogged = true
-        }
-        return envBase
-    }
     try {
-        const distro = await DistroAPI.getDistribution()
-        const raw = distro?.rawDistribution
-        const distroBase = (raw?.schematics?.apiBaseUrl || '').trim() || null
-        const accessBase = (AccessGate.getApiBaseUrl(distro) || '').trim() || null
-        const resolved = distroBase || accessBase || null
+        const service = await resolveSchematicsServiceConfig()
+        const resolved = service.enabled && service.schemaVersion === 2 ? service.apiBaseUrl || null : null
         if(!schematicsApiBaseLogged && loggerLanding){
             loggerLanding.info('[schematics] apiBase resolution.', {
-                distroHasSchematics: Boolean(raw?.schematics),
-                distroBase,
-                accessBase,
-                resolved
+                enabled: service.enabled,
+                schemaVersion: service.schemaVersion,
+                configured: Boolean(resolved)
             })
             schematicsApiBaseLogged = true
         }
@@ -29,6 +41,26 @@ async function resolveSchematicsApiBase(){
         loggerLanding.warn('Failed to resolve schematics api base.', err)
         return null
     }
+}
+
+async function getSchematicsApiClient(){
+    const base = await resolveSchematicsApiBase()
+    if(!base) return null
+    if(!schematicsApiClient || schematicsApiClient.baseUrl !== base){
+        schematicsApiClient = new SchematicApiClient({
+            baseUrl: base,
+            cachePath: pathUtil.join(SCHEMATICS_CACHE_DIR, 'catalog-v2.json'),
+            timeoutMs: 10000
+        })
+    }
+    return schematicsApiClient
+}
+
+async function schematicApiRequest(pathname, options = {}){
+    const client = await getSchematicsApiClient()
+    if(!client) throw new SchematicApiError('Schematics service is not configured.', { code: 'not_configured' })
+    const headers = { ...(options.headers || {}), ...getSchematicsAuthHeaders() }
+    return (await client.request(pathname, { ...options, headers })).data
 }
 
 function getSchematicsAuthHeaders(){
@@ -67,62 +99,62 @@ function isSchematicsAdmin(){
         || AccessGate.hasAccess({ entitlement: 'admin' })
 }
 
-  let schematicsAuthExchangePromise = null
+let schematicsAuthExchangePromise = null
 
-  async function ensureSchematicsAuthSession(baseOverride){
-      if(AccessGate.getSessionToken()){
-          return
-      }
-      if(schematicsAuthExchangePromise){
-          return schematicsAuthExchangePromise
-      }
-      const authUser = ConfigManager.getSelectedAccount()
-      const accessToken = authUser?.accessToken
-      if(!accessToken){
-          return
-      }
-      schematicsAuthExchangePromise = (async () => {
-          try {
-              const base = baseOverride || await resolveSchematicsApiBase()
-              if(!base){
-                  return
-              }
-              const response = await fetch(`${base.replace(/\/+$/, '')}/v1/auth/minecraft`, {
-                  method: 'POST',
-                  headers: {
-                      'Accept': 'application/json',
-                      'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({ accessToken })
-              })
-              if(!response.ok){
-                  return
-              }
-              const data = await response.json()
-              if(data?.token){
-                  AccessGate.setSessionToken(data.token)
-              }
-              if(Array.isArray(data?.entitlements)){
-                  AccessGate.setEntitlements(data.entitlements)
-              }
-              if(data?.profile){
-                  AccessGate.setProfile({
-                      id: data.userId || null,
-                      displayName: data.profile.displayName || null,
-                      avatarUrl: data.profile.avatarUrl || null
-                  })
-              }
-          } catch (err) {
-              loggerLanding.warn('Failed to exchange Minecraft token for session.', err)
-          } finally {
-              if(typeof updateSchematicsAdminVisibility === 'function'){
-                  updateSchematicsAdminVisibility()
-              }
-              schematicsAuthExchangePromise = null
-          }
-      })()
-      return schematicsAuthExchangePromise
-  }
+async function ensureSchematicsAuthSession(baseOverride){
+    if(AccessGate.getSessionToken()){
+        return
+    }
+    if(schematicsAuthExchangePromise){
+        return schematicsAuthExchangePromise
+    }
+    const authUser = ConfigManager.getSelectedAccount()
+    const accessToken = authUser?.accessToken
+    if(!accessToken){
+        return
+    }
+    schematicsAuthExchangePromise = (async () => {
+        try {
+            const base = baseOverride || await resolveSchematicsApiBase()
+            if(!base){
+                return
+            }
+            const response = await fetch(`${base.replace(/\/+$/, '')}/v1/auth/minecraft`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ accessToken })
+            })
+            if(!response.ok){
+                return
+            }
+            const data = await response.json()
+            if(data?.token){
+                AccessGate.setSessionToken(data.token)
+            }
+            if(Array.isArray(data?.entitlements)){
+                AccessGate.setEntitlements(data.entitlements)
+            }
+            if(data?.profile){
+                AccessGate.setProfile({
+                    id: data.userId || null,
+                    displayName: data.profile.displayName || null,
+                    avatarUrl: data.profile.avatarUrl || null
+                })
+            }
+        } catch (err) {
+            loggerLanding.warn('Failed to exchange Minecraft token for session.', err)
+        } finally {
+            if(typeof updateSchematicsAdminVisibility === 'function'){
+                updateSchematicsAdminVisibility()
+            }
+            schematicsAuthExchangePromise = null
+        }
+    })()
+    return schematicsAuthExchangePromise
+}
 
 function getSchematicsFilters(){
     return {
@@ -522,28 +554,28 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
     }
     renderSchematics()
 
-      const base = await resolveSchematicsApiBase()
-      if(!base){
-          schematicsState = {
-              ...schematicsState,
-              status: 'error',
-              error: 'Schematics service not configured.',
-              items: SCHEMATICS_FALLBACK.slice(),
-              total: SCHEMATICS_FALLBACK.length
-          }
-          updateSchematicIndex(schematicsState.items)
-          renderSchematics()
-          return
-      }
-      await ensureSchematicsAuthSession(base)
-      if(typeof updateSchematicsAdminVisibility === 'function'){
-          updateSchematicsAdminVisibility()
-      }
+    const base = await resolveSchematicsApiBase()
+    if(!base){
+        schematicsState = {
+            ...schematicsState,
+            status: 'error',
+            error: 'Schematics service not configured.',
+            items: [],
+            total: 0
+        }
+        updateSchematicIndex(schematicsState.items)
+        renderSchematics()
+        return
+    }
+    await ensureSchematicsAuthSession(base)
+    if(typeof updateSchematicsAdminVisibility === 'function'){
+        updateSchematicsAdminVisibility()
+    }
 
-      schematicsState = {
-          ...schematicsState,
-          apiBase: base
-      }
+    schematicsState = {
+        ...schematicsState,
+        apiBase: base
+    }
 
     const sortParam = nextSortKey.includes('release') ? 'release' : 'likes'
     const offset = (effectivePage - 1) * limit
@@ -561,23 +593,17 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
     if(schematicsMineToggle?.checked){
         params.set('mine', 'true')
     }
-    const url = `${base.replace(/\/+$/, '')}/v1/schematics?${params.toString()}`
-
-      try {
-          const response = await fetch(url, {
-              method: 'GET',
-              signal: schematicsFetchController.signal,
-              headers: { 'Accept': 'application/json', ...getSchematicsAuthHeaders() }
-          })
-        if(!response.ok){
-            throw new Error(`HTTP ${response.status}`)
-        }
-        const data = await response.json()
+    try {
+        const client = await getSchematicsApiClient()
+        const data = await client.list(params, {
+            signal: schematicsFetchController.signal,
+            headers: getSchematicsAuthHeaders()
+        })
         const items = Array.isArray(data?.items) ? data.items : []
         schematicsState = {
             ...schematicsState,
             status: 'ready',
-            error: null,
+            error: data.offline ? 'Offline — showing the last successfully loaded catalog.' : null,
             items,
             total: Number.isFinite(Number(data?.total)) ? Number(data.total) : items.length,
             page: effectivePage,
@@ -587,16 +613,16 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
         renderSchematics()
         updateSchematicsPagination()
     } catch (err) {
-        if(err.name === 'AbortError'){
+        if(err.name === 'AbortError' || schematicsFetchController.signal.aborted){
             return
         }
         loggerLanding.warn('Failed to load schematics list.', err)
         schematicsState = {
             ...schematicsState,
             status: 'error',
-            error: 'Unable to load schematics. Showing cached set.',
-            items: SCHEMATICS_FALLBACK.slice(),
-            total: SCHEMATICS_FALLBACK.length
+            error: 'Unable to load schematics. No cached catalog is available.',
+            items: [],
+            total: 0
         }
         updateSchematicIndex(schematicsState.items)
         renderSchematics()
@@ -604,27 +630,24 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
     }
 }
 
-async function fetchSchematicDetail(id){
+async function fetchSchematicDetail(id, options = {}){
     if(!id){
         return null
     }
     if(SCHEMATIC_DETAIL_CACHE.has(id)){
         return SCHEMATIC_DETAIL_CACHE.get(id)
     }
-      const base = await resolveSchematicsApiBase()
-      if(!base){
-          return null
-      }
-      await ensureSchematicsAuthSession(base)
-      try {
-          const response = await fetch(`${base.replace(/\/+$/, '')}/v1/schematics/${encodeURIComponent(id)}`, {
-              method: 'GET',
-              headers: { 'Accept': 'application/json', ...getSchematicsAuthHeaders() }
-          })
-        if(!response.ok){
-            throw new Error(`HTTP ${response.status}`)
-        }
-        const data = await response.json()
+    const base = await resolveSchematicsApiBase()
+    if(!base){
+        return null
+    }
+    await ensureSchematicsAuthSession(base)
+    try {
+        const data = await schematicApiRequest(`/v1/schematics/${encodeURIComponent(id)}`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            signal: options.signal
+        })
         if(data?.id){
             SCHEMATIC_DETAIL_CACHE.set(id, data)
             SCHEMATIC_INDEX.set(id, data)
@@ -681,26 +704,24 @@ function getSchematicById(id){
     return SCHEMATIC_INDEX.get(id)
 }
 
-async function fetchSchematicFromUrl(url){
+async function fetchSchematicFromUrl(url, options = {}){
     if(!url){
         return null
     }
     try {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
+        const parsed = new URL(url, await resolveSchematicsApiBase())
+        const base = new URL(await resolveSchematicsApiBase())
+        if(parsed.origin !== base.origin) throw new Error('Refusing schematic URL from an untrusted origin.')
+        return await schematicApiRequest(`${parsed.pathname}${parsed.search}`, {
+            method: 'GET', headers: { Accept: 'application/json' }, signal: options.signal
         })
-        if(!response.ok){
-            throw new Error(`HTTP ${response.status}`)
-        }
-        return await response.json()
     } catch (err) {
         loggerLanding.warn('Failed to load schematic data from url.', err)
         return null
     }
 }
 
-async function getNormalizedSchematic(entry){
+async function getNormalizedSchematic(entry, options = {}){
     if(!entry || !entry.id || !Array.isArray(entry.blocks)){
         if(!entry || !entry.id){
             return null
@@ -709,34 +730,25 @@ async function getNormalizedSchematic(entry){
     if(SCHEMATIC_NORMALIZED_CACHE.has(entry.id)){
         return SCHEMATIC_NORMALIZED_CACHE.get(entry.id)
     }
-    let rawBlocks = entry.blocks
-    let base = entry
-    if(!Array.isArray(rawBlocks) && entry.schematic){
-        rawBlocks = entry.schematic.blocks
-        base = entry.schematic
+    let rawSchematic = Array.isArray(entry.blocks) ? entry : null
+    if(!rawSchematic && entry.schematic){
+        rawSchematic = entry.schematic
     }
-    if(!Array.isArray(rawBlocks)){
-        const detail = await fetchSchematicDetail(entry.id)
+    if(!rawSchematic){
+        const detail = await fetchSchematicDetail(entry.id, options)
         if(detail?.schematic){
-            rawBlocks = detail.schematic.blocks
-            base = detail.schematic
+            rawSchematic = detail.schematic
         } else if(detail?.schematicUrl){
-            const schematicData = await fetchSchematicFromUrl(detail.schematicUrl)
+            const schematicData = await fetchSchematicFromUrl(detail.schematicUrl, options)
             if(schematicData?.blocks){
-                rawBlocks = schematicData.blocks
-                base = schematicData
+                rawSchematic = schematicData
             }
         }
     }
-    if(!Array.isArray(rawBlocks)){
+    if(!rawSchematic?.blocks){
         return null
     }
-    const { schematic } = await normalizeJsonSchematic({
-        name: base.name || entry.name,
-        category: base.category || entry.category,
-        icon: base.icon || entry.icon,
-        blocks: rawBlocks
-    }, { id: entry.id })
+    const { schematic } = await normalizeJsonSchematic(rawSchematic, { id: entry.id })
     SCHEMATIC_NORMALIZED_CACHE.set(entry.id, schematic)
     return schematic
 }

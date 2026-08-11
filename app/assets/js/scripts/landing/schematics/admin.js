@@ -101,7 +101,9 @@ function renderAdminResults(items){
 }
 
 function updateSchematicsAdminVisibility(){
-    const visible = isSchematicsAdmin()
+    // The legacy thumbnail repair panel is intentionally retired. Moderation uses
+    // the schema-v2 admin API until a dedicated moderation UI is introduced.
+    const visible = false
     if(schematicsAdminControlGroup){
         schematicsAdminControlGroup.hidden = !visible
     }

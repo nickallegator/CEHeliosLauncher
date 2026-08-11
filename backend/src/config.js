@@ -40,7 +40,8 @@ function objectStorageConfig(prefix, defaults = {}) {
         accessKeyId: getEnv(`${prefix}_ACCESS_KEY_ID`, null),
         secretAccessKey: getEnv(`${prefix}_SECRET_ACCESS_KEY`, null),
         forcePathStyle: parseBoolean(getEnv(`${prefix}_FORCE_PATH_STYLE`, ''), false),
-        getTtlSeconds: parseNumber(getEnv(`${prefix}_GET_TTL_SECONDS`, String(defaults.getTtlSeconds || 900)), defaults.getTtlSeconds || 900)
+        getTtlSeconds: parseNumber(getEnv(`${prefix}_GET_TTL_SECONDS`, String(defaults.getTtlSeconds || 900)), defaults.getTtlSeconds || 900),
+        putTtlSeconds: parseNumber(getEnv(`${prefix}_PUT_TTL_SECONDS`, String(defaults.putTtlSeconds || 900)), defaults.putTtlSeconds || 900)
     }
 }
 
@@ -58,7 +59,17 @@ const config = {
         objectStorage: objectStorageConfig('RELEASES_STORAGE', { getTtlSeconds: 3600 })
     },
     schematics: {
-        enabled: parseBoolean(getEnv('SCHEMATICS_ENABLED', 'true'), true),
+        enabled: parseBoolean(getEnv('SCHEMATICS_ENABLED', 'false')),
+        publicApiUrl: getEnv('SCHEMATICS_PUBLIC_API_URL', null),
+        writeMode: getEnv('SCHEMATICS_WRITE_MODE', 'admin').trim().toLowerCase(),
+        allowDevelopmentSeeds: parseBoolean(getEnv('SCHEMATICS_DEVELOPMENT_SEEDS', 'false')),
+        features: {
+            core: true,
+            collections: parseBoolean(getEnv('SCHEMATICS_COLLECTIONS_ENABLED', 'false')),
+            creators: parseBoolean(getEnv('SCHEMATICS_CREATORS_ENABLED', 'false'))
+        },
+        uploadRateLimit: parseNumber(getEnv('SCHEMATICS_UPLOADS_PER_HOUR', '10'), 10),
+        reportRateLimit: parseNumber(getEnv('SCHEMATICS_REPORTS_PER_DAY', '10'), 10),
         storageDir: getEnv('SCHEMATICS_STORAGE_DIR', null),
         objectStorage: {
             provider: getEnv('SCHEMATICS_STORAGE_PROVIDER', null),
@@ -90,6 +101,18 @@ const config = {
         creatorUserId: getEnv('PATREON_CREATOR_USER_ID', null)
     },
     oauthStateTtlMinutes: parseNumber(getEnv('OAUTH_STATE_TTL_MINUTES', '10'), 10)
+}
+
+if(!['disabled', 'admin', 'authenticated'].includes(config.schematics.writeMode)) {
+    throw new Error('SCHEMATICS_WRITE_MODE must be disabled, admin, or authenticated')
+}
+
+if(config.schematics.enabled && process.env.NODE_ENV === 'production') {
+    const storage = config.schematics.objectStorage
+    const missing = ['provider', 'bucket', 'endpoint', 'accessKeyId', 'secretAccessKey'].filter(key => !storage[key])
+    if(missing.length > 0) {
+        throw new Error(`Schematics are enabled in production but storage is missing: ${missing.join(', ')}`)
+    }
 }
 
 function maskDatabaseUrl(url) {
