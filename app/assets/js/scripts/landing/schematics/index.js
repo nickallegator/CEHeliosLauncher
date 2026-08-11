@@ -1,4 +1,12 @@
 function initSchematics(){
+    if(!schematicsRouteListenerBound){
+        window.addEventListener('helios:shell-route-change', (event) => {
+            if(event.detail?.route !== 'community/schematics'){
+                cancelSchematicsRouteWork()
+            }
+        })
+        schematicsRouteListenerBound = true
+    }
     if(!schematicsGrid){
         return
     }

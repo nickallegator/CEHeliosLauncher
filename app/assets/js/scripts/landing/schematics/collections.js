@@ -49,7 +49,7 @@ function updateCollectionLikeButton(entry){
         return
     }
     const liked = Boolean(entry?.liked)
-    schematicsCollectionsBrowseDetailLike.textContent = liked ? 'Liked' : 'Like'
+    schematicsCollectionsBrowseDetailLike.textContent = liked ? communityCopy('liked') : communityCopy('like')
     schematicsCollectionsBrowseDetailLike.classList.toggle('is-liked', liked)
     const hasToken = Boolean(AccessGate.getSessionToken())
     schematicsCollectionsBrowseDetailLike.disabled = !hasToken
@@ -292,7 +292,7 @@ function createCollectionBrowseCard(collection){
 
     const name = document.createElement('span')
     name.className = 'schematicsCollectionName'
-    name.textContent = collection.name || 'Collection'
+    name.textContent = collection.name || communityCopy('collection')
 
     const meta = document.createElement('span')
     meta.className = 'schematicsCollectionMeta'
@@ -325,14 +325,14 @@ function renderCollectionsBrowseDetail(){
     if(detail?.name){
         schematicsCollectionsBrowseDetailTitle.textContent = detail.name
     } else if(detailStatus === 'loading'){
-        schematicsCollectionsBrowseDetailTitle.textContent = 'Loading collection...'
+        schematicsCollectionsBrowseDetailTitle.textContent = communityCopy('loadingCollection')
     } else {
-        schematicsCollectionsBrowseDetailTitle.textContent = 'Collection'
+        schematicsCollectionsBrowseDetailTitle.textContent = communityCopy('collection')
     }
     if(detailStatus === 'loading'){
-        schematicsCollectionsBrowseDetailMeta.textContent = 'Loading...'
+        schematicsCollectionsBrowseDetailMeta.textContent = communityCopy('loading')
     } else if(detailStatus === 'error'){
-        schematicsCollectionsBrowseDetailMeta.textContent = 'Unable to load'
+        schematicsCollectionsBrowseDetailMeta.textContent = communityCopy('unableToLoad')
     } else if(hasDetail){
         const engagement = new CommunityEngagement(detail)
         const likesText = formatEngagementCount(engagement.getLikes())
@@ -344,22 +344,22 @@ function renderCollectionsBrowseDetail(){
     if(hasDetail){
         updateCollectionLikeButton(detail)
     } else if(schematicsCollectionsBrowseDetailLike){
-        schematicsCollectionsBrowseDetailLike.textContent = 'Like'
+        schematicsCollectionsBrowseDetailLike.textContent = communityCopy('like')
         schematicsCollectionsBrowseDetailLike.classList.remove('is-liked')
         schematicsCollectionsBrowseDetailLike.disabled = true
     }
     schematicsCollectionsBrowseDetailGrid.innerHTML = ''
     const fragment = document.createDocumentFragment()
     if(detailStatus === 'loading'){
-        fragment.appendChild(createSchematicsMessage('Loading collection...'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('loadingCollection')))
     } else if(detailStatus === 'error'){
-        fragment.appendChild(createSchematicsMessage(detailError || 'Unable to load collection.'))
+        fragment.appendChild(createSchematicsMessage(detailError || communityCopy('unableToLoadCollection')))
     } else if(hasDetail && Array.isArray(detail.items) && detail.items.length > 0){
         detail.items.forEach((entry) => fragment.appendChild(createSchematicCard(entry)))
     } else if(hasDetail){
-        fragment.appendChild(createSchematicsMessage('No schematics in this collection.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCollectionSchematics')))
     } else {
-        fragment.appendChild(createSchematicsMessage('No collection selected.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCollectionSelected')))
     }
     schematicsCollectionsBrowseDetailGrid.appendChild(fragment)
 }
@@ -397,7 +397,7 @@ async function openCollectionsBrowseDetail(id){
         schematicsCollectionsBrowseState = {
             ...schematicsCollectionsBrowseState,
             detailStatus: 'error',
-            detailError: 'Schematics service not configured.'
+            detailError: communityCopy('notConfigured')
         }
         renderCollectionsBrowseDetail()
         return
@@ -443,7 +443,7 @@ async function openCollectionsBrowseDetail(id){
         schematicsCollectionsBrowseState = {
             ...schematicsCollectionsBrowseState,
             detailStatus: 'error',
-            detailError: 'Unable to load collection.',
+            detailError: communityCopy('unableToLoadCollection'),
             detail: null
         }
         renderCollectionsBrowseDetail()
@@ -461,11 +461,11 @@ function renderCollectionsBrowse(){
     schematicsCollectionsBrowseList.innerHTML = ''
     const fragment = document.createDocumentFragment()
     if(schematicsCollectionsBrowseState.status === 'loading'){
-        fragment.appendChild(createSchematicsMessage('Loading collections...'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('loadingCollections')))
     } else if(schematicsCollectionsBrowseState.status === 'error' && schematicsCollectionsBrowseState.error){
         fragment.appendChild(createSchematicsMessage(schematicsCollectionsBrowseState.error))
     } else if(schematicsCollectionsBrowseState.items.length === 0){
-        fragment.appendChild(createSchematicsMessage('No collections found.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCollections')))
     } else {
         schematicsCollectionsBrowseState.items.forEach((collection) => {
             fragment.appendChild(createCollectionBrowseCard(collection))
@@ -508,7 +508,7 @@ async function fetchCollectionsBrowse({ page, query, sort, mine } = {}){
         schematicsCollectionsBrowseState = {
             ...schematicsCollectionsBrowseState,
             status: 'error',
-            error: 'Schematics service not configured.',
+            error: communityCopy('notConfigured'),
             items: []
         }
         renderCollectionsBrowse()
@@ -582,7 +582,7 @@ async function fetchCollectionsBrowse({ page, query, sort, mine } = {}){
         schematicsCollectionsBrowseState = {
             ...schematicsCollectionsBrowseState,
             status: 'error',
-            error: 'Unable to load collections.',
+            error: communityCopy('unableToLoadCollection'),
             items: []
         }
         renderCollectionsBrowse()
@@ -634,11 +634,11 @@ function renderCollectionsPanel(){
     }
     const fragment = document.createDocumentFragment()
     if(schematicsCollectionsState.status === 'loading'){
-        fragment.appendChild(createSchematicsMessage('Loading collections...'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('loadingCollections')))
     } else if(schematicsCollectionsState.status === 'error' && schematicsCollectionsState.error){
         fragment.appendChild(createSchematicsMessage(schematicsCollectionsState.error))
     } else if(schematicsCollectionsState.items.length === 0){
-        fragment.appendChild(createSchematicsMessage('No collections found.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCollections')))
     } else {
         schematicsCollectionsState.items.forEach((collection) => {
             fragment.appendChild(createCollectionCard(collection))
@@ -659,7 +659,7 @@ function renderCollectionDetail(){
         return
     }
     schematicsCollectionsDetail.hidden = false
-    schematicsCollectionsDetailTitle.textContent = detail.name || 'Collection'
+    schematicsCollectionsDetailTitle.textContent = detail.name || communityCopy('collection')
     const engagement = new CommunityEngagement(detail)
     const likesText = formatEngagementCount(engagement.getLikes())
     const viewsText = formatEngagementCount(engagement.getViews())
@@ -676,7 +676,7 @@ function renderCollectionDetail(){
             fragment.appendChild(createSchematicCard(entry))
         })
     } else {
-        fragment.appendChild(createSchematicsMessage('No schematics in this collection.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCollectionSchematics')))
     }
     schematicsCollectionsDetailGrid.appendChild(fragment)
 }
@@ -701,7 +701,7 @@ function createCollectionCard(collection){
 
     const name = document.createElement('span')
     name.className = 'schematicsCollectionName'
-    name.textContent = collection.name || 'Collection'
+    name.textContent = collection.name || communityCopy('collection')
 
     const meta = document.createElement('span')
     meta.className = 'schematicsCollectionMeta'
@@ -756,7 +756,7 @@ async function fetchCollectionsList(filter, openCollectionId){
         schematicsCollectionsState = {
             ...schematicsCollectionsState,
             status: 'error',
-            error: 'Schematics service not configured.',
+            error: communityCopy('notConfigured'),
             items: [],
             total: 0
         }
@@ -811,7 +811,7 @@ async function fetchCollectionsList(filter, openCollectionId){
         schematicsCollectionsState = {
             ...schematicsCollectionsState,
             status: 'error',
-            error: 'Unable to load collections.',
+            error: communityCopy('unableToLoadCollection'),
             items: [],
             total: 0
         }

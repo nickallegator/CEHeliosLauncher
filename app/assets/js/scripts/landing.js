@@ -781,9 +781,7 @@ const SCHEMATICS_LAZY_SCRIPT_PATHS = [
 ]
 
 const landingUpperSection = document.querySelector('#landingContainer > #upper')
-const landingLowerLeftSection = document.querySelector('#landingContainer > #lower > #left')
-const landingLowerCenterSection = document.querySelector('#landingContainer > #lower > #center')
-const landingLowerRightSection = document.querySelector('#landingContainer > #lower > #right')
+const communityHubSection = document.getElementById('communityHub')
 
 function setElementInertState(element, inert){
     if(!element){
@@ -804,9 +802,7 @@ function updateOverlayAccessibility(mode = 'landing'){
     setElementInertState(newsContainer, !showNews)
     setElementInertState(schematicsContainer, !showSchematics)
     setElementInertState(landingUpperSection, overlayOpen)
-    setElementInertState(landingLowerLeftSection, overlayOpen)
-    setElementInertState(landingLowerRightSection, overlayOpen)
-    setElementInertState(landingLowerCenterSection, false)
+    setElementInertState(communityHubSection, overlayOpen)
     setElementInertState(topActions, false)
 }
 
@@ -897,96 +893,35 @@ function refreshNewsIfInitialized(){
  * @param {boolean} up True to slide up, otherwise false. 
  */
 function slide_(container, up){
-    const lCUpper = document.querySelector('#landingContainer > #upper')
-    const lCLLeft = document.querySelector('#landingContainer > #lower > #left')
-    const lCLCenter = document.querySelector('#landingContainer > #lower > #center')
-    const lCLRight = document.querySelector('#landingContainer > #lower > #right')
-    const centerContent = document.querySelector('#landingContainer > #lower > #center #content')
     const landingContainer = document.getElementById('landingContainer')
     const overlayContainers = [newsContainer, schematicsContainer]
     const isNews = container === newsContainer
     const isSchematics = container === schematicsContainer
-    const moveDown = isNews
-
     landingOverlayGlideCount++
-
+    const route = up ? (isNews ? 'news' : (isSchematics ? 'community/schematics' : 'home')) : 'home'
+    overlayContainers.forEach((overlay) => {
+        if(overlay && overlay !== container) hideOverlay(overlay)
+    })
     if(up){
-        const offscreen = moveDown ? '200vh' : '-200vh'
-        const communityOffset = '-72vh'
-        if(landingContainer){
-            if(isNews){
-                landingContainer.setAttribute('data-overlay', 'news')
-            } else if(isSchematics){
-                landingContainer.setAttribute('data-overlay', 'schematics')
-            } else {
-                landingContainer.removeAttribute('data-overlay')
-            }
-        }
-        overlayContainers.forEach((overlay) => {
-            if(overlay && overlay !== container){
-                hideOverlay(overlay)
-            }
-        })
-        if(topActions){
-            if(isNews){
-                topActions.style.top = 'calc(100% - 60px)'
-            } else if(isSchematics){
-                topActions.style.top = offscreen
-            } else {
-                topActions.style.top = '18px'
-            }
-        }
-        lCUpper.style.top = offscreen
-        lCLLeft.style.top = offscreen
-        lCLCenter.style.top = isSchematics ? communityOffset : offscreen
-        lCLRight.style.top = offscreen
-        centerContent.style.top = isSchematics ? '-8px' : '130vh'
-        if(lCLCenter){
-            lCLCenter.style.zIndex = isSchematics ? '650' : ''
-        }
-        container.style.top = '22px'
-        //date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric'})
-        //landingContainer.style.background = 'rgba(29, 29, 29, 0.55)'
-        landingContainer.style.background = 'rgba(0, 0, 0, 0.50)'
-        setTimeout(() => {
-            if(landingOverlayGlideCount === 1){
-                lCLCenter.style.transition = 'none'
-                centerContent.style.transition = 'none'
-            }
-            landingOverlayGlideCount--
-        }, 2000)
+        container.hidden = false
+        container.setAttribute('aria-hidden', 'false')
+        landingContainer?.setAttribute('data-overlay', isNews ? 'news' : 'schematics')
     } else {
-        setTimeout(() => {
-            landingOverlayGlideCount--
-        }, 2000)
-        if(landingContainer){
-            landingContainer.removeAttribute('data-overlay')
-        }
-        landingContainer.style.background = null
-        lCLCenter.style.transition = null
-        centerContent.style.transition = null
         hideOverlay(container)
-        lCUpper.style.top = '0px'
-        lCLLeft.style.top = '0px'
-        lCLCenter.style.top = '0px'
-        lCLRight.style.top = '0px'
-        if(topActions){
-            topActions.style.top = '18px'
-        }
-        if(lCLCenter){
-            lCLCenter.style.zIndex = ''
-        }
-        centerContent.style.top = '4px'
+        landingContainer?.removeAttribute('data-overlay')
     }
-}
-
-function getOverlayHiddenTop(container){
-    return container === newsContainer ? '-100%' : '100%'
+    window.AppShell?.setLandingRoute(route)
+    requestAnimationFrame(() => {
+        container.classList.toggle('routeActive', up)
+        landingOverlayGlideCount = Math.max(0, landingOverlayGlideCount - 1)
+    })
 }
 
 function hideOverlay(container){
     if(container){
-        container.style.top = getOverlayHiddenTop(container)
+        container.classList.remove('routeActive')
+        container.hidden = true
+        container.setAttribute('aria-hidden', 'true')
     }
 }
 

@@ -2,16 +2,20 @@
  * Schematics UI
  */
 
-var pathUtil = require('path')
-var {
+let pathUtil = require('path')
+let {
     SchematicApiClient,
     SchematicApiError,
     SchematicInstallManager,
     loadCore,
     moduleContainsCobblePower
 } = require('./assets/js/schematicmanager')
-var schematicsFormatCore = loadCore()
-var { normalizeJsonSchematic, parseCanonicalSchematic } = schematicsFormatCore
+let schematicsFormatCore = loadCore()
+let { normalizeJsonSchematic, parseCanonicalSchematic } = schematicsFormatCore
+
+function communityCopy(key, placeholders){
+    return Lang.queryJS(`community.${key}`, placeholders)
+}
 
 const SCHEMATICS_DEBUG_MODELS = process.env.HELIOS_SCHEMATICS_DEBUG_MODELS === '1'
 const SCHEMATICS_DEBUG_BLOCKS = [
@@ -352,8 +356,8 @@ class CommunityEngagement {
     createRow({ className = 'schematicEngagement' } = {}){
         const row = document.createElement('div')
         row.className = className
-        row.appendChild(this.createStat({ svg: SCHEMATIC_LIKE_SVG, value: this.getLikes(), label: 'Likes' }))
-        row.appendChild(this.createStat({ svg: SCHEMATIC_VIEW_SVG, value: this.getViews(), label: 'Views' }))
+        row.appendChild(this.createStat({ svg: SCHEMATIC_LIKE_SVG, value: this.getLikes(), label: communityCopy('like') }))
+        row.appendChild(this.createStat({ svg: SCHEMATIC_VIEW_SVG, value: this.getViews(), label: communityCopy('views') }))
         return row
     }
 }
@@ -406,37 +410,37 @@ const SCHEMATICS_PAGE_SIZE_FALLBACK = 24
 const SCHEMATICS_VIEW_COPY = {
     content: {
         schematics: {
-            eyebrow: schematicsEyebrow?.textContent || 'Community',
-            title: schematicsTitle?.textContent || 'Schematics Library',
-            subtitle: schematicsSubtitle?.textContent || 'Browse, preview, and install build schematics curated by the community.'
+            eyebrow: schematicsEyebrow?.textContent || communityCopy('communityEyebrow'),
+            title: schematicsTitle?.textContent || communityCopy('schematicsLibrary'),
+            subtitle: schematicsSubtitle?.textContent || communityCopy('schematicsLibrarySubtitle')
         },
         collections: {
-            eyebrow: schematicsEyebrow?.textContent || 'Community',
-            title: 'Collections Library',
-            subtitle: 'Browse curated collections of schematics and discover themed build sets.'
+            eyebrow: schematicsEyebrow?.textContent || communityCopy('communityEyebrow'),
+            title: communityCopy('collectionsLibrary'),
+            subtitle: communityCopy('collectionsLibrarySubtitle')
         }
     },
     creators: {
         list: {
-            eyebrow: schematicsEyebrow?.textContent || 'Community',
-            title: 'Creators',
-            subtitle: 'Explore community creators and jump into their latest builds and collections.'
+            eyebrow: schematicsEyebrow?.textContent || communityCopy('communityEyebrow'),
+            title: communityCopy('creators'),
+            subtitle: communityCopy('creatorsSubtitle')
         },
         profile: {
-            eyebrow: schematicsEyebrow?.textContent || 'Community',
-            title: 'Creator',
-            subtitle: 'Review published schematics and collections from this creator.'
+            eyebrow: schematicsEyebrow?.textContent || communityCopy('communityEyebrow'),
+            title: communityCopy('creator'),
+            subtitle: communityCopy('creatorSubtitle')
         }
     },
     schematics: {
-        eyebrow: schematicsEyebrow?.textContent || 'Community',
-        title: schematicsTitle?.textContent || 'Schematics Library',
-        subtitle: schematicsSubtitle?.textContent || 'Browse, preview, and install build schematics curated by the community.'
+        eyebrow: schematicsEyebrow?.textContent || communityCopy('communityEyebrow'),
+        title: schematicsTitle?.textContent || communityCopy('schematicsLibrary'),
+        subtitle: schematicsSubtitle?.textContent || communityCopy('schematicsLibrarySubtitle')
     },
     collections: {
-        eyebrow: schematicsEyebrow?.textContent || 'Community',
-        title: 'Collections Library',
-        subtitle: 'Browse curated collections of schematics and discover themed build sets.'
+        eyebrow: schematicsEyebrow?.textContent || communityCopy('communityEyebrow'),
+        title: communityCopy('collectionsLibrary'),
+        subtitle: communityCopy('collectionsLibrarySubtitle')
     }
 }
 let schematicsState = {
@@ -629,6 +633,25 @@ function updateCommunityView(){
     scheduleCommunityPageSizeRefresh()
 }
 let schematicsFetchController = null
+let schematicsRouteListenerBound = false
+
+function cancelSchematicsRouteWork(){
+    const controllers = [
+        schematicsFetchController,
+        schematicDetailController,
+        collectionsBrowseFetchController,
+        collectionsBrowseDetailFetchController,
+        collectionsListFetchController,
+        collectionsDetailFetchController,
+        creatorSchematicsFetchController,
+        creatorCollectionsFetchController
+    ]
+    controllers.forEach(controller => controller?.abort())
+    schematicsFetchController = null
+    schematicDetailController = null
+    setSchematicPreviewRendererActive(false)
+    setUploadPreviewRendererActive(false)
+}
 let schematicsFetchTimer = null
 let schematicsInstallIndex = new Map()
 let schematicsInstallManager = null
@@ -1274,7 +1297,7 @@ function extractModIdsFromText(content, regex){
 function extractModIdsFromJar(jarPath){
     const ids = new Set()
     try {
-        // eslint-disable-next-line global-require
+
         const AdmZip = require('adm-zip')
         const zip = new AdmZip(jarPath)
         const entries = zip.getEntries()
@@ -1444,7 +1467,7 @@ async function ensureSchematicsModAssetsPermission(){
     if(current === false){
         return false
     }
-    const confirmed = window.confirm('This schematic uses modded blocks. Allow the launcher to download mod assets from Curse Maven for previews?')
+    const confirmed = window.confirm(communityCopy('modAssetsConfirm'))
     ConfigManager.setSchematicsModAssetsAutoDownload(confirmed)
     ConfigManager.save()
     return confirmed
@@ -1461,7 +1484,7 @@ async function validateModJar(jarPath, namespace){
         if(!stat || stat.size <= 0){
             return false
         }
-        // eslint-disable-next-line global-require
+
         const AdmZip = require('adm-zip')
         const zip = new AdmZip(jarPath)
         const entries = zip.getEntries()
@@ -2373,7 +2396,7 @@ function renderInstalledList(){
     if(items.length === 0){
         const empty = document.createElement('div')
         empty.className = 'schematicsGridMessage'
-        empty.textContent = 'No schematics installed yet.'
+        empty.textContent = communityCopy('noInstalledYet')
         schematicsInstalledList.appendChild(empty)
         return
     }
@@ -2387,7 +2410,7 @@ function renderInstalledList(){
 
         const name = document.createElement('div')
         name.className = 'schematicsInstalledName'
-        name.textContent = item.name || 'Schematic'
+        name.textContent = item.name || communityCopy('schematic')
 
         const date = document.createElement('div')
         date.className = 'schematicsInstalledDate'
@@ -2399,7 +2422,7 @@ function renderInstalledList(){
         const remove = document.createElement('button')
         remove.type = 'button'
         remove.className = 'schematicsMiniButton'
-        remove.textContent = 'Remove'
+        remove.textContent = communityCopy('remove')
         remove.addEventListener('click', () => {
             removeInstalledSchematic({ id: item.schematicId })
             renderInstalledList()
@@ -2446,12 +2469,12 @@ function getInstalledSchematic(id){
 async function resolveSchematicInstallContext(){
     const account = ConfigManager.getSelectedAccount()
     const profileId = ConfigManager.getSelectedServer()
-    if(!account?.uuid) throw new Error('Select a Microsoft account before installing a schematic.')
-    if(!profileId) throw new Error('Select a Cobble Power profile before installing a schematic.')
+    if(!account?.uuid) throw new Error(communityCopy('selectMicrosoftAccount'))
+    if(!profileId) throw new Error(communityCopy('selectCobblePowerProfile'))
     const distro = await DistroAPI.getDistribution()
     const profile = distro?.getServerById(profileId)
     if(!profile || !moduleContainsCobblePower(profile.modules)){
-        throw new Error('The selected profile does not contain Cobble Power.')
+        throw new Error(communityCopy('profileMissingCobblePower'))
     }
     if(!schematicsInstallManager) await loadSchematicsInstallIndex()
     return { account, profileId, profile }
@@ -2469,13 +2492,13 @@ function updateInstallButtonState(entry){
         : 'install'
     schematicsDetailInstall.disabled = !account?.uuid || !profileId
     if(state === 'installed'){
-        schematicsDetailInstall.textContent = 'Installed'
+        schematicsDetailInstall.textContent = communityCopy('installed')
         schematicsDetailInstall.classList.add('is-installed')
         if(schematicsDetailRemove){
             schematicsDetailRemove.style.display = 'inline-flex'
         }
     } else {
-        schematicsDetailInstall.textContent = state === 'update' ? 'Update available' : (state === 'repair' ? 'Repair install' : 'Install')
+        schematicsDetailInstall.textContent = state === 'update' ? communityCopy('updateAvailable') : (state === 'repair' ? communityCopy('repairInstall') : communityCopy('install'))
         schematicsDetailInstall.classList.remove('is-installed')
         if(schematicsDetailRemove){
             schematicsDetailRemove.style.display = installed ? 'inline-flex' : 'none'
@@ -2492,14 +2515,14 @@ async function installSchematicLegacy(entry){
         return
     }
     schematicsDetailInstall.disabled = true
-    schematicsDetailInstall.textContent = 'Downloading...'
+    schematicsDetailInstall.textContent = communityCopy('download')
 
     try {
         let schematic = entry.schematic
         if(!schematic){
             const base = await resolveSchematicsApiBase()
             if(!base){
-                throw new Error('Schematics service not configured.')
+                throw new Error(communityCopy('notConfigured'))
             }
             await ensureSchematicsAuthSession(base)
             const response = await fetch(`${base.replace(/\/+$/, '')}/v1/schematics/${encodeURIComponent(entry.id)}/download`, {
@@ -2512,12 +2535,12 @@ async function installSchematicLegacy(entry){
             schematic = await response.json()
         }
         if(!schematic){
-            throw new Error('No schematic data available.')
+            throw new Error(communityCopy('noSchematicData'))
         }
         try {
             const { schematic: normalized } = await normalizeJsonSchematic(schematic, {})
             if(entry.hash && normalized?.meta?.hash && entry.hash !== normalized.meta.hash){
-                throw new Error('Schematic hash mismatch.')
+                throw new Error(communityCopy('hashMismatch'))
             }
             if(Number.isFinite(Number(entry.blockCount)) && normalized?.meta?.blockCount != null && Number(entry.blockCount) !== Number(normalized.meta.blockCount)){
                 loggerLanding.warn('Schematic block count mismatch.', {
@@ -2535,17 +2558,17 @@ async function installSchematicLegacy(entry){
         await fs.writeJson(filePath, schematic, { spaces: 2 })
         schematicsInstallIndex.set(entry.id, {
             id: entry.id,
-            name: entry.name || schematic.name || 'Schematic',
+            name: entry.name || schematic.name || communityCopy('schematic'),
             filePath,
             installedAt: new Date().toISOString()
         })
         await saveSchematicsInstallIndex()
-        schematicsDetailInstall.textContent = 'Installed'
+        schematicsDetailInstall.textContent = communityCopy('installed')
         schematicsDetailInstall.classList.add('is-installed')
         renderSchematics()
     } catch (err) {
         loggerLanding.warn('Failed to install schematic.', err)
-        schematicsDetailInstall.textContent = 'Install Failed'
+        schematicsDetailInstall.textContent = communityCopy('installFailed')
         setTimeout(() => updateInstallButtonState(entry), 1200)
     } finally {
         schematicsDetailInstall.disabled = false
@@ -2555,11 +2578,11 @@ async function installSchematicLegacy(entry){
 async function installSchematic(entry){
     if(!entry?.id || !schematicsDetailInstall) return
     schematicsDetailInstall.disabled = true
-    schematicsDetailInstall.textContent = 'Downloading...'
+    schematicsDetailInstall.textContent = communityCopy('download')
     try {
         const context = await resolveSchematicInstallContext()
         const detail = entry.revision ? entry : (await fetchSchematicDetail(entry.id) || entry)
-        if(!detail.revision?.sha256) throw new Error('The schematic revision metadata is missing.')
+        if(!detail.revision?.sha256) throw new Error(communityCopy('missingRevision'))
         const canonical = await schematicApiRequest(`/v1/schematics/${encodeURIComponent(entry.id)}/download`, {
             method: 'GET',
             headers: { Accept: 'application/json' }
@@ -2569,14 +2592,14 @@ async function installSchematic(entry){
             playerUuid: context.account.uuid,
             entry: detail,
             canonical,
-            confirmModified: filePath => window.confirm(`This schematic was modified locally:\n${filePath}\n\nReplace it with the community revision?`)
+            confirmModified: filePath => window.confirm(communityCopy('replaceModified', { path: filePath }))
         })
         schematicsInstallIndex.set(record.key, record)
         updateInstallButtonState(detail)
         renderSchematics()
     } catch(err) {
         loggerLanding.warn('Failed to install schematic.', { message: String(err?.message || err).replace(/https?:\/\/[^\s]+/g, '[redacted-url]') })
-        schematicsDetailInstall.textContent = err?.code === 'locally_modified' ? 'Local changes kept' : 'Install failed'
+        schematicsDetailInstall.textContent = err?.code === 'locally_modified' ? communityCopy('localChangesKept') : communityCopy('installFailed')
         setTimeout(() => updateInstallButtonState(entry), 1500)
     } finally {
         schematicsDetailInstall.disabled = false
@@ -2612,7 +2635,7 @@ async function removeInstalledSchematic(entry){
             profileId: context.profileId,
             playerUuid: context.account.uuid,
             schematicId: entry.id,
-            confirmModified: filePath => window.confirm(`This schematic was modified locally:\n${filePath}\n\nDelete the modified file?`)
+            confirmModified: filePath => window.confirm(communityCopy('deleteModified', { path: filePath }))
         })
         if(removed){
             schematicsInstallIndex = new Map(schematicsInstallManager.index.map(item => [item.key, item]))

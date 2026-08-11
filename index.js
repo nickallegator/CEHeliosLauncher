@@ -5,7 +5,6 @@ remoteMain.initialize()
 const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
 const autoUpdater                       = require('electron-updater').autoUpdater
 const ejse                              = require('ejs-electron')
-const fs                                = require('fs')
 const http                              = require('http')
 const isDev                             = require('./app/assets/js/isdev')
 const path                              = require('path')
@@ -310,8 +309,10 @@ let win
 function createWindow() {
 
     win = new BrowserWindow({
-        width: 980,
-        height: 552,
+        width: 1180,
+        height: 680,
+        minWidth: 980,
+        minHeight: 600,
         icon: getPlatformIcon('SealCircle'),
         frame: false,
         webPreferences: {
@@ -324,7 +325,6 @@ function createWindow() {
     remoteMain.enable(win.webContents)
 
     const data = {
-        bkid: Math.floor((Math.random() * fs.readdirSync(path.join(__dirname, 'app', 'assets', 'images', 'backgrounds')).length)),
         lang: (str, placeHolders) => LangLoader.queryEJS(str, placeHolders)
     }
     Object.entries(data).forEach(([key, val]) => ejse.data(key, val))

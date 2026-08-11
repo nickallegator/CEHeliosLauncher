@@ -56,7 +56,7 @@ function updateSchematicShareContext(entry){
         }
     }
     if(schematicsDetailShareMenuSubtitle){
-        const fallback = schematicsDetailShareMenuSubtitle.dataset.default || 'Choose a platform'
+        const fallback = schematicsDetailShareMenuSubtitle.dataset.default || communityCopy('choosePlatform')
         const name = String(entry?.name || '').trim()
         schematicsDetailShareMenuSubtitle.textContent = name || fallback
     }
@@ -122,7 +122,7 @@ function updateLikeButton(entry){
         return
     }
     const liked = Boolean(entry?.liked)
-    schematicsDetailLike.textContent = liked ? 'Liked' : 'Like'
+    schematicsDetailLike.textContent = liked ? communityCopy('liked') : communityCopy('like')
     schematicsDetailLike.classList.toggle('is-liked', liked)
     const hasToken = Boolean(AccessGate.getSessionToken())
     schematicsDetailLike.disabled = !hasToken
@@ -171,7 +171,7 @@ async function openSchematicDetail(entry){
             schematicsDetailPanel.style.setProperty('--schematic-accent', detailEntry.accent || '92, 160, 255')
         }
         if(schematicsDetailTitle){
-            schematicsDetailTitle.textContent = detailEntry.name || 'Schematic'
+            schematicsDetailTitle.textContent = detailEntry.name || communityCopy('schematic')
         }
         if(schematicsDetailCreator){
             schematicsDetailCreator.textContent = detailEntry.creator ? `by ${detailEntry.creator}` : 'by --'
@@ -228,12 +228,12 @@ async function openSchematicDetail(entry){
     if(schematicsDetailPreview){
         schematicsDetailPreview.setAttribute('data-rendered', 'false')
     }
-    renderPreviewPlaceholder('Preparing preview...')
+    renderPreviewPlaceholder(communityCopy('preparingPreview'))
     if(schematicsDetailBlocks){
-        renderBlockCountsPlaceholder('Loading block list...')
+        renderBlockCountsPlaceholder(communityCopy('loadingBlockList'))
     }
     if(schematicsDetailMods){
-        renderModListPlaceholder('Scanning schematic mods...')
+        renderModListPlaceholder(communityCopy('scanningMods'))
     }
 
     if(schematicsDetailInstall){
@@ -323,9 +323,9 @@ async function openSchematicDetail(entry){
             return
         }
         if(!normalized){
-            renderPreviewPlaceholder('No schematic data available.')
-            renderBlockCountsPlaceholder('No block data available.')
-            renderModListPlaceholder('No mod data available.')
+            renderPreviewPlaceholder(communityCopy('noSchematicData'))
+            renderBlockCountsPlaceholder(communityCopy('noBlockData'))
+            renderModListPlaceholder(communityCopy('noModData'))
             return
         }
         if(schematicDetailActiveId !== entry.id){
@@ -357,9 +357,9 @@ async function openSchematicDetail(entry){
         await Promise.all([blockListRenderTask, modsListRenderTask])
     } catch (err) {
         loggerLanding.warn('Failed to normalize schematic for preview.', err)
-        renderPreviewPlaceholder('Preview unavailable.')
-        renderBlockCountsPlaceholder('No block data available.')
-        renderModListPlaceholder('No mod data available.')
+        renderPreviewPlaceholder(communityCopy('previewUnavailable'))
+        renderBlockCountsPlaceholder(communityCopy('noBlockData'))
+        renderModListPlaceholder(communityCopy('noModData'))
     }
 }
 

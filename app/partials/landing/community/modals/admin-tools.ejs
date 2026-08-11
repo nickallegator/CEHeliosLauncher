@@ -3,60 +3,60 @@
     <div id="schematicsAdminPanel" class="schematicsModalPanel schematicsAdminPanel" role="dialog" aria-modal="true" aria-labelledby="schematicsAdminTitle" tabindex="-1">
         <div class="schematicsAdminHeader">
             <div class="schematicsAdminHeading">
-                <div class="schematicsAdminEyebrow">Admin</div>
-                <h2 id="schematicsAdminTitle">Thumbnail Regeneration</h2>
-                <div class="schematicsAdminSubtitle">Regenerate missing thumbnails in batches.</div>
+                <div class="schematicsAdminEyebrow"><%- lang('community.admin') %></div>
+                <h2 id="schematicsAdminTitle"><%- lang('community.thumbnailRegeneration') %></h2>
+                <div class="schematicsAdminSubtitle"><%- lang('community.thumbnailRegenerationSubtitle') %></div>
             </div>
             <div class="schematicsAdminActions">
-                <button id="schematicsAdminClose" type="button" class="schematicsDetailButton">Close</button>
+                <button id="schematicsAdminClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
             </div>
         </div>
         <div class="schematicsAdminBody">
             <div class="schematicsAdminForm">
                 <label class="schematicsAdminField">
-                    <span>IDs (optional)</span>
+                    <span><%- lang('community.idsOptional') %></span>
                     <input id="schematicsAdminIds" type="text" placeholder="uuid, uuid" spellcheck="false" autocomplete="off"/>
                 </label>
                 <div class="schematicsAdminRow">
                     <label class="schematicsAdminField">
-                        <span>Limit</span>
+                        <span><%- lang('community.limit') %></span>
                         <input id="schematicsAdminLimit" type="number" min="1" max="100" value="25"/>
                     </label>
                     <label class="schematicsAdminField">
-                        <span>Offset</span>
+                        <span><%- lang('community.offset') %></span>
                         <input id="schematicsAdminOffset" type="number" min="0" value="0"/>
                     </label>
                 </div>
                 <label class="schematicsAdminField">
-                    <span>Labels</span>
+                    <span><%- lang('community.labels') %></span>
                     <input id="schematicsAdminLabels" type="text" placeholder="tiny, medium" spellcheck="false" autocomplete="off"/>
                 </label>
                 <label class="schematicsAdminField">
-                    <span>Mimes</span>
+                    <span><%- lang('community.mimes') %></span>
                     <input id="schematicsAdminMimes" type="text" placeholder="image/webp, image/png" spellcheck="false" autocomplete="off"/>
                 </label>
                 <div class="schematicsAdminToggles">
                     <label class="schematicsAdminToggle">
                         <input id="schematicsAdminVerifyObjects" type="checkbox" checked/>
-                        <span>Verify objects</span>
+                        <span><%- lang('community.verifyObjects') %></span>
                     </label>
                     <label class="schematicsAdminToggle">
                         <input id="schematicsAdminRepair" type="checkbox" checked/>
-                        <span>Repair stale DB rows</span>
+                        <span><%- lang('community.repairRows') %></span>
                     </label>
                     <label class="schematicsAdminToggle">
                         <input id="schematicsAdminIncludeExisting" type="checkbox"/>
-                        <span>Include existing</span>
+                        <span><%- lang('community.includeExisting') %></span>
                     </label>
                 </div>
                 <div class="schematicsAdminFooter">
-                    <button id="schematicsAdminRun" type="button" class="schematicsDetailButton primary">Run</button>
-                    <span id="schematicsAdminStatus" class="schematicsAdminStatus">Ready.</span>
+                    <button id="schematicsAdminRun" type="button" class="schematicsDetailButton primary"><%- lang('community.run') %></button>
+                    <span id="schematicsAdminStatus" class="schematicsAdminStatus"><%- lang('community.ready') %></span>
                 </div>
             </div>
             <div class="schematicsAdminResults">
                 <div class="schematicsAdminResultsHeader">
-                    <span>Results</span>
+                    <span><%- lang('community.results') %></span>
                 </div>
                 <div id="schematicsAdminResults" class="schematicsAdminResultsList"></div>
             </div>

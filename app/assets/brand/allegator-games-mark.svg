@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Allegator Games</title>
+  <path fill="#111817" stroke="#87decd" stroke-width="4" d="M8 24 20 12h56l12 12v48L76 84H20L8 72V24Z"/>
+  <path fill="#37c8ab" d="M19 35h50l12 11-12 15H44l-8 10H20l9-16-10-20Z"/>
+  <path fill="#87decd" d="M25 41h42l6 6-7 7H38l-5 7h-5l6-11-9-9Z"/>
+  <path fill="#ff6600" d="m51 54 10 0-5 8-5-8Zm17-7 6 0-3 5-3-5Z"/>
+  <path fill="#f9f9f9" d="M56 38h8v7h-8z"/>
+  <path fill="#111817" d="M59 40h3v3h-3z"/>
+</svg>

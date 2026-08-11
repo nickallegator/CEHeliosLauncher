@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="home" viewBox="0 0 24 24">
+    <path d="M3 11 12 3l9 8v10h-6v-6H9v6H3V11Z"/>
+  </symbol>
+  <symbol id="community" viewBox="0 0 24 24">
+    <path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/>
+  </symbol>
+  <symbol id="news" viewBox="0 0 24 24">
+    <path d="M4 4h16v16H4V4Zm3 3v3h10V7H7Zm0 6v2h5v-2H7Zm0 4v1h10v-1H7Zm7-4v2h3v-2h-3Z"/>
+  </symbol>
+  <symbol id="link" viewBox="0 0 24 24">
+    <path d="M10.6 13.4a2 2 0 0 0 2.8 0l3-3a2 2 0 1 0-2.8-2.8l-1 1-1.4-1.4 1-1a4 4 0 0 1 5.6 5.6l-3 3a4 4 0 0 1-5.6 0l1.4-1.4Zm2.8-2.8a2 2 0 0 0-2.8 0l-3 3a2 2 0 1 0 2.8 2.8l1-1 1.4 1.4-1 1a4 4 0 0 1-5.6-5.6l3-3a4 4 0 0 1 5.6 0l-1.4 1.4Z"/>
+  </symbol>
+  <symbol id="settings" viewBox="0 0 24 24">
+    <path d="m19.4 13 .1-1-.1-1 2-1.5-2-3.4-2.5 1a8 8 0 0 0-1.7-1L15 3.5h-4L10.6 6a8 8 0 0 0-1.7 1L6.5 6 4.5 9.5l2 1.5-.1 1 .1 1-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/>
+  </symbol>
+  <symbol id="retry" viewBox="0 0 24 24">
+    <path d="M19 8V4l-2 2a8 8 0 1 0 2.3 8h-2.1A6 6 0 1 1 15.6 7L13 9.5h6V8Z"/>
+  </symbol>
+  <symbol id="close" viewBox="0 0 24 24">
+    <path d="m6.3 4.9 5.7 5.7 5.7-5.7 1.4 1.4-5.7 5.7 5.7 5.7-1.4 1.4-5.7-5.7-5.7 5.7-1.4-1.4 5.7-5.7-5.7-5.7 1.4-1.4Z"/>
+  </symbol>
+</svg>

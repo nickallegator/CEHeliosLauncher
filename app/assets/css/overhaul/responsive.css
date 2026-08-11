@@ -1,0 +1,48 @@
+@media (max-width: 1099px) {
+    :root { --workshop-nav-width: 76px; }
+
+    #appShellNavigation { padding: 12px 9px; }
+    .shellBrandButton { justify-content: center; padding: 7px; }
+    .shellBrandCopy,
+    .shellNavItem > span:not(.shellNavBadge),
+    .shellUtilityButton > span,
+    .shellAccountCopy,
+    #shellServiceSummary > span:last-of-type { display: none; }
+    .shellNavItem,
+    .shellUtilityButton { justify-content: center; padding: 8px; }
+    .shellNavItem:hover,
+    .shellUtilityButton:hover { transform: translateY(-1px); }
+    .shellAccountButton { justify-content: center; }
+    #shellLinksMenu { bottom: 0; left: 58px; }
+    #mojangStatusTooltip { bottom: 0 !important; left: 58px !important; }
+    #updateAvailableTooltip { top: 50px !important; left: 8px !important; }
+
+    #landingContainer > #upper.homeWorkspace {
+        grid-template-columns: minmax(190px, .8fr) minmax(330px, 1.45fr) minmax(185px, .72fr);
+        gap: 12px;
+        padding: 16px 16px 2px;
+    }
+    .homeHeroPanel,
+    .homeSidePanel { padding: 22px 18px; }
+    .homeHeroPanel h1 { font-size: 35px; }
+    .homeSidePanel h2 { font-size: 21px; }
+    .homeStatsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .homePackCard,
+    .homeActivityCard { padding: 18px; }
+    #landingContainer > #lower.globalLaunchDock { right: 16px !important; left: 16px !important; grid-template-columns: minmax(190px, .8fr) minmax(170px, 1fr) minmax(210px, .72fr); }
+    .launchDockMessage { font-size: 11px; }
+    #launch_button { min-width: 158px !important; }
+}
+
+@media (max-height: 639px) {
+    :root { --workshop-launch-height: 72px; }
+    #landingContainer > #upper.homeWorkspace { padding-top: 12px; }
+    .homeHeroPanel,
+    .homeSidePanel { padding-top: 18px; padding-bottom: 18px; }
+    .homeBrandRule { margin: 15px 0; }
+    .homePackCard,
+    .homeActivityCard { padding-top: 15px; padding-bottom: 15px; }
+    .homeStatsGrid { margin-top: 12px; }
+    #landingContainer > #lower.globalLaunchDock { bottom: 10px !important; }
+    .communityHub { padding-top: 18px; }
+}

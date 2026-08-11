@@ -58,7 +58,7 @@ async function getSchematicsApiClient(){
 
 async function schematicApiRequest(pathname, options = {}){
     const client = await getSchematicsApiClient()
-    if(!client) throw new SchematicApiError('Schematics service is not configured.', { code: 'not_configured' })
+    if(!client) throw new SchematicApiError(communityCopy('notConfigured'), { code: 'not_configured' })
     const headers = { ...(options.headers || {}), ...getSchematicsAuthHeaders() }
     return (await client.request(pathname, { ...options, headers })).data
 }
@@ -91,7 +91,7 @@ function getCurrentCreatorName(){
     if(profile?.name){
         return profile.name
     }
-    return profile?.username || profile?.id || 'Creator'
+    return profile?.username || profile?.id || communityCopy('creator')
 }
 
 function isSchematicsAdmin(){
@@ -242,7 +242,7 @@ async function deleteSchematic(entry){
     if(!entry?.id){
         return
     }
-    const confirmed = window.confirm('Delete this schematic? This cannot be undone.')
+    const confirmed = window.confirm(communityCopy('deleteConfirm'))
     if(!confirmed){
         return
     }
@@ -273,7 +273,7 @@ async function reportSchematic(entry){
     if(!entry?.id){
         return
     }
-    const reason = prompt('Report reason (optional):') || ''
+    const reason = prompt(communityCopy('reportPrompt')) || ''
     const detail = reason.trim()
     const base = await resolveSchematicsApiBase()
     if(!base){
@@ -298,7 +298,7 @@ async function reportSchematic(entry){
 async function regenerateMissingThumbnails(options){
     const base = await resolveSchematicsApiBase()
     if(!base){
-        throw new Error('Schematics service not configured.')
+        throw new Error(communityCopy('notConfigured'))
     }
     await ensureSchematicsAuthSession(base)
     const payload = {
@@ -559,7 +559,7 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
         schematicsState = {
             ...schematicsState,
             status: 'error',
-            error: 'Schematics service not configured.',
+            error: communityCopy('notConfigured'),
             items: [],
             total: 0
         }
@@ -603,7 +603,7 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
         schematicsState = {
             ...schematicsState,
             status: 'ready',
-            error: data.offline ? 'Offline — showing the last successfully loaded catalog.' : null,
+            error: data.offline ? communityCopy('offlineCatalog') : null,
             items,
             total: Number.isFinite(Number(data?.total)) ? Number(data.total) : items.length,
             page: effectivePage,
@@ -620,7 +620,7 @@ async function fetchSchematicsList({ query, sortKey, page } = {}){
         schematicsState = {
             ...schematicsState,
             status: 'error',
-            error: 'Unable to load schematics. No cached catalog is available.',
+            error: communityCopy('unavailableNoCache'),
             items: [],
             total: 0
         }

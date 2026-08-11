@@ -3,12 +3,12 @@
     <div id="schematicsUploadPanel" class="schematicsModalPanel" role="dialog" aria-modal="true" aria-labelledby="schematicsUploadTitle" tabindex="-1">
         <div id="schematicsUploadHeader">
             <div id="schematicsUploadHeading">
-                <div id="schematicsUploadEyebrow">Creator Tools</div>
-                <h2 id="schematicsUploadTitle">Upload Schematic</h2>
-                <div id="schematicsUploadSubtitle">Share a build with the community. JSON schematics only for now.</div>
+                <div id="schematicsUploadEyebrow"><%- lang('community.creatorTools') %></div>
+                <h2 id="schematicsUploadTitle"><%- lang('community.uploadSchematic') %></h2>
+                <div id="schematicsUploadSubtitle"><%- lang('community.uploadSubtitle') %></div>
             </div>
             <div id="schematicsUploadActions">
-                <button id="schematicsUploadClose" type="button" class="schematicsDetailButton">Close</button>
+                <button id="schematicsUploadClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
             </div>
         </div>
         <div id="schematicsUploadBody">
@@ -20,38 +20,38 @@
                         <path d="M5 21h14"/>
                     </svg>
                 </div>
-                <div class="schematicsUploadDropText">Drop a schematic JSON here or browse</div>
-                <div class="schematicsUploadDropHint">Max 5MB Â· .json format</div>
+                <div class="schematicsUploadDropText"><%- lang('community.uploadDropText') %></div>
+                <div class="schematicsUploadDropHint"><%- lang('community.uploadDropHint') %></div>
                 <input id="schematicsUploadInput" type="file" accept=".json,application/json" />
             </div>
             <div id="schematicsUploadMeta">
                 <div class="schematicsUploadSection">
-                    <div class="schematicsUploadSectionTitle">Details</div>
+                    <div class="schematicsUploadSectionTitle"><%- lang('community.details') %></div>
                     <label class="schematicsUploadField">
-                        <span>Title</span>
-                        <input id="schematicsUploadTitleInput" type="text" placeholder="e.g. Crimson Keep" maxlength="80" />
+                        <span><%- lang('community.fieldTitle') %></span>
+                        <input id="schematicsUploadTitleInput" type="text" placeholder="<%- lang('community.titlePlaceholder') %>" maxlength="80" />
                     </label>
                     <label class="schematicsUploadField">
-                        <span>Description</span>
-                        <textarea id="schematicsUploadDescriptionInput" placeholder="Describe the build, requirements, and tips." maxlength="600"></textarea>
+                        <span><%- lang('community.description') %></span>
+                        <textarea id="schematicsUploadDescriptionInput" placeholder="<%- lang('community.descriptionPlaceholder') %>" maxlength="600"></textarea>
                     </label>
                     <label class="schematicsUploadField">
-                        <span>Tags</span>
-                        <input id="schematicsUploadTagsInput" type="text" placeholder="castle, survival, redstone" />
+                        <span><%- lang('community.tags') %></span>
+                        <input id="schematicsUploadTagsInput" type="text" placeholder="<%- lang('community.tagsExample') %>" />
                     </label>
                     <label class="schematicsUploadField">
-                        <span>Visibility</span>
+                        <span><%- lang('community.visibility') %></span>
                         <select id="schematicsUploadVisibility">
-                            <option value="public">Public</option>
-                            <option value="unlisted">Unlisted</option>
-                            <option value="private">Private</option>
+                            <option value="public"><%- lang('community.public') %></option>
+                            <option value="unlisted"><%- lang('community.unlisted') %></option>
+                            <option value="private"><%- lang('community.private') %></option>
                         </select>
                     </label>
                 </div>
                 <div class="schematicsUploadSection schematicsUploadPreviewSection">
-                    <div class="schematicsUploadSectionTitle">Preview</div>
+                    <div class="schematicsUploadSectionTitle"><%- lang('community.preview') %></div>
                     <div id="schematicsUploadPreview">
-                        <canvas id="schematicsUploadCanvas" aria-label="Schematic preview"></canvas>
+                        <canvas id="schematicsUploadCanvas" aria-label="<%- lang('community.previewLabel') %>"></canvas>
                         <svg class="schematicsUploadPreviewIcon" viewBox="0 0 48 48" aria-hidden="true" focusable="false" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M24 6 8 14v20l16 8 16-8V14L24 6z"/>
                             <path d="M8 14l16 8 16-8"/>
@@ -59,42 +59,42 @@
                         </svg>
                         <div class="schematicMeshOverlay" aria-hidden="true">
                             <div class="schematicMeshSpinner"></div>
-                            <div class="schematicMeshLabel">Building mesh...</div>
+                            <div class="schematicMeshLabel"><%- lang('community.buildingMesh') %></div>
                         </div>
                     </div>
                     <div id="schematicsUploadBlocks">
                         <div class="schematicsUploadBlockHeader">
-                            <span class="schematicsUploadBlockTitle">Blocks</span>
+                            <span class="schematicsUploadBlockTitle"><%- lang('community.blocks') %></span>
                             <span id="schematicsUploadBlocksTotal" class="schematicsUploadBlockTotal">--</span>
                         </div>
                         <div id="schematicsUploadBlocksList" class="schematicsUploadBlockList"></div>
                     </div>
                     <div class="schematicsUploadStats">
                         <div class="schematicsUploadStat">
-                            <span class="schematicsUploadStatLabel">File</span>
+                            <span class="schematicsUploadStatLabel"><%- lang('community.file') %></span>
                             <span id="schematicsUploadFileName" class="schematicsUploadStatValue">--</span>
                         </div>
                         <div class="schematicsUploadStat">
-                            <span class="schematicsUploadStatLabel">Blocks</span>
+                            <span class="schematicsUploadStatLabel"><%- lang('community.blocks') %></span>
                             <span id="schematicsUploadBlockCount" class="schematicsUploadStatValue">--</span>
                         </div>
                         <div class="schematicsUploadStat">
-                            <span class="schematicsUploadStatLabel">Palette</span>
+                            <span class="schematicsUploadStatLabel"><%- lang('community.palette') %></span>
                             <span id="schematicsUploadPaletteCount" class="schematicsUploadStatValue">--</span>
                         </div>
                         <div class="schematicsUploadStat">
-                            <span class="schematicsUploadStatLabel">Bounds</span>
+                            <span class="schematicsUploadStatLabel"><%- lang('community.bounds') %></span>
                             <span id="schematicsUploadBounds" class="schematicsUploadStatValue">--</span>
                         </div>
                         <div class="schematicsUploadStat">
-                            <span class="schematicsUploadStatLabel">Hash</span>
+                            <span class="schematicsUploadStatLabel"><%- lang('community.hash') %></span>
                             <span id="schematicsUploadHash" class="schematicsUploadStatValue">--</span>
                         </div>
                     </div>
                     <div id="schematicsUploadWarnings"></div>
-                    <div id="schematicsUploadStatus">Select a schematic to begin.</div>
+                    <div id="schematicsUploadStatus"><%- lang('community.selectToBegin') %></div>
                     <div id="schematicsUploadSubmitRow">
-                        <button id="schematicsUploadSubmit" type="button" class="schematicsDetailButton primary" disabled>Upload</button>
+                        <button id="schematicsUploadSubmit" type="button" class="schematicsDetailButton primary" disabled><%- lang('community.upload') %></button>
                     </div>
                 </div>
             </div>

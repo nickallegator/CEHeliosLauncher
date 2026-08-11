@@ -1,0 +1,68 @@
+<aside id="appShellNavigation" aria-label="<%- lang('shell.navigationLabel') %>">
+    <button id="image_seal_container" class="shellBrandButton" type="button" aria-label="<%- lang('shell.brandLabel') %>">
+        <img id="image_seal" src="assets/brand/allegator-games-mark.svg" alt="">
+        <span class="shellBrandCopy"><strong>ALLEGATOR</strong><small>GAMES</small></span>
+        <span id="updateAvailableTooltip"><%- lang('landing.updateAvailableTooltip') %></span>
+    </button>
+
+    <nav id="shellPrimaryNavigation">
+        <button id="shellNavHome" class="shellNavItem" type="button" data-shell-route="home" aria-current="page">
+            <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#home"></use></svg>
+            <span class="shellNavLabel"><%- lang('shell.home') %></span>
+        </button>
+        <button id="shellNavCommunity" class="shellNavItem" type="button" data-shell-route="community">
+            <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#community"></use></svg>
+            <span class="shellNavLabel"><%- lang('shell.community') %></span>
+        </button>
+        <button id="shellNavNews" class="shellNavItem" type="button" data-shell-route="news">
+            <span id="newsButtonAlert" class="shellNavBadge" style="display: none;"></span>
+            <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#news"></use></svg>
+            <span class="shellNavLabel"><%- lang('shell.news') %></span>
+        </button>
+    </nav>
+
+    <div id="shellNavigationFooter">
+        <div id="shellServiceSummary">
+            <span id="mojang_status_icon" aria-hidden="true">&#8226;</span>
+            <span><%- lang('shell.services') %></span>
+            <div id="mojangStatusTooltip" role="tooltip">
+                <div id="mojangStatusTooltipTitle"><%- lang('landing.mojangStatusTooltipTitle') %></div>
+                <div id="mojangStatusEssentialContainer"></div>
+                <div id="mojangStatusNEContainer">
+                    <div class="mojangStatusNEBar"></div>
+                    <div id="mojangStatusNETitle"><%- lang('landing.mojangStatusNETitle') %></div>
+                    <div class="mojangStatusNEBar"></div>
+                </div>
+                <div id="mojangStatusNonEssentialContainer"></div>
+            </div>
+        </div>
+
+        <div id="shellLinks">
+            <button id="shellLinksButton" class="shellUtilityButton" type="button" aria-expanded="false" aria-controls="shellLinksMenu">
+                <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#link"></use></svg>
+                <span><%- lang('shell.links') %></span>
+            </button>
+            <div id="shellLinksMenu" hidden>
+                <a href="<%- lang('landing.mediaGitHubURL') %>" class="mediaURL" id="linkURL">GitHub</a>
+                <a href="<%- lang('landing.mediaXURL') %>" class="mediaURL" id="xURL">X</a>
+                <a href="<%- lang('landing.mediaInstagramURL') %>" class="mediaURL" id="instagramURL">Instagram</a>
+                <a href="<%- lang('landing.mediaYouTubeURL') %>" class="mediaURL" id="youtubeURL">YouTube</a>
+                <a href="<%- lang('landing.mediaDiscordURL') %>" class="mediaURL" id="discordURL">Discord</a>
+                <a href="<%- lang('landing.mediaPatreonURL') %>" class="mediaURL" id="patreonURL">Patreon</a>
+            </div>
+        </div>
+
+        <button class="shellUtilityButton" id="settingsMediaButton" type="button" data-shell-route="settings">
+            <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#settings"></use></svg>
+            <span><%- lang('shell.settings') %></span>
+        </button>
+
+        <button id="avatarOverlay" class="shellAccountButton" type="button">
+            <span id="avatarContainer" aria-hidden="true"></span>
+            <span class="shellAccountCopy">
+                <small><%- lang('shell.signedInAs') %></small>
+                <strong id="user_text"><%- lang('landing.usernamePlaceholder') %></strong>
+            </span>
+        </button>
+    </div>
+</aside>
