@@ -8,11 +8,11 @@ on:
         required: true
         type: string
       pack_version:
-        description: Launcher pack version
-        required: true
+        description: Launcher pack version; defaults to the mod version
+        required: false
         type: string
-      expected_previous_release:
-        description: Current release ID; leave empty only for the first promotion
+      source_commit:
+        description: Exact tagged source commit supplied by automatic dispatch
         required: false
         type: string
 
@@ -71,14 +71,21 @@ jobs:
         env:
           MOD_TAG: ${{ inputs.mod_tag }}
           PACK_VERSION: ${{ inputs.pack_version }}
-          EXPECTED_PREVIOUS: ${{ inputs.expected_previous_release }}
+          REQUESTED_SOURCE_COMMIT: ${{ inputs.source_commit }}
         run: |
           MOD_VERSION="${MOD_TAG#v}"
+          if [ "$MOD_TAG" != "v$MOD_VERSION" ] || [ -z "$MOD_VERSION" ]; then
+            echo "Invalid Cobble Power release tag: $MOD_TAG" >&2
+            exit 1
+          fi
+          if [ -z "$PACK_VERSION" ]; then PACK_VERSION="$MOD_VERSION"; fi
           MOD_JAR="release-asset/cobblepower-${MOD_VERSION}.jar"
           SOURCE_COMMIT="$(git -C mod-source rev-parse HEAD)"
+          if [ -n "$REQUESTED_SOURCE_COMMIT" ] && [ "$SOURCE_COMMIT" != "$REQUESTED_SOURCE_COMMIT" ]; then
+            echo "Tagged source commit $SOURCE_COMMIT does not match requested commit $REQUESTED_SOURCE_COMMIT" >&2
+            exit 1
+          fi
           RELEASE_ID="cobble-power-${MOD_VERSION}"
-          EXTRA_ARGS=()
-          if [ -n "$EXPECTED_PREVIOUS" ]; then EXTRA_ARGS+=(--expected-previous "$EXPECTED_PREVIOUS"); fi
           npm run releases -- prepare \
             --mod "$MOD_JAR" \
             --mod-version "$MOD_VERSION" \
@@ -88,8 +95,7 @@ jobs:
             --source-commit "$SOURCE_COMMIT" \
             --source-repo mod-source \
             --release-id "$RELEASE_ID" \
-            --output "dist/release-prepared/$RELEASE_ID" \
-            "${EXTRA_ARGS[@]}"
+            --output "dist/release-prepared/$RELEASE_ID"
           echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
           echo "prepared_dir=dist/release-prepared/$RELEASE_ID" >> "$GITHUB_OUTPUT"
 
@@ -147,11 +153,17 @@ jobs:
           RELEASES_STORAGE_ACCESS_KEY_ID: ${{ secrets.RELEASES_STORAGE_ACCESS_KEY_ID }}
           RELEASES_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.RELEASES_STORAGE_SECRET_ACCESS_KEY }}
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
-          EXPECTED_PREVIOUS: ${{ inputs.expected_previous_release }}
         run: |
           npm run releases -- publish --prepared prepared-release
           npm run releases -- verify --release-id "$RELEASE_ID" --channel test
+          CURRENT_JSON="$(node scripts/release-publisher.js current --channel test --json)"
+          CURRENT_RELEASE="$(node -e 'const value = JSON.parse(process.argv[1]); process.stdout.write(value.releaseId || "")' "$CURRENT_JSON")"
+          if [ "$CURRENT_RELEASE" = "$RELEASE_ID" ]; then
+            echo "Release $RELEASE_ID is already current; verified without rewriting the channel pointer."
+            npm run releases -- verify --channel test
+            exit 0
+          fi
           PROMOTE_ARGS=()
-          if [ -n "$EXPECTED_PREVIOUS" ]; then PROMOTE_ARGS+=(--expected-previous "$EXPECTED_PREVIOUS"); fi
+          if [ -n "$CURRENT_RELEASE" ]; then PROMOTE_ARGS+=(--expected-previous "$CURRENT_RELEASE"); fi
           npm run releases -- promote --release-id "$RELEASE_ID" --channel test "${PROMOTE_ARGS[@]}"
           npm run releases -- verify --channel test

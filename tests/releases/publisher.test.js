@@ -5,12 +5,14 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { execFileSync } = require('node:child_process')
 const AdmZip = require('adm-zip')
 
 const {
     hashFile,
     prepareRelease,
     replaceModuleUrl,
+    validateSourceCommit,
     validateVersionAgreement
 } = require('../../scripts/lib/release-publisher')
 
@@ -58,6 +60,20 @@ test('publisher rejects tag, metadata, and non-prerelease version disagreement',
     }), /Git tag/)
 })
 
+test('publisher rejects a tagged source commit mismatch', (t) => {
+    const sourceRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'cobblepower-source-'))
+    t.after(() => fs.rmSync(sourceRepo, { recursive: true, force: true }))
+    execFileSync('git', ['init'], { cwd: sourceRepo })
+    execFileSync('git', ['config', 'user.email', 'release-test@example.invalid'], { cwd: sourceRepo })
+    execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: sourceRepo })
+    fs.writeFileSync(path.join(sourceRepo, 'tracked.txt'), 'source')
+    execFileSync('git', ['add', 'tracked.txt'], { cwd: sourceRepo })
+    execFileSync('git', ['commit', '-m', 'Test source'], { cwd: sourceRepo })
+    const actual = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRepo, encoding: 'utf8' }).trim()
+    assert.equal(validateSourceCommit(sourceRepo, actual), actual)
+    assert.throws(() => validateSourceCommit(sourceRepo, 'f'.repeat(40)), /does not match requested commit/)
+})
+
 test('private module URL replacement is exact and deterministic', () => {
     const distribution = { servers: [{ modules: [{ id: 'a:b:1', artifact: { url: 'https://old' }, subModules: [] }] }] }
     replaceModuleUrl(distribution, 'a:b:1', 'maven/a/b/1/b-1.jar')
@@ -72,6 +88,12 @@ test('prepare produces deterministic templates, descriptors, and publish state',
     const sourceRepo = path.join(fixture, 'source')
     fs.mkdirSync(sourceRepo)
     fs.writeFileSync(path.join(sourceRepo, 'gradle.properties'), `mod_version=${version}\n`)
+    execFileSync('git', ['init'], { cwd: sourceRepo })
+    execFileSync('git', ['config', 'user.email', 'release-test@example.invalid'], { cwd: sourceRepo })
+    execFileSync('git', ['config', 'user.name', 'Release Test'], { cwd: sourceRepo })
+    execFileSync('git', ['add', 'gradle.properties'], { cwd: sourceRepo })
+    execFileSync('git', ['commit', '-m', 'Test source'], { cwd: sourceRepo })
+    const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRepo, encoding: 'utf8' }).trim()
     const outputA = path.join(projectRoot, 'dist', `publisher-test-a-${process.pid}`)
     const outputB = path.join(projectRoot, 'dist', `publisher-test-b-${process.pid}`)
     t.after(() => {
@@ -85,7 +107,7 @@ test('prepare produces deterministic templates, descriptors, and publish state',
         packVersion: '1.0.1-test.1',
         sourceRepository: 'https://github.com/nickallegator/Cobble-Power-1.21.X',
         sourceTag: `v${version}`,
-        sourceCommit: 'a'.repeat(40),
+        sourceCommit,
         sourceRepo,
         createdAt: '2026-08-09T00:00:00.000Z'
     }
