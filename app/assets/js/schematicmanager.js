@@ -42,10 +42,20 @@ class SchematicApiError extends Error {
     }
 }
 
+function resolveFetchImplementation(explicitFetch, webRuntime = globalThis, nodeRuntime = typeof global === 'undefined' ? null : global) {
+    if(typeof explicitFetch === 'function') return explicitFetch
+    if(typeof webRuntime?.fetch === 'function') return webRuntime.fetch.bind(webRuntime)
+    if(typeof nodeRuntime?.fetch === 'function') return nodeRuntime.fetch.bind(nodeRuntime)
+    return null
+}
+
 class SchematicApiClient {
     constructor(options = {}) {
         this.baseUrl = String(options.baseUrl || '').replace(/\/+$/, '')
-        this.fetch = options.fetch || global.fetch
+        // Electron renderers expose the browser Fetch API on globalThis. The
+        // Node-compatible `global` alias is not guaranteed to carry web APIs,
+        // even though it does in the Node test runner.
+        this.fetch = resolveFetchImplementation(options.fetch)
         this.timeoutMs = Number(options.timeoutMs) || 10_000
         this.cachePath = options.cachePath || null
         if(!this.baseUrl || !this.fetch) throw new Error('SchematicApiClient requires baseUrl and fetch.')
@@ -280,5 +290,6 @@ module.exports = {
     hashFile,
     loadCore,
     moduleContainsCobblePower,
-    redactUrl
+    redactUrl,
+    resolveFetchImplementation
 }

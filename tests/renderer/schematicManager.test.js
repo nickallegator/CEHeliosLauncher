@@ -12,7 +12,8 @@ const {
     SchematicApiClient,
     SchematicInstallManager,
     moduleContainsCobblePower,
-    redactUrl
+    redactUrl,
+    resolveFetchImplementation
 } = require('../../app/assets/js/schematicmanager')
 
 function source() {
@@ -85,6 +86,19 @@ test('catalog client uses ETags and last-successful offline cache', async t => {
     assert.equal(cached.offline, true)
     assert.equal(cached.items[0].id, 'one')
     assert.equal(redactUrl('failed https://x.test/a?token=secret'), 'failed https://x.test/a?[redacted]')
+})
+
+test('schematic client resolves the Electron renderer fetch implementation', async () => {
+    let receiver = null
+    const rendererRuntime = {
+        fetch() {
+            receiver = this
+            return 'renderer-fetch'
+        }
+    }
+    const selected = resolveFetchImplementation(null, rendererRuntime, {})
+    assert.equal(selected(), 'renderer-fetch')
+    assert.equal(receiver, rendererRuntime)
 })
 
 test('catalog cache is isolated by normalized query parameters', async t => {

@@ -7,7 +7,7 @@ artifactName: 'Cobble-Power-Test-Channel-setup-${version}.${ext}'
 copyright: 'Copyright © 2026 Allegator'
 
 extraMetadata:
-  version: '2.3.1-test.1'
+  version: '2.3.1-test.2'
   productName: 'Cobble Power Test Launcher'
 
 extraResources:
