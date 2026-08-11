@@ -17,6 +17,11 @@ const logger = LoggerUtil.getLogger('Preloader')
 
 logger.info('Loading..')
 
+// Page scripts execute while bootstrapPreloader is awaiting configuration and
+// remote-channel work. Load translations synchronously before the first await;
+// langloader also initializes lazily as a second line of defense.
+LangLoader.setupLanguage()
+
 /**
  * 
  * @param {HeliosDistribution} data 
@@ -107,9 +112,6 @@ async function bootstrapPreloader(){
             logger.warn('Tester channel authorization was not restored during startup.', err.message || err)
         }
     }
-
-    // Load Strings
-    LangLoader.setupLanguage()
 
     // Ensure Distribution is downloaded and cached.
     DistroAPI.getDistribution()

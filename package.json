@@ -30,7 +30,7 @@
     "test:releases": "node --test tests/releases/*.test.js tests/backend/releaseChannel.test.js",
     "test:schematics-core": "node --test libraries/schematics-core/__tests__/schematics-core.test.js",
     "test:backend": "node --test tests/backend/*.test.js",
-    "test:renderer": "node --test tests/renderer/smoke.test.js tests/renderer/javaLaunchWorkflow.test.js",
+    "test:renderer": "node --test tests/renderer/smoke.test.js tests/renderer/javaLaunchWorkflow.test.js tests/renderer/langloader.test.js",
     "test:e2e:install": "npx playwright install",
     "test:e2e": "npx playwright test",
     "test:smoke": "npm run test:auth && npm run test:mods && npm run test:tester && npm run test:releases && npm run test:backend && npm run test:renderer",
