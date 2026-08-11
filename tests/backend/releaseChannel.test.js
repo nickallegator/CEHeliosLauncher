@@ -16,6 +16,7 @@ const {
 } = require('../../backend/src/services/releaseStorage')
 const { normalizeMinecraftUuid } = require('../../backend/src/services/store')
 const { buildMinecraftEntitlements } = require('../../backend/src/routes/minecraftAuth')
+const { injectSchematicsService } = require('../../backend/src/routes/releases')
 
 test('Minecraft UUIDs normalize consistently and reject invalid identities', () => {
     assert.equal(normalizeMinecraftUuid('12345678-1234-1234-1234-123456789ABC'), '12345678123412341234123456789abc')
@@ -67,4 +68,20 @@ test('release storage resolves current template and returns its release ID', asy
     const result = await service.getAuthorizedDistribution('test')
     assert.equal(result.releaseId, 'release-1')
     assert.match(result.distribution.servers[0].modules[0].artifact.url, /^https:\/\/signed\.example\//)
+})
+
+test('authorized distribution service discovery is injected without rebuilding the launcher', () => {
+    const distribution = { version: '1', servers: [] }
+    injectSchematicsService(distribution, {
+        publicApiUrl: 'https://schematics.example.test/',
+        features: { core: true, collections: false, creators: false }
+    })
+    assert.deepEqual(distribution.schematics, {
+        schemaVersion: 2,
+        enabled: true,
+        apiBaseUrl: 'https://schematics.example.test',
+        features: { core: true, collections: false, creators: false },
+        allowedVisibilities: ['public']
+    })
+    assert.deepEqual(injectSchematicsService({ servers: [] }, { publicApiUrl: '' }), { servers: [] })
 })

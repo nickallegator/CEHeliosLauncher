@@ -13,6 +13,19 @@ function initSchematics(){
             openSchematicDetail(entry)
         }
     })
+    resolveSchematicsServiceConfig().then((service) => {
+        if(schematicsCategorySelect){
+            const collectionsOption = schematicsCategorySelect.querySelector('option[value="collections"]')
+            if(collectionsOption) collectionsOption.hidden = !service.features.collections
+            if(!service.features.collections && schematicsCategorySelect.value === 'collections') schematicsCategorySelect.value = 'schematics'
+        }
+        if(schematicsDetailAddToCollection) schematicsDetailAddToCollection.hidden = !service.features.collections
+        if(schematicsUploadVisibility){
+            schematicsUploadVisibility.value = 'public'
+            schematicsUploadVisibility.disabled = true
+            Array.from(schematicsUploadVisibility.options).forEach(option => { option.hidden = option.value !== 'public' })
+        }
+    }).catch(() => {})
     if(schematicsCreatorGrid){
         schematicsCreatorGrid.addEventListener('click', (event) => {
             const card = event.target.closest('.schematicCard')
@@ -300,10 +313,13 @@ function initSchematics(){
         })
     }
     if(schematicsOpenFolderButton){
-        schematicsOpenFolderButton.addEventListener('click', () => {
+        schematicsOpenFolderButton.addEventListener('click', async () => {
             try {
                 const { shell } = require('electron')
-                shell.openPath(SCHEMATICS_INSTALL_DIR)
+                const context = await resolveSchematicInstallContext()
+                const directory = schematicsInstallManager.directory(context.profileId, context.account.uuid)
+                await fs.ensureDir(directory)
+                shell.openPath(directory)
             } catch (err) {
                 loggerLanding.warn('Failed to open schematics folder.', err)
             }
@@ -319,7 +335,7 @@ function initSchematics(){
         schematicsInstalledScrim.addEventListener('click', closeInstalledPanel)
     }
     if(schematicsUploadButton){
-        schematicsUploadButton.addEventListener('click', openSchematicUpload)
+        schematicsUploadButton.addEventListener('click', () => openSchematicUpload())
     }
     if(schematicsUploadClose){
         schematicsUploadClose.addEventListener('click', closeSchematicUpload)
@@ -357,7 +373,7 @@ function initSchematics(){
         })
     }
     if(schematicsUploadSubmit){
-        schematicsUploadSubmit.addEventListener('click', submitSchematicUpload)
+        schematicsUploadSubmit.addEventListener('click', submitSchematicUploadV2)
     }
     if(schematicsEditClose){
         schematicsEditClose.addEventListener('click', closeSchematicEdit)
@@ -370,6 +386,9 @@ function initSchematics(){
     }
     if(schematicsEditSubmit){
         schematicsEditSubmit.addEventListener('click', submitSchematicEdit)
+    }
+    if(schematicsEditRevision){
+        schematicsEditRevision.addEventListener('click', openSchematicRevisionUpload)
     }
     if(schematicsPagePrev){
         schematicsPagePrev.addEventListener('click', () => {

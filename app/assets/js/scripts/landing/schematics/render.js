@@ -59,15 +59,17 @@ function createSchematicCard(entry){
     const metaRow = document.createElement('div')
     metaRow.className = 'schematicMetaRow'
 
-    const creator = document.createElement('button')
-    creator.type = 'button'
+    const creator = document.createElement(schematicsFeatureEnabled('creators') ? 'button' : 'span')
+    if(creator.tagName === 'BUTTON') creator.type = 'button'
     creator.className = 'schematicCreatorButton'
     creator.textContent = `by ${entry.creator}`
-    creator.addEventListener('click', (event) => {
-        event.stopPropagation()
-        event.preventDefault()
-        openCreatorPanel(entry.creator)
-    })
+    if(schematicsFeatureEnabled('creators')){
+        creator.addEventListener('click', (event) => {
+            event.stopPropagation()
+            event.preventDefault()
+            openCreatorPanel(entry.creator)
+        })
+    }
 
     metaRow.appendChild(creator)
     const userId = getCurrentUserId()
@@ -91,7 +93,11 @@ function createSchematicCard(entry){
         card.setAttribute('data-installed', 'true')
         const installedBadge = document.createElement('span')
         installedBadge.className = 'schematicInstalledBadge'
-        installedBadge.textContent = 'Installed'
+        const account = ConfigManager.getSelectedAccount()
+        const status = schematicsInstallManager && account?.uuid
+            ? schematicsInstallManager.status(ConfigManager.getSelectedServer(), account.uuid, entry).state
+            : 'installed'
+        installedBadge.textContent = status === 'update' ? 'Update available' : (status === 'repair' ? 'Repair needed' : 'Installed')
         details.appendChild(installedBadge)
     }
     details.appendChild(metaRow)
@@ -406,7 +412,7 @@ function renderSchematics(options = {}){
 
     const query = normalizeSchematicQuery(schematicsSearchInput?.value)
     const sortKey = schematicsSortSelect?.value || SCHEMATICS_SORT_DEFAULT
-    const sourceItems = schematicsState.items.length > 0 ? schematicsState.items : SCHEMATICS_FALLBACK
+    const sourceItems = schematicsState.items
     let filtered = filterSchematics(sourceItems, query)
     if(schematicsInstalledToggle?.checked){
         filtered = filtered.filter(entry => entry?.id && getInstalledSchematic(entry.id))

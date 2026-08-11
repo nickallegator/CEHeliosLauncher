@@ -42,8 +42,9 @@ function extractAvatar(profile){
     return skin?.url || null
 }
 
-function buildMinecraftEntitlements(activeTester, requiredEntitlement = config.releases.requiredEntitlement) {
-    return activeTester ? ['minecraft:player', requiredEntitlement] : ['minecraft:player']
+function buildMinecraftEntitlements(activeTester, requiredEntitlement = config.releases.requiredEntitlement, grants = []) {
+    const values = activeTester ? ['minecraft:player', requiredEntitlement] : ['minecraft:player']
+    return Array.from(new Set([...values, ...grants].map(value => String(value).toLowerCase())))
 }
 
 router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }), asyncRoute(async (req, res) => {
@@ -64,7 +65,8 @@ router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }),
     const avatarUrl = extractAvatar(profile)
     const userId = await store.upsertUser('minecraft', providerUserId, displayName, avatarUrl)
     const activeTester = config.releases.enabled && await store.isMinecraftTester(providerUserId)
-    const minecraftEntitlements = buildMinecraftEntitlements(activeTester)
+    const grants = await store.getMinecraftEntitlementGrants(providerUserId)
+    const minecraftEntitlements = buildMinecraftEntitlements(activeTester, config.releases.requiredEntitlement, grants)
     await store.replaceEntitlements(userId, minecraftEntitlements, 'minecraft')
     const entitlements = await store.getEntitlements(userId)
     const session = await sessions.createSession(userId)

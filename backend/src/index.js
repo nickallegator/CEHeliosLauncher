@@ -11,6 +11,7 @@ const entitlementRoutes = require('./routes/entitlements')
 const releaseRoutes = require('./routes/releases')
 const db = require('./db')
 const { createReleaseStorage } = require('./services/releaseStorage')
+const { getSchematicsObjectStorage } = require('./services/schematicsObjectStorage')
 const { safeError } = require('./services/logSafety')
 
 const app = express()
@@ -18,7 +19,7 @@ const app = express()
 if(config.trustProxy) app.set('trust proxy', 1)
 
 app.use(helmet())
-app.use(express.json({ limit: '12mb' }))
+app.use(express.json({ limit: '64kb' }))
 app.use((req, res, next) => {
     req.requestId = String(req.headers['x-request-id'] || crypto.randomUUID()).slice(0, 128)
     res.set('X-Request-ID', req.requestId)
@@ -54,7 +55,17 @@ app.get('/ready', async (_req, res) => {
     } else {
         checks.releases = 'disabled'
     }
-    checks.schematics = config.schematics.enabled ? 'enabled' : 'disabled'
+    if(config.schematics.enabled) {
+        try {
+            await db.query('select 1 from schematic_revisions limit 1')
+            await getSchematicsObjectStorage().ready()
+            checks.schematics = 'ok'
+        } catch(_err) {
+            checks.schematics = 'error'
+        }
+    } else {
+        checks.schematics = 'disabled'
+    }
     const ready = !Object.values(checks).includes('error')
     res.status(ready ? 200 : 503).json({ ok: ready, checks })
 })
@@ -65,19 +76,11 @@ app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
 if(config.schematics.enabled) {
     const schematicsRoutes = require('./routes/schematics')
-    const collectionsRoutes = require('./routes/collections')
-    const uploadTokens = require('./services/schematicsUploadTokens')
-
     app.use('/v1', schematicsRoutes)
-    app.use('/v1', collectionsRoutes)
-
-    const tokenCleanupInterval = setInterval(() => {
-        uploadTokens.cleanupExpired().catch(() => {})
-    }, 10 * 60 * 1000)
-    if(typeof tokenCleanupInterval.unref === 'function'){
-        tokenCleanupInterval.unref()
+    if(config.schematics.features.collections) {
+        const collectionsRoutes = require('./routes/collections')
+        app.use('/v1', collectionsRoutes)
     }
-    uploadTokens.cleanupExpired().catch(() => {})
 }
 
 app.use((req, res) => {
@@ -86,6 +89,20 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
     console.error('[server] error', { requestId: req.requestId, ...safeError(err) })
+    if(err?.name === 'SchematicValidationError') {
+        res.status(400).json({
+            error: err.code || 'schematic_validation_failed',
+            message: err.message,
+            details: err.details || undefined,
+            requestId: req.requestId
+        })
+        return
+    }
+    const statusCode = Number(err?.statusCode)
+    if(Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 500) {
+        res.status(statusCode).json({ error: err.code || 'request_failed', requestId: req.requestId })
+        return
+    }
     res.status(500).json({ error: 'server_error', requestId: req.requestId })
 })
 

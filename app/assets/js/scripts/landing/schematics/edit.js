@@ -168,3 +168,13 @@ async function submitSchematicEdit(){
         }
     }
 }
+
+function openSchematicRevisionUpload(){
+    if(!schematicsEditEntry?.id){
+        updateSchematicEditStatus('No schematic selected for revision.', 'error')
+        return
+    }
+    const target = schematicsEditEntry
+    closeSchematicEdit()
+    openSchematicUpload(target)
+}

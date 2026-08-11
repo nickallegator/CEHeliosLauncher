@@ -74,6 +74,21 @@ async function getUser(userId) {
     return rows[0] || null
 }
 
+async function getMinecraftIdentity(userId) {
+    const { rows } = await db.query(
+        `select id, provider_user_id, display_name, avatar_url
+         from users where id = $1 and provider = 'minecraft'`,
+        [userId]
+    )
+    if(rows.length === 0) return null
+    return {
+        userId: rows[0].id,
+        uuid: normalizeMinecraftUuid(rows[0].provider_user_id),
+        displayName: rows[0].display_name || null,
+        avatarUrl: rows[0].avatar_url || null
+    }
+}
+
 function normalizeMinecraftUuid(value) {
     const normalized = String(value || '').trim().toLowerCase().replace(/-/g, '')
     if(!/^[a-f0-9]{32}$/.test(normalized)) {
@@ -136,6 +151,65 @@ async function listMinecraftTesters() {
     return rows
 }
 
+function normalizeEntitlement(value) {
+    const normalized = String(value || '').trim().toLowerCase()
+    if(!/^[a-z0-9][a-z0-9:_-]{1,127}$/.test(normalized)) {
+        throw new Error('Entitlement must use lowercase letters, numbers, colon, underscore, or hyphen')
+    }
+    return normalized
+}
+
+async function getMinecraftEntitlementGrants(uuid) {
+    const normalized = normalizeMinecraftUuid(uuid)
+    const { rows } = await db.query(
+        `select entitlement from minecraft_entitlement_grants
+         where minecraft_uuid = $1 and enabled = true
+         order by entitlement`,
+        [normalized]
+    )
+    return rows.map(row => row.entitlement)
+}
+
+async function grantMinecraftEntitlement(uuid, entitlement, label = null) {
+    const normalizedUuid = normalizeMinecraftUuid(uuid)
+    const normalizedEntitlement = normalizeEntitlement(entitlement)
+    const { rows } = await db.query(
+        `insert into minecraft_entitlement_grants(minecraft_uuid, entitlement, label, enabled)
+         values ($1, $2, $3, true)
+         on conflict (minecraft_uuid, entitlement) do update
+         set label = coalesce(excluded.label, minecraft_entitlement_grants.label),
+             enabled = true,
+             updated_at = now()
+         returning minecraft_uuid, entitlement, label, enabled, created_at, updated_at`,
+        [normalizedUuid, normalizedEntitlement, label || null]
+    )
+    return rows[0]
+}
+
+async function revokeMinecraftEntitlement(uuid, entitlement) {
+    const normalizedUuid = normalizeMinecraftUuid(uuid)
+    const normalizedEntitlement = normalizeEntitlement(entitlement)
+    const { rows } = await db.query(
+        `update minecraft_entitlement_grants set enabled = false, updated_at = now()
+         where minecraft_uuid = $1 and entitlement = $2
+         returning minecraft_uuid, entitlement, label, enabled, created_at, updated_at`,
+        [normalizedUuid, normalizedEntitlement]
+    )
+    return rows[0] || null
+}
+
+async function listMinecraftEntitlementGrants(entitlement = null) {
+    const normalized = entitlement ? normalizeEntitlement(entitlement) : null
+    const { rows } = await db.query(
+        `select minecraft_uuid, entitlement, label, enabled, created_at, updated_at
+         from minecraft_entitlement_grants
+         where ($1::text is null or entitlement = $1)
+         order by entitlement, enabled desc, label nulls last, minecraft_uuid`,
+        [normalized]
+    )
+    return rows
+}
+
 async function createOAuthState(state, redirectUrl, expiresAt) {
     await db.query(
         'insert into oauth_states (state, redirect_url, expires_at) values ($1, $2, $3)',
@@ -164,12 +238,18 @@ module.exports = {
     replaceEntitlements,
     getEntitlements,
     getUser,
+    getMinecraftIdentity,
     normalizeMinecraftUuid,
     isMinecraftTester,
     isUserActiveMinecraftTester,
     upsertMinecraftTester,
     disableMinecraftTester,
     listMinecraftTesters,
+    normalizeEntitlement,
+    getMinecraftEntitlementGrants,
+    grantMinecraftEntitlement,
+    revokeMinecraftEntitlement,
+    listMinecraftEntitlementGrants,
     createOAuthState,
     consumeOAuthState
 }

@@ -307,6 +307,9 @@ async function seedSchematics(){
         return
     }
     seeded = true
+    if(!config.schematics.allowDevelopmentSeeds){
+        return
+    }
 
     if(!config.databaseUrl){
         if(SCHEMATICS.length === 0){

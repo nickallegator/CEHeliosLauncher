@@ -80,7 +80,6 @@ const schematicsDetailShareButton   = document.getElementById('schematicsDetailS
 const schematicsDetailShareMenu     = document.getElementById('schematicsDetailShareMenu')
 const schematicsDetailShareMenuSubtitle = document.getElementById('schematicsDetailShareMenuSubtitle')
 const schematicsDetailShareOptions  = document.querySelectorAll('[data-schematic-share-option]')
-const schematicsDetailThumbRegen    = document.getElementById('schematicsDetailThumbRegen')
 const schematicsDetailBlocks        = document.getElementById('schematicsDetailBlocks')
 const schematicsDetailBlocksList    = document.getElementById('schematicsDetailBlocksList')
 const schematicsDetailBlocksTotal   = document.getElementById('schematicsDetailBlocksTotal')
@@ -191,6 +190,7 @@ const schematicsEditLikesValue      = document.getElementById('schematicsEditLik
 const schematicsEditViewsValue      = document.getElementById('schematicsEditViewsValue')
 const schematicsEditStatus          = document.getElementById('schematicsEditStatus')
 const schematicsEditSubmit          = document.getElementById('schematicsEditSubmit')
+const schematicsEditRevision        = document.getElementById('schematicsEditRevision')
 const schematicsEditCancel          = document.getElementById('schematicsEditCancel')
 
 const schematicsAdminControlGroup   = document.getElementById('schematicsAdminControlGroup')
