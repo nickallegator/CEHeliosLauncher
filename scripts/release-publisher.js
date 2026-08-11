@@ -64,7 +64,13 @@ async function main(argv = process.argv) {
         console.log(`Verified ${result.releaseId}`)
         return result
     }
-    throw new Error('Usage: release-publisher.js <prepare|publish|promote|verify|rollback> [options]')
+    if(command === 'current') {
+        const result = await remote.getCurrentRelease(args.channel || 'test')
+        if(args.json) console.log(JSON.stringify(result))
+        else console.log(result.releaseId || '<none>')
+        return result
+    }
+    throw new Error('Usage: release-publisher.js <prepare|publish|promote|verify|rollback|current> [options]')
 }
 
 if(require.main === module) {

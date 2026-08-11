@@ -160,12 +160,22 @@ async function readCurrent(channel, storage) {
     }
 }
 
+async function getCurrentRelease(channel = 'test', storage = createRemoteStorage()) {
+    const current = await readCurrent(channel, storage)
+    return {
+        schemaVersion: 1,
+        channel,
+        releaseId: current.pointer?.releaseId || null
+    }
+}
+
 async function promoteRelease(options, storage = createRemoteStorage()) {
     const channel = options.channel || 'test'
     const releaseId = options.releaseId
     await verifyRelease(releaseId, channel, storage)
     const current = await readCurrent(channel, storage)
     const actualPrevious = current.pointer?.releaseId || null
+    if(actualPrevious === releaseId) return { ...current.pointer, unchanged: true }
     const expectedPrevious = options.expectedPreviousReleaseId || null
     if(actualPrevious !== expectedPrevious) {
         throw new Error(`Channel moved: expected previous release ${expectedPrevious || '<none>'}, found ${actualPrevious || '<none>'}`)
@@ -197,6 +207,7 @@ async function verifyCurrent(channel = 'test', storage = createRemoteStorage()) 
 
 module.exports = {
     createRemoteStorage,
+    getCurrentRelease,
     hashBody,
     promoteRelease,
     publishPrepared,

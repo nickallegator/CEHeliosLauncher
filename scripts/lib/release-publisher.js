@@ -1,6 +1,7 @@
 'use strict'
 
 const crypto = require('crypto')
+const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 const { finished } = require('stream/promises')
@@ -58,6 +59,17 @@ function validateVersionAgreement({ version, tag, metadata, sourceRepo }) {
         const match = properties.match(/^mod_version\s*=\s*(.+)$/m)
         if(!match || match[1].trim() !== version) throw new Error(`gradle.properties mod_version must be ${version}`)
     }
+}
+
+function validateSourceCommit(sourceRepo, expectedCommit) {
+    const expected = String(expectedCommit || '').trim().toLowerCase()
+    if(!/^[a-f0-9]{40}$/.test(expected)) throw new Error('sourceCommit must be a full 40-character Git commit')
+    const actual = execFileSync('git', ['-C', path.resolve(sourceRepo), 'rev-parse', 'HEAD'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe']
+    }).trim().toLowerCase()
+    if(actual !== expected) throw new Error(`Tagged source commit ${actual} does not match requested commit ${expected}`)
+    return actual
 }
 
 function validateCompatibility(metadata, packManifest) {
@@ -135,6 +147,7 @@ async function prepareRelease(options) {
     if(!/^[a-f0-9]{40}$/.test(commit)) throw new Error('sourceCommit must be a full 40-character Git commit')
     const sourceRepository = String(options.sourceRepository || '').trim()
     if(!sourceRepository) throw new Error('sourceRepository is required')
+    if(options.sourceRepo) validateSourceCommit(options.sourceRepo, commit)
 
     const baseManifestPath = path.resolve(options.packManifestPath || path.join(PACK_ROOT, 'packs', 'cobble-power-1.21.1.json'))
     const baseManifest = readJson(baseManifestPath)
@@ -301,5 +314,6 @@ module.exports = {
     replaceModuleUrl,
     stableJson,
     validateCompatibility,
+    validateSourceCommit,
     validateVersionAgreement
 }
