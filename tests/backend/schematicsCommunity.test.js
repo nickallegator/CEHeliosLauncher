@@ -76,3 +76,13 @@ test('object downloads stop as soon as the configured byte limit is exceeded', a
     assert.equal((await streamToBuffer(chunks(), 8)).toString('utf8'), '12345678')
     await assert.rejects(() => streamToBuffer(chunks(), 7), error => error.code === 'OBJECT_TOO_LARGE')
 })
+
+test('object downloads are unlimited when no byte limit is supplied', async () => {
+    async function* chunks() {
+        yield Buffer.from('distribution-')
+        yield Buffer.from('template')
+    }
+    assert.equal((await streamToBuffer(chunks())).toString('utf8'), 'distribution-template')
+    assert.equal((await streamToBuffer(chunks(), null)).toString('utf8'), 'distribution-template')
+    await assert.rejects(() => streamToBuffer(chunks(), 0), error => error.code === 'OBJECT_TOO_LARGE')
+})

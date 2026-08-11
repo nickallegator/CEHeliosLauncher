@@ -10,7 +10,8 @@ function validateSettings(settings, label = 'object storage') {
 
 async function streamToBuffer(body, maxBytes = null) {
     if(body == null) return Promise.resolve(Buffer.alloc(0))
-    const limit = Number.isFinite(Number(maxBytes)) ? Number(maxBytes) : null
+    const parsedLimit = maxBytes == null || maxBytes === '' ? null : Number(maxBytes)
+    const limit = Number.isFinite(parsedLimit) && parsedLimit >= 0 ? parsedLimit : null
     if(typeof body[Symbol.asyncIterator] === 'function') {
         const chunks = []
         let received = 0
