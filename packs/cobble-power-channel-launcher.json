@@ -5,7 +5,7 @@
     "channel": {
         "schemaVersion": 2,
         "id": "cobble-power-test",
-        "name": "Cobble Power Test Launcher",
+        "name": "Allegator Games Launcher",
         "channel": "test",
         "bootstrapDistribution": "distribution_bootstrap.json",
         "requiredEntitlement": "cobblepower:test",

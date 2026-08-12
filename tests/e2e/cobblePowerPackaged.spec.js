@@ -81,7 +81,7 @@ test('packaged Cobble Power tester contains its channel and locked mod', async (
         const profile = distribution.servers.find(server => server.id === 'Cobble-Power-1.21.1')
         const expectedDataDirectory = useRealProfile
             ? JSON.parse(fs.readFileSync(process.env.E2E_PACKAGED_CONFIG, 'utf8')).settings.launcher.dataDirectory
-            : path.join(appDataDirectory, '.cobblepower-test-launcher')
+            : path.join(appDataDirectory, '.ag-launcher')
         const state = {
             ...appState,
             dataDirectory: expectedDataDirectory,
@@ -90,7 +90,7 @@ test('packaged Cobble Power tester contains its channel and locked mod', async (
             modules: profile.modules.map(module => module.id)
         }
 
-        expect(state.appName).toBe('Cobble Power Test Launcher')
+        expect(state.appName).toBe('Allegator Games Launcher')
         expect(state.appVersion).toBe('2.2.1-test.4')
         expect(state.dataDirectory).toBe(expectedDataDirectory)
         expect(state.profileName).toBe('Cobble Power Test (Minecraft 1.21.1)')

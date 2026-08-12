@@ -9,7 +9,7 @@ const { buildDependencyTree } = require('../../scripts/npm-list-shim')
 test('npm list shim exposes production dependencies to Electron Builder', () => {
     const projectRoot = path.resolve(__dirname, '..', '..')
     const tree = buildDependencyTree(projectRoot)
-    assert.equal(tree.name, 'helioslauncher')
+    assert.equal(tree.name, 'ag-launcher')
     assert.ok(tree.dependencies.jquery)
     assert.ok(tree.dependencies['helios-core'])
     assert.ok(tree.dependencies['@electron/remote'])

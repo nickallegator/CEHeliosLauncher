@@ -2,8 +2,8 @@
     :root { --workshop-nav-width: 76px; }
 
     #appShellNavigation { padding: 12px 9px; }
-    .shellBrandButton { justify-content: center; padding: 7px; }
-    .shellBrandCopy,
+    .shellBrandButton { min-height: 64px; justify-content: center; padding: 4px; }
+    #image_seal { width: 58px !important; }
     .shellNavItem > span:not(.shellNavBadge),
     .shellUtilityButton > span,
     .shellAccountCopy,
@@ -15,7 +15,6 @@
     .shellAccountButton { justify-content: center; }
     #shellLinksMenu { bottom: 0; left: 58px; }
     #mojangStatusTooltip { bottom: 0 !important; left: 58px !important; }
-    #updateAvailableTooltip { top: 50px !important; left: 8px !important; }
 
     #landingContainer > #upper.homeWorkspace {
         grid-template-columns: minmax(190px, .8fr) minmax(330px, 1.45fr) minmax(185px, .72fr);
@@ -44,5 +43,4 @@
     .homeActivityCard { padding-top: 15px; padding-bottom: 15px; }
     .homeStatsGrid { margin-top: 12px; }
     #landingContainer > #lower.globalLaunchDock { bottom: 10px !important; }
-    .communityHub { padding-top: 18px; }
 }

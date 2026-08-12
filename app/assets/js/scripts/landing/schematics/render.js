@@ -59,17 +59,16 @@ function createSchematicCard(entry){
     const metaRow = document.createElement('div')
     metaRow.className = 'schematicMetaRow'
 
-    const creator = document.createElement(schematicsFeatureEnabled('creators') ? 'button' : 'span')
-    if(creator.tagName === 'BUTTON') creator.type = 'button'
+    const creator = document.createElement('button')
+    creator.type = 'button'
     creator.className = 'schematicCreatorButton'
     creator.textContent = `by ${entry.creator}`
-    if(schematicsFeatureEnabled('creators')){
-        creator.addEventListener('click', (event) => {
-            event.stopPropagation()
-            event.preventDefault()
-            openCreatorPanel(entry.creator)
-        })
-    }
+    creator.addEventListener('click', (event) => {
+        event.stopPropagation()
+        event.preventDefault()
+        if(schematicsCreatorInput) schematicsCreatorInput.value = entry.creator || ''
+        fetchSchematicsList({ page: 1 })
+    })
 
     metaRow.appendChild(creator)
     const userId = getCurrentUserId()
@@ -465,17 +464,15 @@ function scheduleSchematicsFetch(){
 }
 
 function updateSchematicsPagination(){
-    if(!schematicsPageStatus){
-        return
+    if(schematicsPageStatus){
+        const loaded = schematicsState.items.length
+        schematicsPageStatus.textContent = schematicsState.offline
+            ? `${loaded} · ${communityCopy('offlineCatalog')}`
+            : `${loaded} ${loaded === 1 ? 'creation' : 'creations'}`
     }
-    const total = Number.isFinite(Number(schematicsState.total)) ? Number(schematicsState.total) : 0
-    const pages = Math.max(1, Math.ceil(total / schematicsState.pageSize))
-    const page = Math.min(Math.max(1, schematicsState.page), pages)
-    schematicsPageStatus.textContent = `${page} / ${pages}`
-    if(schematicsPagePrev){
-        schematicsPagePrev.disabled = page <= 1
-    }
-    if(schematicsPageNext){
-        schematicsPageNext.disabled = page >= pages
+    if(communityLoadMoreButton){
+        communityLoadMoreButton.hidden = !schematicsState.nextCursor
+        communityLoadMoreButton.disabled = schematicsState.loadingMore
+        communityLoadMoreButton.setAttribute('aria-busy', String(schematicsState.loadingMore))
     }
 }

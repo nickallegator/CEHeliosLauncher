@@ -12,11 +12,11 @@ const {
     STARTUP_SKIP_DELAY_MS
 } = require('../../app/assets/js/scripts/startup-presentation')
 const {
-    CommunityModuleRegistry,
-    createDefaultCommunityRegistry,
+    CommunityContentTypeRegistry,
+    createDefaultCommunityContentRegistry,
     isSchematicsEnabled
 } = require('../../app/assets/js/scripts/community-modules')
-const { countOptionalModules } = require('../../app/assets/js/scripts/shell')
+const { canonicalizeShellRoute, countOptionalModules } = require('../../app/assets/js/scripts/shell')
 const { checkRendererAssets } = require('../../scripts/check-renderer-assets')
 
 class FakeElement extends EventTarget {
@@ -128,20 +128,38 @@ test('fatal startup stops the loop and exposes recovery actions', () => {
     assert.match(document.getElementById('startupStatus').textContent, /Distribution unavailable/)
 })
 
-test('community registry validates ids and filters disabled modules', async () => {
-    const registry = new CommunityModuleRegistry()
-    registry.register({ id: 'enabled', isEnabled: async () => true, open(){} })
-    registry.register({ id: 'disabled', isEnabled: async () => false, open(){} })
-    assert.deepEqual((await registry.enabled()).map((module) => module.id), ['enabled'])
-    assert.throws(() => registry.register({ id: 'enabled', isEnabled(){ return true }, open(){} }), /Duplicate/)
+test('Community content registry validates ids and filters disabled types', async () => {
+    const registry = new CommunityContentTypeRegistry()
+    const enabled = { id: 'enabled', isEnabled: async () => true, normalize: value => value, openDetail(){} }
+    registry.register(enabled)
+    registry.register({ id: 'disabled', isEnabled: async () => false, normalize: value => value, openDetail(){} })
+    assert.deepEqual((await registry.enabled()).map((type) => type.id), ['enabled'])
+    assert.throws(() => registry.register(enabled), /Duplicate/)
 })
 
 test('schematics module follows existing distribution and environment capabilities', async () => {
     assert.equal(isSchematicsEnabled({ schematics: { schemaVersion: 2, enabled: true, features: { core: true } } }), true)
     assert.equal(isSchematicsEnabled({ schematics: { schemaVersion: 3, enabled: true } }), false)
     assert.equal(isSchematicsEnabled({}, { HELIOS_SCHEMATICS_API_URL: 'https://schematics.example.test' }), true)
-    const registry = createDefaultCommunityRegistry({ environment: {} })
+    const registry = createDefaultCommunityContentRegistry({ environment: {} })
     assert.equal((await registry.enabled({ rawDistribution: {} })).length, 0)
+})
+
+test('Community template opens a unified catalog and keeps Collections deferred', async () => {
+    const appPath = path.resolve(__dirname, '..', '..', 'app', 'app.ejs')
+    const html = await ejs.renderFile(appPath, { lang: (key) => key })
+    assert.match(html, /data-community-category="all"[^>]*aria-pressed="true"/)
+    assert.match(html, /data-community-category="schematics"/)
+    assert.match(html, /id="communityLoadMoreButton"/)
+    assert.doesNotMatch(html, /id="communityModuleGrid"/)
+    assert.doesNotMatch(html, /id="schematicsCategorySelect"/)
+    assert.match(html, /data-community-deferred="collections"/)
+})
+
+test('legacy schematic routes canonicalize to the unified Community catalog', () => {
+    assert.equal(canonicalizeShellRoute('community/schematics'), 'community')
+    assert.equal(canonicalizeShellRoute('community'), 'community')
+    assert.equal(canonicalizeShellRoute('unknown'), 'home')
 })
 
 test('Home optional-module summary includes nested optional modules', () => {
@@ -156,8 +174,18 @@ test('renderer template contains the brand sequence and persistent navigation', 
     const html = await ejs.renderFile(appPath, { lang: (key) => key })
     assert.match(html, /allegator-games-intro\.svg/)
     assert.match(html, /allegator-games-loading-chomp\.svg/)
+    assert.match(html, /allegator-games-logo\.svg/)
+    assert.match(html, /allegator-games-app-icon\.png/)
+    assert.doesNotMatch(html, /updateAvailableTooltip/)
     assert.match(html, /id="shellNavCommunity"/)
     assert.match(html, /id="appShellViewport"/)
+})
+
+test('profile selectors resolve launcher-managed artwork locally', () => {
+    const overlay = fs.readFileSync(path.resolve(__dirname, '..', '..', 'app', 'assets', 'js', 'scripts', 'overlay.js'), 'utf8')
+    const settings = fs.readFileSync(path.resolve(__dirname, '..', '..', 'app', 'assets', 'js', 'scripts', 'settings.js'), 'utf8')
+    assert.match(overlay, /ServerBrandingOverlay\.resolveServerIcon/)
+    assert.match(settings, /ServerBranding\.resolveServerIcon/)
 })
 
 test('renderer artwork remains inside the vector-first asset budget', () => {
@@ -170,4 +198,6 @@ test('main window declares the responsive default and minimum bounds', () => {
     assert.match(source, /height:\s*680/)
     assert.match(source, /minWidth:\s*980/)
     assert.match(source, /minHeight:\s*600/)
+    assert.match(source, /Brand\.productName/)
+    assert.match(source, /allegator-games-app-icon\.png/)
 })

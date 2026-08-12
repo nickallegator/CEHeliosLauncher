@@ -1,47 +1,34 @@
-.communityHub {
-    position: absolute;
-    inset: 0 0 calc(var(--workshop-launch-height) + 18px);
-    padding: 24px 26px;
-    overflow: auto;
-    box-sizing: border-box;
-}
+[data-community-deferred="collections"] { display: none !important; }
 
-.communityHub[hidden] { display: none !important; }
-.communityModuleGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px; margin-top: 26px; }
-
-.communityModuleCard {
-    display: grid;
-    min-height: 180px;
-    grid-template-columns: 58px minmax(0, 1fr);
-    grid-template-rows: 1fr auto;
-    gap: 14px 18px;
-    padding: 24px;
-    box-sizing: border-box;
-}
-
-.communityModuleIcon { grid-row: 1 / 3; }
-.communityModuleCopy h2 { margin: 6px 0 8px; color: var(--workshop-text); font-family: 'Pixelify Sans'; font-size: 27px; }
-.communityModuleCopy p { margin: 0; color: var(--workshop-text-muted); font-size: 14px; line-height: 1.45; }
-.communityModuleCard .workshopButton { justify-self: start; }
-.communityModuleCard[data-loading="true"] { opacity: 0.72; }
-
-.workshopEmptyState {
-    display: grid;
-    min-height: 280px;
-    place-items: center;
-    align-content: center;
-    margin-top: 24px;
-    padding: 32px;
-    border: 1px dashed var(--workshop-line);
-    border-radius: var(--workshop-radius);
+.communityCategoryRow { align-self: end; }
+.communityCategoryFilters { display: flex; flex-wrap: wrap; gap: 8px; }
+.communityCategoryChip {
+    min-height: 34px;
+    padding: 7px 14px;
+    border: 1px solid var(--workshop-line-strong);
+    border-radius: 999px;
+    background: var(--workshop-surface-soft);
     color: var(--workshop-text-muted);
-    text-align: center;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
 }
-
-.workshopEmptyState img { width: 72px; height: 72px; opacity: 0.7; }
-.workshopEmptyState h2 { margin: 14px 0 5px; color: var(--workshop-text); font-family: 'Pixelify Sans'; }
-.workshopEmptyState p { margin: 0; }
-
+.communityCategoryChip:hover,
+.communityCategoryChip:focus-visible { border-color: var(--workshop-mint); color: var(--workshop-text); }
+.communityCategoryChip.selected {
+    border-color: var(--workshop-copper-light);
+    background: var(--workshop-copper);
+    color: var(--workshop-ink);
+}
+.schematicsTypeFilterControls { display: contents; }
+.schematicsTypeFilterControls[hidden],
+#schematicsTypeManageControls[hidden],
+#communityLoadMoreButton[hidden] { display: none !important; }
+.communityProgressivePager .schematicsPagerControls { align-items: center; justify-content: center; }
+#communityLoadSentinel { width: 1px; height: 1px; }
+.communityPublishPickerPanel { width: min(520px, calc(100vw - 48px)); }
+.communityPublishPickerOptions { display: grid; gap: 10px; padding: 18px; }
+.communityPublishPickerOptions .schematicsDetailButton { justify-content: flex-start; min-height: 44px; }
 #schematicsContainer {
     position: absolute !important;
     z-index: 710 !important;

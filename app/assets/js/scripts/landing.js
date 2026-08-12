@@ -781,7 +781,6 @@ const SCHEMATICS_LAZY_SCRIPT_PATHS = [
 ]
 
 const landingUpperSection = document.querySelector('#landingContainer > #upper')
-const communityHubSection = document.getElementById('communityHub')
 
 function setElementInertState(element, inert){
     if(!element){
@@ -802,7 +801,6 @@ function updateOverlayAccessibility(mode = 'landing'){
     setElementInertState(newsContainer, !showNews)
     setElementInertState(schematicsContainer, !showSchematics)
     setElementInertState(landingUpperSection, overlayOpen)
-    setElementInertState(communityHubSection, overlayOpen)
     setElementInertState(topActions, false)
 }
 
@@ -898,7 +896,7 @@ function slide_(container, up){
     const isNews = container === newsContainer
     const isSchematics = container === schematicsContainer
     landingOverlayGlideCount++
-    const route = up ? (isNews ? 'news' : (isSchematics ? 'community/schematics' : 'home')) : 'home'
+    const route = up ? (isNews ? 'news' : (isSchematics ? 'community' : 'home')) : 'home'
     overlayContainers.forEach((overlay) => {
         if(overlay && overlay !== container) hideOverlay(overlay)
     })

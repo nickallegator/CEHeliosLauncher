@@ -75,7 +75,9 @@ app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
 if(config.schematics.enabled) {
+    const communityRoutes = require('./routes/community')
     const schematicsRoutes = require('./routes/schematics')
+    app.use('/v1', communityRoutes)
     app.use('/v1', schematicsRoutes)
     if(config.schematics.features.collections) {
         const collectionsRoutes = require('./routes/collections')

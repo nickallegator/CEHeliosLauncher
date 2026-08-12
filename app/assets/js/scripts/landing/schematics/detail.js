@@ -175,13 +175,8 @@ async function openSchematicDetail(entry){
         }
         if(schematicsDetailCreator){
             schematicsDetailCreator.textContent = detailEntry.creator ? `by ${detailEntry.creator}` : 'by --'
-            if(detailEntry.creator && schematicsFeatureEnabled('creators')){
-                schematicsDetailCreator.style.cursor = 'pointer'
-                schematicsDetailCreator.onclick = () => openCreatorPanel(detailEntry.creator)
-            } else {
-                schematicsDetailCreator.onclick = null
-                schematicsDetailCreator.style.cursor = ''
-            }
+            schematicsDetailCreator.onclick = null
+            schematicsDetailCreator.style.cursor = ''
         }
         if(schematicsDetailRelease){
             schematicsDetailRelease.textContent = formatSchematicDate(detailEntry.release)

@@ -9,7 +9,7 @@ if not "%~1"=="" set "COBBLEPOWER_RELEASE_API=%~1"
 
 echo.
 echo ============================================================
-echo  Cobble Power Test Launcher - Verified Windows Release Build
+echo  AG Launcher - Verified Cobble Power Test Release Build
 echo ============================================================
 echo  API: %COBBLEPOWER_RELEASE_API%
 echo.
@@ -44,7 +44,7 @@ call npm.cmd run dist:channel -- --api-url "%COBBLEPOWER_RELEASE_API%"
 if errorlevel 1 goto :failed
 
 set "COBBLEPOWER_INSTALLER="
-for %%F in ("dist\channel-output\Cobble-Power-Test-Channel-setup-*.exe") do set "COBBLEPOWER_INSTALLER=%%~fF"
+for %%F in ("dist\channel-output\AG-Launcher-Test-setup-*.exe") do set "COBBLEPOWER_INSTALLER=%%~fF"
 if not defined COBBLEPOWER_INSTALLER goto :missing_installer
 if not exist "%COBBLEPOWER_INSTALLER%" goto :missing_installer
 
@@ -53,8 +53,8 @@ echo.
 echo Installer:
 echo %COBBLEPOWER_INSTALLER%
 echo.
-echo Launch this installer as Cobble Power Test Launcher. The generic
-echo Helios Launcher installer does not include the authenticated channel.
+echo Launch this installer as Allegator Games Launcher. It includes the
+echo authenticated Cobble Power test channel.
 echo.
 exit /b 0
 

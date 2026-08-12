@@ -256,7 +256,7 @@ function buildInstaller() {
 }
 
 function finalizeRelease(release, integrity) {
-    const installerName = `Cobble-Power-Test-Launcher-setup-${release.launcherVersion}.exe`
+    const installerName = `AG-Launcher-Standalone-Test-setup-${release.launcherVersion}.exe`
     const installerPath = path.join(outputRoot, installerName)
     if(!fs.existsSync(installerPath)){
         throw new Error(`Expected tester installer was not produced: ${installerName}`)
@@ -280,7 +280,7 @@ function finalizeRelease(release, integrity) {
         [
             'COBBLE POWER PRIVATE TEST',
             '',
-            '1. Run the Cobble Power Test Launcher installer.',
+            '1. Run the Allegator Games Launcher installer.',
             '2. Windows SmartScreen may warn because this private test build is unsigned.',
             '3. Sign in with a Microsoft account that owns Minecraft Java Edition.',
             '4. Select Cobble Power Test and press Play. Java and the mod pack install automatically.',
@@ -288,7 +288,7 @@ function finalizeRelease(release, integrity) {
             '',
             'Do not redistribute this private test build outside the testing group.',
             'When reporting a problem, include the latest.log file from:',
-            '  %APPDATA%\\.cobblepower-test-launcher\\instances\\Cobble-Power-1.21.1\\logs\\latest.log',
+            '  %APPDATA%\\.ag-launcher\\instances\\Cobble-Power-1.21.1\\logs\\latest.log',
             ''
         ].join('\r\n'),
         'utf8'

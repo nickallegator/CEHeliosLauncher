@@ -10,8 +10,14 @@ let {
     loadCore,
     moduleContainsCobblePower
 } = require('./assets/js/schematicmanager')
+let {
+    CommunityApiClient,
+    createCommunitySessionState
+} = require('./assets/js/communitymanager')
 let schematicsFormatCore = loadCore()
 let { normalizeJsonSchematic, parseCanonicalSchematic } = schematicsFormatCore
+let communityContentRegistry = window.CommunityModules?.createDefaultCommunityContentRegistry?.() || null
+let communityEnabledContentTypes = []
 
 function communityCopy(key, placeholders){
     return Lang.queryJS(`community.${key}`, placeholders)
@@ -391,9 +397,11 @@ function createGridEntryMedia({ className, imageUrl, alt, fallbackSvg, imageClas
     return wrapper
 }
 
-const SCHEMATICS_SORT_DEFAULT = 'likes-desc'
+const SCHEMATICS_SORT_DEFAULT = 'popular'
 
 const SCHEMATIC_SORTERS = {
+    'popular': (a, b) => (getLikesValue(b) - getLikesValue(a)) || (getReleaseTimestamp(b) - getReleaseTimestamp(a)) || compareSchematicName(a, b),
+    'recent': (a, b) => (getReleaseTimestamp(b) - getReleaseTimestamp(a)) || compareSchematicName(a, b),
     'likes-desc': (a, b) => (getLikesValue(b) - getLikesValue(a)) || (getReleaseTimestamp(b) - getReleaseTimestamp(a)) || compareSchematicName(a, b),
     'likes-asc': (a, b) => (getLikesValue(a) - getLikesValue(b)) || (getReleaseTimestamp(b) - getReleaseTimestamp(a)) || compareSchematicName(a, b),
     'release-desc': (a, b) => (getReleaseTimestamp(b) - getReleaseTimestamp(a)) || (getLikesValue(b) - getLikesValue(a)) || compareSchematicName(a, b),
@@ -443,20 +451,24 @@ const SCHEMATICS_VIEW_COPY = {
         subtitle: communityCopy('collectionsLibrarySubtitle')
     }
 }
+const communitySessionDefaults = createCommunitySessionState()
 let schematicsState = {
     status: 'idle',
     error: null,
     items: [],
     total: 0,
+    category: communitySessionDefaults.category,
+    nextCursor: null,
+    loadingMore: false,
+    offline: false,
+    cached: false,
+    scrollTop: communitySessionDefaults.scrollTop,
     apiBase: null,
-    query: '',
-    sortKey: SCHEMATICS_SORT_DEFAULT,
+    query: communitySessionDefaults.query,
+    sortKey: communitySessionDefaults.sort,
     page: 1,
     pageSize: 24,
-    filters: {
-        tags: '',
-        creator: ''
-    }
+    filters: communitySessionDefaults.filters
 }
 
 function toggleSchematicsHitDebug(){
@@ -514,18 +526,9 @@ function scheduleCommunityPageSizeRefresh(){
         if(nextSchematicsSize && nextSchematicsSize !== schematicsState.pageSize){
             schematicsState = {
                 ...schematicsState,
-                pageSize: nextSchematicsSize,
-                page: 1
+                pageSize: Math.max(12, nextSchematicsSize)
             }
-            if(schematicsActive && schematicsCommunitySection === 'content' && schematicsContentTab === 'schematics'){
-                fetchSchematicsList({
-                    query: schematicsSearchInput?.value || '',
-                    sortKey: schematicsSortSelect?.value || SCHEMATICS_SORT_DEFAULT,
-                    page: 1
-                })
-            } else {
-                updateSchematicsPagination()
-            }
+            updateSchematicsPagination()
         }
 
         const nextCollectionsSize = computeGridPageSize(schematicsCollectionsBrowseList)
@@ -577,7 +580,7 @@ function setCommunitySection(section, { skipFetch } = {}){
 }
 
 function setContentTab(tab, { skipFetch } = {}){
-    const next = tab === 'collections' ? 'collections' : 'schematics'
+    const next = 'schematics'
     schematicsContentTab = next
     if(schematicsContent){
         schematicsContent.setAttribute('data-content-tab', next)
@@ -590,6 +593,80 @@ function setContentTab(tab, { skipFetch } = {}){
         }
     }
     updateCommunityView()
+}
+
+function setCommunityCategory(category, { skipFetch } = {}){
+    const next = communityContentRegistry?.get(category) ? category : 'all'
+    schematicsState = { ...schematicsState, category: next, nextCursor: null, page: 1 }
+    getCommunityCategoryButtons().forEach(button => {
+        const selected = button.dataset.communityCategory === next
+        button.classList.toggle('selected', selected)
+        button.setAttribute('aria-pressed', String(selected))
+    })
+    const schematicsOnly = next === 'schematics'
+    if(schematicsTypeFilterControls) schematicsTypeFilterControls.hidden = !schematicsOnly
+    if(schematicsTypeManageControls) schematicsTypeManageControls.hidden = !schematicsOnly
+    if(!schematicsOnly){
+        if(schematicsInstalledToggle) schematicsInstalledToggle.checked = false
+        if(schematicsMineToggle) schematicsMineToggle.checked = false
+    }
+    if(!skipFetch) fetchSchematicsList({ page: 1 })
+}
+
+function syncCommunityCategoryFilters(enabledTypes = []){
+    if(!communityCategoryFilters) return
+    communityEnabledContentTypes = enabledTypes
+    const enabledIds = new Set(enabledTypes.map(definition => definition.id))
+    getCommunityCategoryButtons().forEach(button => {
+        if(button.dataset.communityCategory !== 'all') button.hidden = !enabledIds.has(button.dataset.communityCategory)
+    })
+    for(const definition of enabledTypes){
+        if(communityCategoryFilters.querySelector(`[data-community-category="${definition.id}"]`)) continue
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'communityCategoryChip'
+        button.dataset.communityCategory = definition.id
+        button.setAttribute('aria-pressed', 'false')
+        button.textContent = Lang.query(definition.labelKey)
+        communityCategoryFilters.appendChild(button)
+    }
+    if(schematicsUploadButton){
+        schematicsUploadButton.disabled = getWritableCommunityTypes().length === 0
+        schematicsUploadButton.textContent = schematicsState.category === 'schematics'
+            ? Lang.query('ejs.community.uploadSchematic')
+            : Lang.query('ejs.community.publish')
+    }
+}
+
+function getWritableCommunityTypes(){
+    const categories = new Map((communityCapabilities?.categories || []).map(category => [category.id, category]))
+    return communityEnabledContentTypes.filter(definition => definition.publish && categories.get(definition.id)?.writable !== false)
+}
+
+function closeCommunityPublishPicker(){
+    closeModal(communityPublishPicker)
+}
+
+function openCommunityPublisher(){
+    const selected = communityContentRegistry?.get(schematicsState.category)
+    if(selected?.publish) return selected.publish({ openSchematicUpload })
+    const writableTypes = getWritableCommunityTypes()
+    if(writableTypes.length === 1) return writableTypes[0].publish({ openSchematicUpload })
+    if(writableTypes.length === 0) return
+    if(!communityPublishPickerOptions || !communityPublishPicker) return
+    communityPublishPickerOptions.replaceChildren()
+    writableTypes.forEach(definition => {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'schematicsDetailButton'
+        button.textContent = Lang.query(definition.labelKey)
+        button.addEventListener('click', () => {
+            closeCommunityPublishPicker()
+            definition.publish({ openSchematicUpload })
+        })
+        communityPublishPickerOptions.appendChild(button)
+    })
+    openModal(communityPublishPicker, communityPublishPickerPanel)
 }
 
 function setCreatorView(view, { skipFetch } = {}){
@@ -625,10 +702,6 @@ function updateCommunityView(){
     if(schematicsBrowseCreatorView){
         schematicsBrowseCreatorView.hidden = !(schematicsCommunitySection === 'creators' && schematicsCreatorView === 'profile')
     }
-    if(schematicsCategorySelect){
-        schematicsCategorySelect.value = schematicsContentTab
-        schematicsCategorySelect.disabled = schematicsCommunitySection !== 'content'
-    }
     updateCommunityHeader()
     scheduleCommunityPageSizeRefresh()
 }
@@ -651,6 +724,7 @@ function cancelSchematicsRouteWork(){
     schematicDetailController = null
     setSchematicPreviewRendererActive(false)
     setUploadPreviewRendererActive(false)
+    if(communityPublishPicker?.getAttribute('data-open') === 'true') closeCommunityPublishPicker()
 }
 let schematicsFetchTimer = null
 let schematicsInstallIndex = new Map()
@@ -662,6 +736,17 @@ let schematicsContentTab = 'schematics'
 let schematicsCreatorView = 'list'
 let schematicsCollectionsBrowseTimer = null
 let schematicsPageSizeTimer = null
+let communityProgressiveFrame = null
+
+function scheduleCommunityProgressiveLoad(){
+    if(communityProgressiveFrame) cancelAnimationFrame(communityProgressiveFrame)
+    communityProgressiveFrame = requestAnimationFrame(() => {
+        communityProgressiveFrame = null
+        if(!schematicsActive || !schematicsScroll || !schematicsState.nextCursor || schematicsState.loadingMore) return
+        const remaining = schematicsScroll.scrollHeight - schematicsScroll.scrollTop - schematicsScroll.clientHeight
+        if(remaining <= 240) fetchSchematicsList({ append: true })
+    })
+}
 let schematicsCollectionsBrowseState = {
     status: 'idle',
     items: [],

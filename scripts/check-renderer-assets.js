@@ -8,7 +8,8 @@ const assetsRoot = path.join(root, 'app', 'assets')
 const requiredBrandAssets = [
     'brand/allegator-games-intro.svg',
     'brand/allegator-games-loading-chomp.svg',
-    'brand/allegator-games-mark.svg',
+    'brand/allegator-games-logo.svg',
+    'brand/allegator-games-app-icon.png',
     'brand/allegator-icons.svg',
     'fonts/PixelifySans-Variable.ttf',
     'fonts/AtkinsonHyperlegible-Regular.ttf',
@@ -35,6 +36,9 @@ function checkRendererAssets(){
     }
     if(fs.existsSync(path.join(assetsRoot, 'images', 'backgrounds'))){
         failures.push('The obsolete raster background directory must not be packaged.')
+    }
+    if(fs.existsSync(path.join(assetsRoot, 'brand', 'allegator-games-mark.svg'))){
+        failures.push('The superseded placeholder brand mark must not be packaged.')
     }
     for(const file of files){
         const relative = path.relative(assetsRoot, file).replaceAll('\\', '/')

@@ -2,6 +2,7 @@
  * Script for overlay.ejs
  */
 const AccessManagerOverlay = global.AccessManager || require('./assets/js/accessmanager')
+const ServerBrandingOverlay = require('./assets/js/serverbranding')
 
 /* Overlay Wrapper Functions */
 
@@ -309,7 +310,7 @@ async function populateServerListings(){
         const lockAttr = isLocked ? 'locked' : ''
         const lockNote = isLocked ? `<span class="serverListingRequirement">${Lang.queryJS('settings.serverListing.supporterRequired')}</span>` : ''
         htmlString += `<button class="serverListing" servid="${serv.rawServer.id}" ${serv.rawServer.id === giaSel ? 'selected' : ''} ${lockAttr}>
-            <img class="serverListingImg" src="${serv.rawServer.icon}"/>
+            <img class="serverListingImg" src="${ServerBrandingOverlay.resolveServerIcon(serv.rawServer)}" alt=""/>
             <div class="serverListingDetails">
                 <span class="serverListingName">${serv.rawServer.name}</span>
                 <span class="serverListingDescription">${serv.rawServer.description}</span>

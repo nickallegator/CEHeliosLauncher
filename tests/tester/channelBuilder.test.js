@@ -38,12 +38,14 @@ test('channel output verification requires the authenticated channel and Cobble 
     fs.mkdirSync(testerRoot, { recursive: true })
     fs.cpSync(path.join(stagingRoot, 'tester'), testerRoot, { recursive: true })
     fs.writeFileSync(
-        path.join(outputRoot, `Cobble-Power-Test-Channel-setup-${build.launcherVersion}.exe`),
+        path.join(outputRoot, `AG-Launcher-Test-setup-${build.launcherVersion}.exe`),
         'installer fixture'
     )
+    fs.writeFileSync(path.join(outputRoot, 'win-unpacked', 'AG Launcher.exe'), 'executable fixture')
 
     const verified = verifyOutput('https://api.example.test', build, { outputRoot })
-    assert.equal(path.basename(verified.installerPath), 'Cobble-Power-Test-Channel-setup-2.3.1-test.2.exe')
+    assert.equal(path.basename(verified.installerPath), 'AG-Launcher-Test-setup-2.3.1-test.2.exe')
+    assert.equal(path.basename(verified.executablePath), 'AG Launcher.exe')
 
     const channel = JSON.parse(fs.readFileSync(verified.channelPath, 'utf8'))
     channel.remoteDistributionUrl = 'https://wrong.example.test/v1/releases/channels/test/distribution'

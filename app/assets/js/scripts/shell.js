@@ -3,15 +3,17 @@
 const SHELL_ROUTES = Object.freeze({
     home: 'home',
     community: 'community',
-    schematics: 'community/schematics',
+    schematics: 'community',
     news: 'news',
     settings: 'settings'
 })
 
 let shellRoute = SHELL_ROUTES.home
-let communityRegistry = null
-let communityInitialized = false
 
+function canonicalizeShellRoute(route){
+    const requested = route === 'community/schematics' ? SHELL_ROUTES.community : route
+    return Object.values(SHELL_ROUTES).includes(requested) ? requested : SHELL_ROUTES.home
+}
 function setHidden(element, hidden){
     if(!element) return
     element.hidden = hidden
@@ -30,95 +32,21 @@ function setShellNavigationState(route){
 function applyLandingRoute(route){
     const landing = document.getElementById('landingContainer')
     const home = document.getElementById('upper')
-    const hub = document.getElementById('communityHub')
     const news = document.getElementById('newsContainer')
     const schematics = document.getElementById('schematicsContainer')
     if(!landing) return
 
     landing.dataset.shellRoute = route
     setHidden(home, route !== SHELL_ROUTES.home)
-    setHidden(hub, route !== SHELL_ROUTES.community)
     setHidden(news, route !== SHELL_ROUTES.news)
-    setHidden(schematics, route !== SHELL_ROUTES.schematics)
+    setHidden(schematics, route !== SHELL_ROUTES.community)
     setShellNavigationState(route)
     shellRoute = route
     window.dispatchEvent(new CustomEvent('helios:shell-route-change', { detail: { route } }))
 }
 
-async function getRawDistribution(){
-    const distribution = await DistroAPI.getDistribution()
-    return distribution?.rawDistribution || {}
-}
-
-function createModuleCard(definition){
-    const article = document.createElement('article')
-    article.className = 'communityModuleCard workshopPanel'
-    article.setAttribute('role', 'listitem')
-    article.dataset.communityModule = definition.id
-
-    const icon = document.createElement('div')
-    icon.className = 'communityModuleIcon itemSlot'
-    icon.innerHTML = '<svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#community"></use></svg>'
-
-    const copy = document.createElement('div')
-    copy.className = 'communityModuleCopy'
-    const meta = document.createElement('span')
-    meta.className = 'workshopEyebrow'
-    meta.textContent = Lang.query(definition.metaKey)
-    const title = document.createElement('h2')
-    title.textContent = Lang.query(definition.labelKey)
-    const description = document.createElement('p')
-    description.textContent = Lang.query(definition.descriptionKey)
-    copy.append(meta, title, description)
-
-    const action = document.createElement('button')
-    action.type = 'button'
-    action.className = 'workshopButton primary'
-    action.textContent = Lang.query(definition.actionKey)
-    action.addEventListener('click', async () => {
-        action.disabled = true
-        article.dataset.loading = 'true'
-        try {
-            await definition.load?.({ ensureReady: ensureSchematicsReady })
-            await definition.open({ navigate: navigateShellRoute })
-        } finally {
-            action.disabled = false
-            delete article.dataset.loading
-        }
-    })
-
-    article.append(icon, copy, action)
-    return article
-}
-
-async function initializeCommunityHub(force = false){
-    if(communityInitialized && !force) return
-    const grid = document.getElementById('communityModuleGrid')
-    const empty = document.getElementById('communityHubEmpty')
-    const connection = document.getElementById('communityConnectionState')
-    if(!grid || !window.CommunityModules) return
-
-    grid.replaceChildren()
-    connection.textContent = Lang.query('ejs.community.checking')
-    communityRegistry ||= window.CommunityModules.createDefaultCommunityRegistry()
-    try {
-        const rawDistribution = await getRawDistribution()
-        const modules = await communityRegistry.enabled({ rawDistribution })
-        modules.forEach((definition) => grid.appendChild(createModuleCard(definition)))
-        setHidden(empty, modules.length > 0)
-        connection.textContent = Lang.query('ejs.community.online')
-        connection.dataset.state = 'online'
-        communityInitialized = true
-    } catch(err){
-        loggerLanding?.warn?.('Failed to initialize the Community hub.', err)
-        setHidden(empty, false)
-        connection.textContent = Lang.query('ejs.community.offline')
-        connection.dataset.state = 'offline'
-    }
-}
-
 async function navigateShellRoute(route){
-    const next = Object.values(SHELL_ROUTES).includes(route) ? route : SHELL_ROUTES.home
+    const next = canonicalizeShellRoute(route)
 
     if(next === SHELL_ROUTES.settings){
         document.getElementById('settingsMediaButton')?.click()
@@ -135,16 +63,16 @@ async function navigateShellRoute(route){
         return
     }
 
-    if(next === SHELL_ROUTES.schematics){
+    if(next === SHELL_ROUTES.community){
         if(newsActive) document.getElementById('newsButton')?.click()
         if(!schematicsActive) document.getElementById('schematicsButton')?.click()
+        else applyLandingRoute(SHELL_ROUTES.community)
         return
     }
 
     if(newsActive) document.getElementById('newsButton')?.click()
     if(schematicsActive) document.getElementById('schematicsButton')?.click()
     applyLandingRoute(next)
-    if(next === SHELL_ROUTES.community) await initializeCommunityHub()
 }
 
 function setApplicationView(view){
@@ -207,7 +135,6 @@ function initializeShell(){
     })
 
     window.addEventListener('helios:distribution-refresh', () => {
-        communityInitialized = false
         refreshHomeSummary()
     })
     applyLandingRoute(SHELL_ROUTES.home)
@@ -224,7 +151,7 @@ if(typeof window !== 'undefined'){
         setLandingRoute: applyLandingRoute,
         setApplicationView,
         refreshHomeSummary,
-        refreshCommunity: () => initializeCommunityHub(true),
+        refreshCommunity: () => navigateShellRoute(SHELL_ROUTES.community),
         getRoute: () => shellRoute
     }
 
@@ -233,5 +160,5 @@ if(typeof window !== 'undefined'){
 }
 
 if(typeof module !== 'undefined'){
-    module.exports = { SHELL_ROUTES, countOptionalModules }
+    module.exports = { SHELL_ROUTES, canonicalizeShellRoute, countOptionalModules }
 }

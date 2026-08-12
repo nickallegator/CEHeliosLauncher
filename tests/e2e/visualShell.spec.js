@@ -115,16 +115,18 @@ test('persistent shell routes preserve Home, Community, News, Settings, and the 
         await expect(page.locator('#lower')).toBeVisible()
         await expect(page.locator('#shellNavHome')).toHaveAttribute('aria-current', 'page')
         await expectNoSeriousAccessibilityViolations(application, page, '#appShell')
-        await expect(page.locator('#upper')).toHaveScreenshot('home-workshop.png', {
+        await expect(page.locator('#appShell')).toHaveScreenshot('home-workshop.png', {
             animations: 'disabled',
             mask: [page.locator('#player_count')],
             maskColor: '#15211f'
         })
 
         await page.locator('#shellNavCommunity').click()
-        await expect(page.locator('#communityHub')).toBeVisible()
-        await expect(page.locator('#communityHubEmpty')).toBeVisible()
-        await expect(page.locator('[data-community-module="schematics"]')).toHaveCount(0)
+        await expect(page.locator('#schematicsContainer')).toBeVisible({ timeout: 10000 })
+        await expect(page.locator('[data-community-category="all"]')).toHaveAttribute('aria-pressed', 'true')
+        await expect(page.locator('[data-community-category="schematics"]')).toBeVisible()
+        await expect(page.locator('#schematicsCategorySelect')).toHaveCount(0)
+        await expect(page.locator('[data-community-deferred="collections"]:visible')).toHaveCount(0)
         await expect(page.locator('#lower')).toBeVisible()
         await expectNoSeriousAccessibilityViolations(application, page, '#appShell')
         await expect(page.locator('#appShellViewport')).toHaveScreenshot('community-empty-workshop.png', { animations: 'disabled' })
@@ -137,6 +139,19 @@ test('persistent shell routes preserve Home, Community, News, Settings, and the 
         await page.locator('#settingsMediaButton').click()
         await expect(page.locator('#settingsContainer')).toBeVisible()
         await expect(page.locator('#settingsMediaButton')).toHaveAttribute('aria-current', 'page')
+        await page.locator('[rSc="settingsTabMods"]').click()
+        await expect(page.locator('#settingsTabMods')).toBeVisible()
+        await expect(page.locator('.settingsSelServContent .serverListingImg').first()).toHaveAttribute(
+            'src',
+            'assets/brand/allegator-games-app-icon.png'
+        )
+        await page.locator('#settingsTabMods .settingsSwitchServerButton').click({ force: true })
+        await expect(page.locator('#serverSelectContent')).toBeVisible()
+        await expect(page.locator('#serverSelectListScrollable [servid="Cobble-Power-1.21.1"] .serverListingImg')).toHaveAttribute(
+            'src',
+            'assets/brand/allegator-games-app-icon.png'
+        )
+        await page.locator('#serverSelectCancel').click()
         await expectNoSeriousAccessibilityViolations(application, page, '#appShell')
 
         await page.locator('#shellNavHome').click()
@@ -148,7 +163,7 @@ test('persistent shell routes preserve Home, Community, News, Settings, and the 
     }
 })
 
-test('enabled Community modules load on demand and the compact shell fits 980 by 600', async () => {
+test('unified Community catalog loads directly and the compact shell fits 980 by 600', async () => {
     const { application, page, userDataDirectory } = await launchVisualShell({ signedIn: true, schematics: true })
     try {
         await expect(page.locator('#loadingContainer')).toBeHidden({ timeout: 10000 })
@@ -160,10 +175,11 @@ test('enabled Community modules load on demand and the compact shell fits 980 by
         await expect(page.locator('#lower')).toBeVisible()
 
         await page.locator('#shellNavCommunity').click()
-        const schematicsModule = page.locator('[data-community-module="schematics"]')
-        await expect(schematicsModule).toBeVisible()
-        await schematicsModule.locator('button').click()
         await expect(page.locator('#schematicsContainer')).toBeVisible({ timeout: 10000 })
+        await expect(page.locator('[data-community-category="all"]')).toHaveAttribute('aria-pressed', 'true')
+        await page.locator('[data-community-category="schematics"]').click()
+        await expect(page.locator('[data-community-category="schematics"]')).toHaveAttribute('aria-pressed', 'true')
+        await expect(page.locator('#schematicsTypeManageControls')).toBeVisible()
         await expect(page.locator('#lower')).toBeVisible()
     } finally {
         await closeVisualShell(application, userDataDirectory)

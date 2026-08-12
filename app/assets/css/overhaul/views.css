@@ -161,7 +161,7 @@
     left: 50%;
     width: 82px;
     height: 82px;
-    background: url('../../brand/allegator-games-mark.svg') center/contain no-repeat;
+    background: url('../../brand/allegator-games-logo.svg') center/contain no-repeat;
     content: '';
     opacity: .9;
     transform: translateX(-50%);
@@ -172,6 +172,24 @@
 #waitingContainer h2 { color: var(--workshop-text) !important; font-family: 'Pixelify Sans' !important; }
 #welcomeDescription,
 #loginSubheader { color: var(--workshop-text-muted) !important; }
+
+#welcomeImageSeal,
+#loginImageSeal {
+    width: 180px !important;
+    height: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    object-fit: contain;
+}
+
+#settingsAboutLogo {
+    width: 72px !important;
+    height: 38px !important;
+    padding: 2px 4px !important;
+    object-fit: contain;
+}
 #welcomeButton,
 #loginButton,
 .loginOptionButton,

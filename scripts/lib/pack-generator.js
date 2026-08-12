@@ -276,7 +276,7 @@ function requestOnce(url, options = {}, redirects = 0) {
         const lib = url.startsWith('https:') ? https : http
         const req = lib.get(url, {
             headers: {
-                'User-Agent': 'CEHeliosLauncher-PackGenerator/1.0'
+                'User-Agent': 'AGLauncher-PackGenerator/1.0'
             }
         }, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {

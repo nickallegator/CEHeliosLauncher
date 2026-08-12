@@ -71,6 +71,12 @@
     display: none;
 }
 
+#startupStaticImage {
+    width: min(390px, 82%);
+    height: auto;
+    object-fit: contain;
+}
+
 #loadingContainer[data-startup-phase="loading"] #startupIntroImage,
 #loadingContainer[data-startup-state="fatal"] #startupIntroImage {
     display: none;

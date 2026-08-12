@@ -2,13 +2,13 @@ const fs   = require('fs-extra')
 const { LoggerUtil } = require('helios-core')
 const os   = require('os')
 const path = require('path')
-const { isTesterBuild } = require('./testerchannel')
+const Brand = require('./brand')
 
 const logger = LoggerUtil.getLogger('ConfigManager')
 
 const sysRoot = process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + '/Library/Application Support' : process.env.HOME)
 
-const dataPath = path.join(sysRoot, isTesterBuild() ? '.cobblepower-test-launcher' : '.helioslauncher')
+const dataPath = path.join(sysRoot, Brand.dataDirectoryName)
 
 const launcherDir = require('@electron/remote').app.getPath('userData')
 
@@ -41,8 +41,12 @@ exports.setDataDirectory = function(dataDirectory){
 }
 
 const configPath = path.join(exports.getLauncherDirectory(), 'config.json')
-const configPathLEGACY = path.join(dataPath, 'config.json')
-const firstLaunch = !fs.existsSync(configPath) && !fs.existsSync(configPathLEGACY)
+const legacyConfigPaths = [
+    path.join(dataPath, 'config.json'),
+    ...Brand.legacyDataDirectoryNames.map(directory => path.join(sysRoot, directory, 'config.json'))
+]
+const configPathLEGACY = legacyConfigPaths.find(candidate => fs.existsSync(candidate)) || legacyConfigPaths[0]
+const firstLaunch = !fs.existsSync(configPath) && !legacyConfigPaths.some(candidate => fs.existsSync(candidate))
 
 exports.getAbsoluteMinRAM = function(ram){
     if(ram?.minimum != null) {
@@ -187,7 +191,7 @@ exports.load = async function(){
         // Create all parent directories.
         await fs.ensureDir(path.join(configPath, '..'))
         if(await fs.pathExists(configPathLEGACY)){
-            await fs.move(configPathLEGACY, configPath)
+            await fs.copy(configPathLEGACY, configPath, { overwrite: false })
         } else {
             doLoad = false
             config = DEFAULT_CONFIG

@@ -17,7 +17,7 @@
             "minecraftVersion": "1.19.4",
             "discord": {
                 "shortId": "1.19.4 Demo",
-                "largeImageKey": "https://raw.githubusercontent.com/dscalzi/HeliosLauncher/master/build/icon.png",
+                "largeImageKey": "https://raw.githubusercontent.com/nickallegator/CEHeliosLauncher/master/app/assets/brand/allegator-games-app-icon.png",
                 "largeImageText": "forge-vanilla"
             },
             "mainServer": false,
@@ -1581,7 +1581,7 @@
             "id": "Cobble-Power-1.21.1",
             "name": "Cobble Power (Minecraft 1.21.1)",
             "description": "Cobble Power dependency profile for Minecraft 1.21.1 and NeoForge 21.1.77.",
-            "icon": "https://raw.githubusercontent.com/dscalzi/HeliosLauncher/master/build/icon.png",
+            "icon": "https://raw.githubusercontent.com/nickallegator/CEHeliosLauncher/master/app/assets/brand/allegator-games-app-icon.png",
             "version": "0.1.0-deps.5",
             "address": "localhost:25565",
             "minecraftVersion": "1.21.1",

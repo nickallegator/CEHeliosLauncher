@@ -65,7 +65,7 @@ test('packaged channel authorizes, installs a release, and clears it on explicit
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cobblepower-channel-auth-'))
     const appData = path.join(tempRoot, 'appdata')
     const userData = path.join(tempRoot, 'user-data')
-    const dataDirectory = path.join(appData, '.cobblepower-test-launcher')
+    const dataDirectory = path.join(appData, '.ag-launcher')
     fs.mkdirSync(userData, { recursive: true })
     const uuid = '12345678123412341234123456789abc'
     fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({

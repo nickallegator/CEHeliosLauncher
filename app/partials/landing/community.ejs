@@ -2,20 +2,17 @@
         <div id="schematicsContent">
             <div id="schematicsHeader">
                 <div id="schematicsTitleGroup">
-                    <div id="schematicsEyebrow"><%- lang('landing.schematicsEyebrow') %></div>
-                    <div id="schematicsTitle"><%- lang('landing.schematicsTitle') %></div>
-                    <div id="schematicsSubtitle"><%- lang('landing.schematicsSubtitle') %></div>
+                    <div id="schematicsEyebrow"><%- lang('community.eyebrow') %></div>
+                    <div id="schematicsTitle"><%- lang('community.title') %></div>
+                    <div id="schematicsSubtitle"><%- lang('community.subtitle') %></div>
                 </div>
             </div>
             <div id="schematicsActionGroup">
                 <div id="schematicsControlsRow">
-                    <div id="schematicsCategoryRow" class="schematicsCategoryRow">
-                        <div class="schematicsControlGroup">
-                            <span class="schematicsControlLabel"><%- lang('landing.schematicsCategoryLabel') %></span>
-                            <select id="schematicsCategorySelect" aria-label="<%- lang('landing.schematicsCategoryLabel') %>">
-                                <option value="schematics"><%- lang('community.schematicsTitle') %></option>
-                                <option value="collections"><%- lang('community.collections') %></option>
-                            </select>
+                    <div id="schematicsCategoryRow" class="schematicsCategoryRow communityCategoryRow" aria-label="<%- lang('community.categories') %>">
+                        <div id="communityCategoryFilters" class="communityCategoryFilters" role="group" aria-label="<%- lang('community.categories') %>">
+                            <button type="button" class="communityCategoryChip selected" data-community-category="all" aria-pressed="true"><%- lang('community.all') %></button>
+                            <button type="button" class="communityCategoryChip" data-community-category="schematics" aria-pressed="false"><%- lang('community.schematicsTitle') %></button>
                         </div>
                     </div>
                     <div id="schematicsControls">
@@ -33,10 +30,8 @@
                             <div class="schematicsControlGroup">
                                 <span class="schematicsControlLabel"><%- lang('landing.schematicsSortLabel') %></span>
                                 <select id="schematicsSortSelect" aria-label="<%- lang('landing.schematicsSortLabel') %>">
-                                    <option value="likes-desc"><%- lang('landing.schematicsSortLikesDesc') %></option>
-                                    <option value="likes-asc"><%- lang('landing.schematicsSortLikesAsc') %></option>
-                                    <option value="release-desc"><%- lang('landing.schematicsSortReleaseDesc') %></option>
-                                    <option value="release-asc"><%- lang('landing.schematicsSortReleaseAsc') %></option>
+                                    <option value="popular"><%- lang('community.popular') %></option>
+                                    <option value="recent"><%- lang('community.newest') %></option>
                                 </select>
                             </div>
                         <div id="schematicsFiltersPanel" class="schematicsFiltersPanel" hidden>
@@ -53,30 +48,32 @@
                                     <span><%- lang('community.creator') %></span>
                                     <input id="schematicsCreatorInput" type="text" placeholder="<%- lang('community.creatorPlaceholder') %>" aria-label="<%- lang('community.creatorFilter') %>" spellcheck="false" autocomplete="off"/>
                                 </label>
-                                <label class="schematicsFilterField schematicsFilterToggle">
-                                    <span><%- lang('community.installedOnly') %></span>
-                                    <input id="schematicsInstalledToggle" type="checkbox" />
-                                </label>
-                                <label class="schematicsFilterField schematicsFilterToggle">
-                                    <span><%- lang('community.myUploads') %></span>
-                                    <input id="schematicsMineToggle" type="checkbox" />
-                                </label>
+                                <div id="schematicsTypeFilterControls" class="schematicsTypeFilterControls" hidden>
+                                    <label class="schematicsFilterField schematicsFilterToggle">
+                                        <span><%- lang('community.installedOnly') %></span>
+                                        <input id="schematicsInstalledToggle" type="checkbox" />
+                                    </label>
+                                    <label class="schematicsFilterField schematicsFilterToggle">
+                                        <span><%- lang('community.myUploads') %></span>
+                                        <input id="schematicsMineToggle" type="checkbox" />
+                                    </label>
+                                </div>
                             </div>
                         </div>
-                        <div class="schematicsControlGroup">
+                        <div id="schematicsTypeManageControls" class="schematicsControlGroup" hidden>
                             <span class="schematicsControlLabel"><%- lang('landing.schematicsManageLabel') %></span>
-                            <button id="schematicsManageInstalledButton" type="button" class="schematicsMiniButton"><%- lang('community.manage') %></button>
+                            <button id="schematicsManageInstalledButton" type="button" class="schematicsMiniButton"><%- lang('community.manageInstalled') %></button>
                         </div>
                         <div class="schematicsControlGroup">
-                            <span class="schematicsControlLabel"><%- lang('community.upload') %></span>
-                            <button id="schematicsUploadButton" type="button" class="schematicsMiniButton primary"><%- lang('community.uploadSchematic') %></button>
+                            <span class="schematicsControlLabel"><%- lang('community.publish') %></span>
+                            <button id="schematicsUploadButton" type="button" class="schematicsMiniButton primary" disabled><%- lang('community.publish') %></button>
                         </div>
                         <div id="schematicsAdminControlGroup" class="schematicsControlGroup" hidden>
                             <span class="schematicsControlLabel"><%- lang('community.admin') %></span>
                             <button id="schematicsAdminToolsButton" type="button" class="schematicsMiniButton"><%- lang('community.thumbnailTools') %></button>
                         </div>
                     </div>
-                    <div id="schematicsCollectionsControls">
+                    <div id="schematicsCollectionsControls" data-community-deferred="collections" hidden>
                         <div class="schematicsControlGroup schematicsControlMeta">
                             <span class="schematicsControlLabel"><%- lang('community.collections') %></span>
                             <span id="schematicsCollectionsBrowseCount" class="schematicsMetaValue">0</span>
@@ -125,17 +122,17 @@
             </div>
             <div id="schematicsBrowseSchematicsView" role="tabpanel">
                 <div id="schematicsScroll">
-                    <div id="schematicsGrid" role="list"></div>
+                    <div id="schematicsGrid" aria-live="polite"></div>
+                    <span id="communityLoadSentinel" aria-hidden="true"></span>
                 </div>
-                <div class="schematicsPagerBottom">
+                <div class="schematicsPagerBottom communityProgressivePager">
                     <div class="schematicsPagerControls">
-                        <button id="schematicsPagePrev" type="button" class="schematicsMiniButton"><%- lang('community.previous') %></button>
-                        <span id="schematicsPageStatus" class="schematicsPagerStatus">1 / 1</span>
-                        <button id="schematicsPageNext" type="button" class="schematicsMiniButton"><%- lang('community.next') %></button>
+                        <span id="schematicsPageStatus" class="schematicsPagerStatus" aria-live="polite"></span>
+                        <button id="communityLoadMoreButton" type="button" class="schematicsMiniButton"><%- lang('community.loadMore') %></button>
                     </div>
                 </div>
             </div>
-            <div id="schematicsBrowseCollectionsView" role="tabpanel" hidden>
+            <div id="schematicsBrowseCollectionsView" role="tabpanel" data-community-deferred="collections" hidden>
                 <div id="schematicsCollectionsBrowseList" class="schematicsCollectionsBrowseList" role="list"></div>
                 <div class="schematicsPagerBottom">
                     <div class="schematicsPagerControls">
@@ -145,10 +142,10 @@
                     </div>
                 </div>
             </div>
-            <div id="schematicsCreatorsBrowseView" role="tabpanel" hidden>
+            <div id="schematicsCreatorsBrowseView" role="tabpanel" data-community-deferred="collections" hidden>
                 <div id="schematicsCreatorsGrid" class="schematicsCreatorGrid" role="list"></div>
             </div>
-            <div id="schematicsBrowseCreatorView" role="tabpanel" hidden>
+            <div id="schematicsBrowseCreatorView" role="tabpanel" data-community-deferred="collections" hidden>
                 <div class="schematicsCreatorHeader">
                     <div class="schematicsCreatorProfile">
                         <div id="schematicsCreatorAvatar" class="schematicsCreatorAvatar">C</div>
@@ -190,9 +187,22 @@
                 <div id="schematicsCreatorGrid" class="schematicsCreatorGrid" role="list"></div>
             </div>
             <%- include('community/modals/detail.ejs') %>
+            <div id="communityPublishPicker" class="schematicsModalRoot" aria-hidden="true">
+                <div id="communityPublishPickerScrim" class="schematicsModalScrim"></div>
+                <div id="communityPublishPickerPanel" class="schematicsModalPanel communityPublishPickerPanel" role="dialog" aria-modal="true" aria-labelledby="communityPublishPickerTitle" tabindex="-1">
+                    <div class="schematicsCollectionsHeader">
+                        <div class="schematicsCollectionsHeading">
+                            <div class="schematicsCollectionsEyebrow"><%- lang('community.publish') %></div>
+                            <h2 id="communityPublishPickerTitle"><%- lang('community.choosePublishType') %></h2>
+                        </div>
+                        <button id="communityPublishPickerClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
+                    </div>
+                    <div id="communityPublishPickerOptions" class="communityPublishPickerOptions"></div>
+                </div>
+            </div>
             <%- include('community/modals/admin-tools.ejs') %>
-            <%- include('community/modals/collections-browse-detail.ejs') %>
-            <div id="schematicsCollectionsPanel" aria-hidden="true">
+            <div data-community-deferred="collections" hidden><%- include('community/modals/collections-browse-detail.ejs') %></div>
+            <div id="schematicsCollectionsPanel" data-community-deferred="collections" aria-hidden="true" hidden>
                 <div id="schematicsCollectionsScrim"></div>
                 <div id="schematicsCollectionsCard" role="dialog" aria-modal="true" aria-labelledby="schematicsCollectionsTitle">
                     <div class="schematicsCollectionsHeader">

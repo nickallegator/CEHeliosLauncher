@@ -86,7 +86,7 @@ test('schema v2 resolves a bootstrap distribution without bundled artifacts', (t
     fs.writeFileSync(channelPath, JSON.stringify({
         schemaVersion: 2,
         id: 'cobble-power-test',
-        name: 'Cobble Power Test Launcher',
+        name: 'Allegator Games Launcher',
         channel: 'test',
         bootstrapDistribution: 'bootstrap.json',
         remoteDistributionUrl: 'https://api.example.test/v1/releases/channels/test/distribution',

@@ -60,10 +60,11 @@ function verifyOutput(apiBase, build, options = {}) {
     const bootstrapPath = path.join(testerRoot, build.channel.bootstrapDistribution)
     const installerPath = path.join(
         targetOutputRoot,
-        `Cobble-Power-Test-Channel-setup-${build.launcherVersion}.exe`
+        `AG-Launcher-Test-setup-${build.launcherVersion}.exe`
     )
+    const executablePath = path.join(targetOutputRoot, 'win-unpacked', 'AG Launcher.exe')
 
-    for(const requiredPath of [channelPath, bootstrapPath, installerPath]) {
+    for(const requiredPath of [channelPath, bootstrapPath, executablePath, installerPath]) {
         if(!fs.existsSync(requiredPath)) {
             throw new Error(`Channel build is incomplete: ${requiredPath} is missing`)
         }
@@ -89,7 +90,7 @@ function verifyOutput(apiBase, build, options = {}) {
         throw new Error(`Channel installer is empty: ${installerPath}`)
     }
 
-    return { installerPath, channelPath, bootstrapPath }
+    return { installerPath, executablePath, channelPath, bootstrapPath }
 }
 
 function buildInstaller(apiBase, build) {

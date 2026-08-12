@@ -1,7 +1,7 @@
 # Custom Language File for Launcher Customizer
 
 [ejs.app]
-title = "Cobble Power Launcher"
+title = "Allegator Games Launcher"
 
 [ejs.landing]
 mediaGitHubURL = "https://github.com/nickallegator/CEHeliosLauncher"
@@ -16,6 +16,6 @@ sourceGithubLink = "https://github.com/nickallegator/CEHeliosLauncher"
 supportLink = "https://github.com/nickallegator/CEHeliosLauncher/issues"
 
 [ejs.welcome]
-welcomeHeader = "WELCOME TO COBBLE POWER"
-welcomeDescription = "Your managed Cobble Power workshop keeps the tested NeoForge profile, required dependencies, optional integrations, and community creations together in one launcher."
-welcomeDescCTA = "Sign in with Microsoft to prepare your first launch."
+welcomeHeader = "WELCOME TO AG LAUNCHER"
+welcomeDescription = "The Allegator Games Launcher keeps official modpacks, tested dependencies, optional integrations, updates, and community creations together in one workshop."
+welcomeDescCTA = "Sign in with Microsoft to prepare your first Allegator Games profile."

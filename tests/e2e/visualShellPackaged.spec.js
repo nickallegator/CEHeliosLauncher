@@ -14,13 +14,16 @@ test('packaged Windows launcher contains and boots the Allegator workshop shell'
     const expectedAssets = [
         '/app/assets/brand/allegator-games-intro.svg',
         '/app/assets/brand/allegator-games-loading-chomp.svg',
-        '/app/assets/brand/allegator-games-mark.svg',
+        '/app/assets/brand/allegator-games-logo.svg',
+        '/app/assets/brand/allegator-games-app-icon.png',
         '/app/assets/brand/allegator-icons.svg',
         '/app/assets/fonts/PixelifySans-Variable.ttf',
         '/app/assets/fonts/AtkinsonHyperlegible-Regular.ttf',
         '/app/assets/fonts/AtkinsonHyperlegible-Bold.ttf'
     ]
     expectedAssets.forEach(asset => expect(packagedFiles).toContain(asset))
+    expect(packagedFiles).not.toContain('/app/assets/brand/allegator-games-mark.svg')
+    expect(packagedFiles.some(file => /\/build\/branding\//.test(file))).toBe(false)
     expect(packagedFiles.some(file => /\/app\/assets\/images\/backgrounds\//.test(file))).toBe(false)
     expect(packagedFiles.some(file => /\/app\/assets\/images\/(LoadingSeal|LoadingText)\.png$/.test(file))).toBe(false)
 

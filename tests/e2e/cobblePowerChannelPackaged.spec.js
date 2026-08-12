@@ -31,6 +31,8 @@ test('packaged authenticated channel starts from a JAR-free bootstrap at shortcu
         await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 25000 })
         const resources = path.join(path.dirname(executablePath), 'resources', 'tester')
         const channel = JSON.parse(fs.readFileSync(path.join(resources, 'tester-channel.json'), 'utf8'))
+        const identity = await app.evaluate(({ app }) => ({ name: app.getName(), version: app.getVersion() }))
+        expect(identity).toEqual({ name: 'Allegator Games Launcher', version: '2.3.1-test.2' })
         expect(channel.schemaVersion).toBe(2)
         expect(channel.requiredEntitlement).toBe('cobblepower:test')
         expect(fs.readdirSync(resources).sort()).toEqual(['distribution_bootstrap.json', 'tester-channel.json'])
