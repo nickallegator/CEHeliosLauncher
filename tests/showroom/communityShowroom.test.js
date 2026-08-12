@@ -22,8 +22,9 @@ function digest(value) {
 }
 
 test('showroom arguments preserve explicit directories and reject unknown switches', () => {
-    const value = parseArguments(['--keep-data', '--data-dir', 'fixture-output'])
+    const value = parseArguments(['--keep-data', '--verify', '--data-dir', 'fixture-output'])
     assert.equal(value.keepData, true)
+    assert.equal(value.verify, true)
     assert.equal(value.dataDirectory, path.resolve('fixture-output'))
     assert.throws(() => parseArguments(['--unknown']), /Unknown argument/)
     assert.throws(() => parseArguments(['--data-dir']), /requires a path/)

@@ -13,15 +13,17 @@ function usage() {
         '',
         '  --keep-data       Keep the disposable showroom directory after exit.',
         '  --data-dir <path> Use an explicit directory and never remove it automatically.',
+        '  --verify          Open, verify the catalog, then close automatically.',
         '  --help            Show this help.'
     ].join('\n')
 }
 
 function parseArguments(argv) {
-    const options = { keepData: false, dataDirectory: null, help: false }
+    const options = { keepData: false, dataDirectory: null, verify: false, help: false }
     for(let index = 0; index < argv.length; index += 1) {
         const argument = argv[index]
         if(argument === '--keep-data') options.keepData = true
+        else if(argument === '--verify') options.verify = true
         else if(argument === '--help' || argument === '-h' || argument === '/?') options.help = true
         else if(argument === '--data-dir') {
             const value = argv[index + 1]
@@ -87,13 +89,15 @@ async function run(argv = process.argv.slice(2)) {
         const page = await application.firstWindow()
         await page.waitForLoadState('domcontentloaded')
         await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 20_000 })
-        await page.evaluate(() => {
-            globalThis.document.title = 'AG Launcher — Local Community Showroom'
-            globalThis.document.body.dataset.communityShowroom = 'true'
-        })
         await page.locator('#shellNavCommunity').click()
         await page.locator('.schematicCard').first().waitFor({ state: 'visible', timeout: 10_000 })
         console.log(`Showroom ready with ${runtime.entries.length} representative creations.`)
+        if(options.verify) {
+            await application.close()
+            application = null
+            console.log('Showroom verification completed successfully.')
+            return 0
+        }
         await waitForApplicationClose(application)
         application = null
         return 0

@@ -71,6 +71,8 @@ Run `run-community-showroom.cmd` from the launcher repository to open a disposab
 
 Use `run-community-showroom.cmd --keep-data` to preserve the generated instance for inspection, or `run-community-showroom.cmd --data-dir <path>` to use an explicit persistent location. The showroom never reads or writes the installed launcher's profile, production PostgreSQL database, or R2 bucket.
 
+Use `run-community-showroom.cmd --verify` for a non-interactive health check of the complete batch-file, Electron startup, local catalog, and shutdown path.
+
 ## Rollout
 
 1. Apply migrations and deploy the backend with all new provider flags disabled.
