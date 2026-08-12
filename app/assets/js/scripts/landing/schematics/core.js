@@ -4,6 +4,11 @@
 
 let pathUtil = require('path')
 let {
+    buildSchematicMesh,
+    collectTextureIdsForSchematic
+} = require(pathUtil.resolve(process.cwd(), 'libraries', 'schematics-visualizer'))
+let { colorForState: schematicPreviewColorForState } = require(pathUtil.resolve(process.cwd(), 'libraries', 'schematics-preview'))
+let {
     SchematicApiClient,
     SchematicApiError,
     SchematicInstallManager,
@@ -774,7 +779,7 @@ const SCHEMATICS_CACHE_DIR = pathUtil.join(ConfigManager.getLauncherDirectory(),
 const SCHEMATICS_INSTALL_DIR = pathUtil.join(SCHEMATICS_CACHE_DIR, 'installed')
 const SCHEMATICS_INDEX_PATH = pathUtil.join(SCHEMATICS_CACHE_DIR, 'index.json')
 const SCHEMATICS_ATLAS_CACHE_DIR = pathUtil.join(SCHEMATICS_CACHE_DIR, 'atlas')
-const SCHEMATICS_ATLAS_CACHE_VERSION = 5
+const SCHEMATICS_ATLAS_CACHE_VERSION = 6
 const SCHEMATICS_REBUILD_CACHE = ['1', 'true', 'yes'].includes(String(process.env.SCHEMATICS_REBUILD_CACHE || '').toLowerCase())
 const SCHEMATICS_ATLAS_DISK_LIMIT = 8
 const SCHEMATICS_MODS_JSON_PATH = pathUtil.resolve(process.cwd(), 'mods.json')
@@ -2219,6 +2224,32 @@ async function loadImageFromBuffer(buffer){
     })
 }
 
+function getMissingTextureColor(textureId){
+    let hash = 2166136261
+    const value = String(textureId || '')
+    for(let index = 0; index < value.length; index++){
+        hash ^= value.charCodeAt(index)
+        hash = Math.imul(hash, 16777619)
+    }
+    const red = 70 + (hash & 63)
+    const green = 82 + ((hash >>> 8) & 79)
+    const blue = 78 + ((hash >>> 16) & 71)
+    return {
+        base: `rgb(${red}, ${green}, ${blue})`,
+        accent: `rgb(${Math.min(255, red + 28)}, ${Math.min(255, green + 28)}, ${Math.min(255, blue + 28)})`
+    }
+}
+
+function drawMissingTextureFallback(ctx, textureId, x, y, size){
+    const color = getMissingTextureColor(textureId)
+    ctx.fillStyle = color.base
+    ctx.fillRect(x, y, size, size)
+    ctx.fillStyle = color.accent
+    const half = Math.max(1, Math.floor(size / 2))
+    ctx.fillRect(x, y, half, half)
+    ctx.fillRect(x + half, y + half, size - half, size - half)
+}
+
 async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {}){
     if(!Array.isArray(textureIds) || textureIds.length === 0){
         schematicsTextureAtlas = null
@@ -2282,6 +2313,7 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
     ctx.imageSmoothingEnabled = false
 
     const mapping = {}
+    let resolvedTextureCount = 0
     for(let i=0; i<textureIds.length; i++){
         const textureId = textureIds[i]
         const col = i % columns
@@ -2302,6 +2334,7 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
             }
         }
         if(image){
+            resolvedTextureCount += 1
             let source = image
             if(image.height > image.width && image.height % image.width === 0){
                 const frameSize = image.width
@@ -2319,9 +2352,8 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
                 setTextureAlphaMode(textureId, alphaMode)
             }
         } else {
-            ctx.fillStyle = 'rgba(255, 0, 255, 0.8)'
-            ctx.fillRect(drawX, drawY, size, size)
-            setTextureAlphaMode(textureId, 'cutout')
+            drawMissingTextureFallback(ctx, textureId, drawX, drawY, size)
+            setTextureAlphaMode(textureId, 'opaque')
         }
         mapping[textureId] = {
             u0: drawX / canvas.width,
@@ -2330,6 +2362,16 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
             v1: (drawY + size) / canvas.height,
             alphaMode: getTextureAlphaMode(textureId)
         }
+    }
+
+    if(resolvedTextureCount === 0){
+        schematicsTextureAtlas = null
+        schematicsTextureAtlasCache.set(key, null)
+        if(schematicsTextureAtlasCache.size > SCHEMATICS_ATLAS_CACHE_LIMIT){
+            const firstKey = schematicsTextureAtlasCache.keys().next().value
+            schematicsTextureAtlasCache.delete(firstKey)
+        }
+        return null
     }
 
     const atlas = { key, canvas, mapping }

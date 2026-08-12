@@ -68,6 +68,7 @@ parentPort.on('message', (message) => {
         const mesh = buildSchematicMesh(schematic, registry, {
             center: options?.center || [0, 0, 0],
             paletteColors: options?.paletteColors || [],
+            usePaletteColors: !atlasMapping,
             cullFaces: options?.cullFaces !== false,
             coplanarBias: options?.coplanarBias !== false,
             tintProvider: getTintColor,

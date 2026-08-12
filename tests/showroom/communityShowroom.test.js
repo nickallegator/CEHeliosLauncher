@@ -58,10 +58,13 @@ test('local showroom serves representative read-only artifacts without productio
     const schematicDetail = await fetch(`${runtime.apiBaseUrl}/v1/schematics/${schematicEntry.id}`).then(response => response.json())
     const schematicArtifact = await fetch(`${runtime.apiBaseUrl}/v1/schematics/${schematicEntry.id}/download`).then(response => response.json())
     const parsedSchematic = parseCanonicalSchematic(schematicArtifact)
-    assert.equal(schematicEntry.thumbnailUrl, null)
+    assert.match(schematicEntry.thumbnailUrl, /\/preview$/)
     assert.equal(schematicDetail.schematic.format, 'cobblepower_schematic')
     assert.equal(parsedSchematic.sha256, schematicEntry.revision.sha256)
     assert.equal(parsedSchematic.blockCount, schematicEntry.typeData.blockCount)
+    const schematicPreview = await fetch(`${runtime.apiBaseUrl}${schematicEntry.thumbnailUrl}`).then(response => response.text())
+    assert.match(schematicPreview, /3D preview/)
+    assert.match(schematicPreview, /<polygon/)
 
     for(const entry of catalog.items.filter(value => value.type !== 'schematics')) {
         const descriptor = await fetch(`${runtime.apiBaseUrl}/v1/community/items/${entry.type}/${entry.id}/download`).then(response => response.json())

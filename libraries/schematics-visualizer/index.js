@@ -581,7 +581,9 @@ function buildSchematicMesh(schematic, registry, options = {}){
         if(mesh.hasCoplanar){
             hasCoplanar = true
         }
-        const color = [1, 1, 1]
+        const color = options.usePaletteColors === false
+            ? [1, 1, 1]
+            : (paletteColors[block.p] || [0.7, 0.7, 0.7])
         for(let i=0; i<mesh.opaque.positions.length; i+=3){
             positions.push(
                 mesh.opaque.positions[i] + block.x - center[0],
@@ -1105,8 +1107,8 @@ function collectTextureIdsForSchematic(schematic, registry){
         const state = entry?.state
         const models = resolveBlockstateModels(blockId, state, registry)
         for(const modelEntry of models){
-        const modelId = normalizeModelId(modelEntry.model || 'block/cube_all')
-        const model = resolveModel(modelId, registry)
+            const modelId = normalizeModelId(modelEntry.model || 'block/cube_all')
+            const model = resolveModel(modelId, registry)
             collectTextureIdsForModel(model).forEach(id => ids.add(id))
         }
     }

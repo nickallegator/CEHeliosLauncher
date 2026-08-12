@@ -318,7 +318,7 @@ async function openSchematicDetail(entry){
             return
         }
         if(!normalized){
-            renderPreviewPlaceholder(communityCopy('noSchematicData'))
+            renderPreviewPlaceholder(communityCopy('noSchematicData'), 'unavailable')
             renderBlockCountsPlaceholder(communityCopy('noBlockData'))
             renderModListPlaceholder(communityCopy('noModData'))
             return
@@ -352,7 +352,7 @@ async function openSchematicDetail(entry){
         await Promise.all([blockListRenderTask, modsListRenderTask])
     } catch (err) {
         loggerLanding.warn('Failed to normalize schematic for preview.', err)
-        renderPreviewPlaceholder(communityCopy('previewUnavailable'))
+        renderPreviewPlaceholder(communityCopy('previewUnavailable'), 'error')
         renderBlockCountsPlaceholder(communityCopy('noBlockData'))
         renderModListPlaceholder(communityCopy('noModData'))
     }

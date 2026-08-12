@@ -44,6 +44,7 @@
 }
 
 #schematicsContainer.routeActive { opacity: 1; transform: translateY(0); }
+#schematicsContainer:has(.schematicsModalRoot[data-open="true"]) { z-index: 1200 !important; }
 #schematicsContainer > #schematicsContent {
     width: 100% !important;
     height: 100% !important;

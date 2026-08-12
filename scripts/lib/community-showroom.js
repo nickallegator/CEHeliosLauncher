@@ -16,6 +16,7 @@ const {
     canonicalizeTrainer
 } = require('../../libraries/community-core')
 const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
+const { renderSchematicPreviewSvg } = require('../../libraries/schematics-preview')
 const { validateResourcePack } = require('../../backend/src/services/communityResourcePack')
 
 const SHOWROOM_SCHEMA_VERSION = 1
@@ -405,10 +406,11 @@ function createSchematicEntry(definition, artifact) {
             bounds: artifact.result.bounds,
             paletteSize: artifact.result.canonical.palette.length
         },
-        thumbnailUrl: null,
+        thumbnailUrl: `/v1/community/items/${SCHEMATIC_TYPE}/${itemId}/preview`,
         capabilities: { canEdit: false, canDelete: false, canReport: true, liked: false },
         artifact: artifact.bytes,
-        canonical: artifact.result.canonical
+        canonical: artifact.result.canonical,
+        preview: Buffer.from(renderSchematicPreviewSvg(artifact.result, { title: definition.title }), 'utf8')
     }
 }
 

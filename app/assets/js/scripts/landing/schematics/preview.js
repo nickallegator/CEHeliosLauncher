@@ -113,16 +113,17 @@ function resizePreviewCanvas(){
     return resizeCanvasToContainer(schematicsDetailCanvas, schematicsDetailPreview)
 }
 
-function renderPreviewPlaceholder(text){
+function renderPreviewPlaceholder(text, state = 'loading'){
     if(!schematicsDetailCanvas || !schematicsDetailPreview){
         return
     }
     schematicsDetailPreview.removeAttribute('data-mesh')
+    schematicsDetailPreview.setAttribute('data-preview-state', state)
+    schematicsDetailPreview.setAttribute('data-rendered', 'false')
     const renderer = ensureSchematicPreviewRenderer()
     if(renderer && renderer.isWebGL){
         renderer.clearMesh()
         renderer.requestRender()
-        schematicsDetailPreview.setAttribute('data-rendered', 'true')
         return
     }
     const ctx = schematicsDetailCanvas.getContext('2d')
@@ -138,7 +139,6 @@ function renderPreviewPlaceholder(text){
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(text, width / 2, height / 2)
-    schematicsDetailPreview.setAttribute('data-rendered', 'true')
 }
 
 function renderSchematicPreviewFallback(schematic){
@@ -181,6 +181,7 @@ function renderSchematicPreviewFallback(schematic){
     ctx.fillText(`Palette: ${schematic.palette.length}`, box.x, box.y + 62 * scale)
 
     schematicsDetailPreview.setAttribute('data-rendered', 'true')
+    schematicsDetailPreview.setAttribute('data-preview-state', 'fallback')
 }
 
 function resizeUploadPreviewCanvas(){
@@ -192,11 +193,12 @@ function renderUploadPreviewPlaceholder(text){
         return
     }
     schematicsUploadPreview.removeAttribute('data-mesh')
+    schematicsUploadPreview.setAttribute('data-preview-state', 'loading')
+    schematicsUploadPreview.setAttribute('data-rendered', 'false')
     const renderer = ensureUploadPreviewRenderer()
     if(renderer && renderer.isWebGL){
         renderer.clearMesh()
         renderer.requestRender()
-        schematicsUploadPreview.setAttribute('data-rendered', 'true')
         return
     }
     const ctx = schematicsUploadCanvas.getContext('2d')
@@ -212,7 +214,6 @@ function renderUploadPreviewPlaceholder(text){
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(text, width / 2, height / 2)
-    schematicsUploadPreview.setAttribute('data-rendered', 'true')
 }
 
 function renderUploadSchematicPreviewFallback(schematic){
@@ -252,6 +253,7 @@ function renderUploadSchematicPreviewFallback(schematic){
     ctx.fillText(`Palette: ${schematic.palette.length}`, box.x, box.y + 60 * scale)
 
     schematicsUploadPreview.setAttribute('data-rendered', 'true')
+    schematicsUploadPreview.setAttribute('data-preview-state', 'fallback')
 }
 
 function waitForRendererMesh(renderer, timeoutMs = 4000){
@@ -458,6 +460,15 @@ function mat4Multiply(out, a, b){
     out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32
     out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33
     return out
+}
+
+function computePreviewCameraRadius(boundsSize, aspect, fov = Math.PI / 4){
+    const dimensions = Array.isArray(boundsSize) ? boundsSize.map(value => Math.max(1, Number(value) || 1)) : [1, 1, 1]
+    const boundingRadius = Math.hypot(dimensions[0], dimensions[1], dimensions[2]) / 2
+    const safeAspect = Math.max(0.2, Number(aspect) || 1)
+    const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * safeAspect)
+    const limitingFov = Math.max(0.2, Math.min(fov, horizontalFov))
+    return Math.max(6, boundingRadius / Math.sin(limitingFov / 2) * 1.12)
 }
 
 class SchematicPreviewRenderer {
@@ -903,6 +914,7 @@ class SchematicPreviewRenderer {
         this.meshTransSorted = null
         this.meshTransSortDirty = true
         this.lastTransSortEye = null
+        this.container?.removeAttribute('data-preview-vertices')
         this.requestRender()
     }
 
@@ -1147,18 +1159,23 @@ class SchematicPreviewRenderer {
             })
         }
         const bounds = schematic.bounds || { min: [0, 0, 0], max: [0, 0, 0], size: [1, 1, 1] }
-        const center = [
+        const meshCenter = [
             (bounds.min[0] + bounds.max[0]) / 2,
             (bounds.min[1] + bounds.max[1]) / 2,
             (bounds.min[2] + bounds.max[2]) / 2
         ]
-        this.center = center
+        // Mesh vertices are normalized around the schematic bounds before upload.
+        // Keep the camera target in that same local coordinate system.
+        this.center = [0, 0, 0]
         this.boundsSize = bounds.size || [1, 1, 1]
-        const maxDim = Math.max(...this.boundsSize, 1)
-        this.radius = Math.max(6, maxDim * 1.6)
+        const previewRect = this.container?.getBoundingClientRect()
+        const aspect = previewRect?.height > 0 ? previewRect.width / previewRect.height : 1
+        this.radius = computePreviewCameraRadius(this.boundsSize, aspect)
 
         const paletteColors = buildPaletteColors(schematic)
         this.container?.setAttribute('data-mesh', 'building')
+        this.container?.setAttribute('data-preview-state', 'building')
+        this.container?.setAttribute('data-rendered', 'false')
         const taskId = ++this.meshTaskId
         const atlasMapping = schematicsTextureAtlas?.mapping || null
         const registrySubset = collectRegistrySubset(schematic)
@@ -1167,7 +1184,7 @@ class SchematicPreviewRenderer {
             registry: registrySubset,
             atlasMapping,
             options: {
-                center,
+                center: meshCenter,
                 paletteColors,
                 cullFaces: true,
                 coplanarBias: true
@@ -1181,7 +1198,7 @@ class SchematicPreviewRenderer {
                     if(taskId !== this.meshTaskId){
                         return
                     }
-                    this.applyMeshResult(mesh, schematic, paletteColors, center)
+                    this.applyMeshResult(mesh, schematic, paletteColors, meshCenter)
                 })
                 .catch((err) => {
                     loggerLanding.warn('Mesh worker build failed, falling back to main thread.', err)
@@ -1189,8 +1206,9 @@ class SchematicPreviewRenderer {
                         return
                     }
                     const mesh = buildSchematicMesh(schematic, schematicsRuntimeRegistry, {
-                        center,
+                        center: meshCenter,
                         paletteColors,
+                        usePaletteColors: !schematicsTextureAtlas?.mapping,
                         cullFaces: true,
                         tintProvider: getTintColor,
                         variantSeedFn: (block, paletteEntry) => computeVariantSeed(paletteEntry?.block || 'minecraft:stone', block),
@@ -1220,14 +1238,15 @@ class SchematicPreviewRenderer {
                             }
                         }
                     })
-                    this.applyMeshResult(mesh, schematic, paletteColors, center)
+                    this.applyMeshResult(mesh, schematic, paletteColors, meshCenter)
                 })
             return
         }
 
         const mesh = buildSchematicMesh(schematic, schematicsRuntimeRegistry, {
-            center,
+            center: meshCenter,
             paletteColors,
+            usePaletteColors: !schematicsTextureAtlas?.mapping,
             cullFaces: true,
             tintProvider: getTintColor,
             variantSeedFn: (block, paletteEntry) => computeVariantSeed(paletteEntry?.block || 'minecraft:stone', block),
@@ -1257,7 +1276,7 @@ class SchematicPreviewRenderer {
                 }
             }
         })
-        this.applyMeshResult(mesh, schematic, paletteColors, center)
+        this.applyMeshResult(mesh, schematic, paletteColors, meshCenter)
     }
 
     render(){
@@ -1381,7 +1400,13 @@ class SchematicPreviewRenderer {
             gl.disable(gl.POLYGON_OFFSET_FILL)
         }
         gl.bindVertexArray(null)
-        this.container?.setAttribute('data-rendered', 'true')
+        const renderedVertices = this.meshVertexCount + this.meshCutoutVertexCount + this.meshTransVertexCount
+            + (this.blocksCount * 36)
+        if(renderedVertices > 0){
+            this.container?.setAttribute('data-preview-vertices', String(renderedVertices))
+            this.container?.setAttribute('data-rendered', 'true')
+            this.container?.setAttribute('data-preview-state', 'ready')
+        }
     }
 
     sortTranslucent(eye){
@@ -1477,36 +1502,12 @@ class SchematicPreviewRenderer {
     }
 }
 
-function hsvToRgb(h, s, v){
-    const i = Math.floor(h * 6)
-    const f = h * 6 - i
-    const p = v * (1 - s)
-    const q = v * (1 - f * s)
-    const t = v * (1 - (1 - f) * s)
-    switch(i % 6){
-        case 0: return [v, t, p]
-        case 1: return [q, v, p]
-        case 2: return [p, v, t]
-        case 3: return [p, q, v]
-        case 4: return [t, p, v]
-        case 5: return [v, p, q]
-        default: return [v, t, p]
-    }
-}
-
 function buildPaletteColors(schematic){
     const palette = schematic?.palette || []
-    return new Array(palette.length).fill(null).map((_, index) => {
-        const item = palette[index]
-        const key = item?.block || `block-${index}`
-        let hash = 0
-        for(let i=0; i<key.length; i++){
-            hash = (hash * 31 + key.charCodeAt(i)) >>> 0
-        }
-        const hue = (hash % 360) / 360
-        const sat = 0.45 + ((hash >> 6) % 30) / 100
-        const val = 0.65 + ((hash >> 3) % 20) / 100
-        return hsvToRgb(hue, sat, val)
+    return palette.map((item, index) => {
+        const hex = schematicPreviewColorForState(item?.block || `block-${index}`)
+        const value = Number.parseInt(hex.slice(1), 16)
+        return [(value >> 16) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255]
     })
 }
 
@@ -1516,14 +1517,14 @@ function buildUnitCube(){
         -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,  0.5,  0.5,  0.5,
         -0.5, -0.5,  0.5,  0.5,  0.5,  0.5, -0.5,  0.5,  0.5,
         // Back
-         0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5,  0.5, -0.5,
-         0.5, -0.5, -0.5, -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
+        0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5,  0.5, -0.5,
+        0.5, -0.5, -0.5, -0.5,  0.5, -0.5,  0.5,  0.5, -0.5,
         // Left
         -0.5, -0.5, -0.5, -0.5, -0.5,  0.5, -0.5,  0.5,  0.5,
         -0.5, -0.5, -0.5, -0.5,  0.5,  0.5, -0.5,  0.5, -0.5,
         // Right
-         0.5, -0.5,  0.5,  0.5, -0.5, -0.5,  0.5,  0.5, -0.5,
-         0.5, -0.5,  0.5,  0.5,  0.5, -0.5,  0.5,  0.5,  0.5,
+        0.5, -0.5,  0.5,  0.5, -0.5, -0.5,  0.5,  0.5, -0.5,
+        0.5, -0.5,  0.5,  0.5,  0.5, -0.5,  0.5,  0.5,  0.5,
         // Top
         -0.5,  0.5,  0.5,  0.5,  0.5,  0.5,  0.5,  0.5, -0.5,
         -0.5,  0.5,  0.5,  0.5,  0.5, -0.5, -0.5,  0.5, -0.5,

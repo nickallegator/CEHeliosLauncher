@@ -33,11 +33,12 @@ test('local showroom browses and installs every representative content type', as
 
         const schematicKey = `schematics:${ITEM_IDS.schematics}`
         const schematicCard = page.locator(`.schematicCard[data-community-key="${schematicKey}"]`)
-        await expect(schematicCard.locator('.schematicPreview svg')).toBeVisible()
+        await expect(schematicCard.locator('.schematicPreviewImage')).toBeVisible()
         await schematicCard.locator('.schematicPreview').click()
         await expect(page.locator('#schematicsDetail')).toHaveAttribute('aria-hidden', 'false')
         await expect(page.locator('#schematicsDetailCanvas')).toBeVisible()
-        await expect(page.locator('#schematicsDetailPreview')).toHaveAttribute('data-rendered', 'true', { timeout: 20_000 })
+        await expect(page.locator('#schematicsDetailPreview')).toHaveAttribute('data-preview-state', 'ready', { timeout: 20_000 })
+        await expect(page.locator('#schematicsDetailPreview')).toHaveAttribute('data-preview-vertices', /^[1-9]\d*$/)
         await expect(page.locator('#schematicsDetailBlocksTotal')).not.toHaveText('--')
         await page.locator('#schematicsDetailInstall').click()
         await expect(page.locator('#schematicsDetailInstall')).toHaveText('Installed', { timeout: 10_000 })
