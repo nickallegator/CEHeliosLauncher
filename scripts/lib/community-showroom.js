@@ -15,12 +15,15 @@ const {
     canonicalizeGradient,
     canonicalizeTrainer
 } = require('../../libraries/community-core')
+const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
 const { validateResourcePack } = require('../../backend/src/services/communityResourcePack')
 
 const SHOWROOM_SCHEMA_VERSION = 1
 const SHOWROOM_PROFILE_ID = 'Cobble-Power-1.21.1'
 const SHOWROOM_PLAYER_UUID = '12345678123442348234123456789abc'
+const SCHEMATIC_TYPE = 'schematics'
 const SHOWROOM_TYPES = Object.freeze([
+    SCHEMATIC_TYPE,
     TYPES.AUTOMATION,
     TYPES.BATTLE_TRAINERS,
     TYPES.BUILDER_PRESETS,
@@ -31,6 +34,7 @@ const RESOURCE_PACK_ITEM_ID = '40000000-0000-4000-8000-000000000001'
 const SHOWROOM_MANIFEST = 'showroom-manifest.json'
 
 const ITEM_IDS = Object.freeze({
+    [SCHEMATIC_TYPE]: '60000000-0000-4000-8000-000000000001',
     [TYPES.AUTOMATION]: '10000000-0000-4000-8000-000000000001',
     [TYPES.BATTLE_TRAINERS]: '20000000-0000-4000-8000-000000000001',
     [TYPES.BUILDER_PRESETS]: '30000000-0000-4000-8000-000000000001',
@@ -38,6 +42,7 @@ const ITEM_IDS = Object.freeze({
 })
 
 const REVISION_IDS = Object.freeze({
+    [SCHEMATIC_TYPE]: '70000000-0000-4000-8000-000000000001',
     [TYPES.AUTOMATION]: '50000000-0000-4000-8000-000000000001',
     [TYPES.BATTLE_TRAINERS]: '50000000-0000-4000-8000-000000000002',
     [TYPES.BUILDER_PRESETS]: '50000000-0000-4000-8000-000000000003',
@@ -59,6 +64,73 @@ function md5(value) {
 
 function jsonBuffer(value) {
     return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8')
+}
+
+function createSchematicArtifact() {
+    const palette = [
+        'minecraft:deepslate_tiles',
+        'minecraft:stripped_spruce_log[axis=y]',
+        'minecraft:stripped_spruce_log[axis=x]',
+        'minecraft:stripped_spruce_log[axis=z]',
+        'minecraft:spruce_planks',
+        'minecraft:cut_copper',
+        'minecraft:oxidized_cut_copper',
+        'minecraft:glass',
+        'minecraft:lantern[hanging=true,waterlogged=false]'
+    ]
+    const placed = new Map()
+    const place = (x, y, z, state) => placed.set(`${x},${y},${z}`, { pos: [x, y, z], state })
+
+    for(let x = -5; x <= 5; x += 1) {
+        for(let z = -4; z <= 4; z += 1) place(x, 0, z, 0)
+    }
+    for(const x of [-5, 5]) {
+        for(const z of [-4, 4]) {
+            for(let y = 1; y <= 5; y += 1) place(x, y, z, 1)
+        }
+    }
+    for(let x = -4; x <= 4; x += 1) {
+        place(x, 1, 4, 4)
+        place(x, 5, 4, 2)
+        place(x, 5, -4, 2)
+        if(x < -1 || x > 1) place(x, 1, -4, 4)
+        for(const y of [2, 3]) {
+            place(x, y, 4, x % 3 === 0 ? 7 : 4)
+            if(x < -1 || x > 1) place(x, y, -4, x % 3 === 0 ? 7 : 4)
+        }
+    }
+    for(let z = -3; z <= 3; z += 1) {
+        place(-5, 5, z, 3)
+        place(5, 5, z, 3)
+        for(const y of [1, 2, 3]) {
+            place(-5, y, z, z % 3 === 0 ? 7 : 4)
+            place(5, y, z, z % 3 === 0 ? 7 : 4)
+        }
+    }
+    for(let x = -5; x <= 5; x += 1) {
+        for(let z = -4; z <= 4; z += 1) {
+            place(x, 6, z, (Math.abs(x) + Math.abs(z)) % 4 === 0 ? 6 : 5)
+        }
+    }
+    for(const x of [-3, 0, 3]) {
+        place(x, 5, 0, 8)
+    }
+
+    const blocks = [...placed.values()].sort((left, right) =>
+        left.pos[1] - right.pos[1]
+        || left.pos[2] - right.pos[2]
+        || left.pos[0] - right.pos[0])
+    const result = parseCanonicalSchematic({
+        format: 'cobblepower_schematic',
+        version: 2,
+        name: 'Copper Workshop Pavilion',
+        category: 'workshop',
+        type: 'standard',
+        icon: 'minecraft:cut_copper',
+        palette,
+        blocks
+    }, { stripBlockEntityNbt: true })
+    return { bytes: Buffer.from(result.serialized, 'utf8'), result }
 }
 
 function createAutomationArtifact() {
@@ -298,15 +370,93 @@ function createEntry(type, definition, artifact) {
     }
 }
 
+function createSchematicEntry(definition, artifact) {
+    const itemId = ITEM_IDS[SCHEMATIC_TYPE]
+    const revision = {
+        id: REVISION_IDS[SCHEMATIC_TYPE],
+        number: 1,
+        sha256: artifact.result.sha256,
+        sizeBytes: artifact.result.sizeBytes,
+        mimeType: 'application/json',
+        formatId: 'cobblepower_schematic',
+        formatVersion: 2
+    }
+    return {
+        schemaVersion: 1,
+        id: itemId,
+        type: SCHEMATIC_TYPE,
+        key: `${SCHEMATIC_TYPE}:${itemId}`,
+        title: definition.title,
+        description: definition.description,
+        creator: { id: '9001', name: 'AG Workshop Team' },
+        ownerId: null,
+        tags: definition.tags,
+        license: 'Community-Use-1.0',
+        rightsAttestedAt: '2026-08-11T12:00:00.000Z',
+        publishedAt: definition.publishedAt,
+        updatedAt: definition.updatedAt,
+        stats: { likes: definition.likes, views: definition.views, downloads: definition.downloads },
+        compatibility: { ...DEFAULT_COMPATIBILITY },
+        revision,
+        schematic: { version: 2, revision },
+        dependencies: [],
+        typeData: {
+            blockCount: artifact.result.blockCount,
+            bounds: artifact.result.bounds,
+            paletteSize: artifact.result.canonical.palette.length
+        },
+        thumbnailUrl: null,
+        capabilities: { canEdit: false, canDelete: false, canReport: true, liked: false },
+        artifact: artifact.bytes,
+        canonical: artifact.result.canonical
+    }
+}
+
+function schematicDetail(entry) {
+    const size = entry.typeData.bounds?.size || [0, 0, 0]
+    return {
+        schemaVersion: 2,
+        id: entry.id,
+        name: entry.title,
+        title: entry.title,
+        description: entry.description,
+        creator: entry.creator.name,
+        ownerId: entry.ownerId,
+        tags: entry.tags,
+        release: entry.publishedAt,
+        updatedAt: entry.updatedAt,
+        downloads: entry.stats.downloads,
+        likes: entry.stats.likes + (entry.capabilities.liked ? 1 : 0),
+        views: entry.stats.views,
+        version: String(entry.revision.formatVersion),
+        revision: entry.revision,
+        blockCount: entry.typeData.blockCount,
+        size: size.join(' x '),
+        hash: entry.revision.sha256,
+        schematic: entry.canonical,
+        thumbnailUrl: null,
+        liked: entry.capabilities.liked,
+        capabilities: entry.capabilities
+    }
+}
+
 async function createShowroomFixtures(workspaceRoot) {
     fs.mkdirSync(workspaceRoot, { recursive: true })
     const artifacts = {
+        [SCHEMATIC_TYPE]: createSchematicArtifact(),
         [TYPES.AUTOMATION]: createAutomationArtifact(),
         [TYPES.BATTLE_TRAINERS]: createTrainerArtifact(),
         [TYPES.BUILDER_PRESETS]: createGradientArtifact(),
         [TYPES.RESOURCE_PACKS]: await createResourcePackArtifact(workspaceRoot)
     }
     const definitions = {
+        [SCHEMATIC_TYPE]: {
+            title: 'Copper Workshop Pavilion',
+            description: 'A complete build represented as individual blocks and rendered in the interactive 3D schematic viewer.',
+            tags: ['schematic', 'workshop', 'copper'],
+            likes: 137, views: 618, downloads: 214,
+            publishedAt: '2026-07-30T12:00:00.000Z', updatedAt: '2026-08-11T10:15:00.000Z'
+        },
         [TYPES.AUTOMATION]: {
             title: 'Apricorn Sorting Line',
             description: 'An Operation bundled with its reusable workshop timing Shared Space.',
@@ -336,13 +486,16 @@ async function createShowroomFixtures(workspaceRoot) {
             publishedAt: '2026-08-04T12:00:00.000Z', updatedAt: '2026-08-08T09:00:00.000Z'
         }
     }
-    return SHOWROOM_TYPES.map(type => createEntry(type, definitions[type], artifacts[type]))
+    return SHOWROOM_TYPES.map(type => type === SCHEMATIC_TYPE
+        ? createSchematicEntry(definitions[type], artifacts[type])
+        : createEntry(type, definitions[type], artifacts[type]))
 }
 
 function publicEntry(entry) {
     const value = { ...entry }
     delete value.artifact
     delete value.preview
+    delete value.canonical
     return value
 }
 
@@ -454,6 +607,37 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 return
             }
             writeJson(response, 200, catalog, { ETag: etag })
+            return
+        }
+        const schematicDownloadMatch = url.pathname.match(/^\/v1\/schematics\/([^/]+)\/download$/)
+        if(schematicDownloadMatch && request.method === 'GET') {
+            const entry = byKey.get(`${SCHEMATIC_TYPE}:${decodeURIComponent(schematicDownloadMatch[1])}`)
+            writeJson(response, entry ? 200 : 404, entry ? entry.canonical : { error: 'not_found' })
+            return
+        }
+        const schematicEngagementMatch = url.pathname.match(/^\/v1\/schematics\/([^/]+)\/(like|view|report)$/)
+        if(schematicEngagementMatch && ['POST', 'DELETE'].includes(request.method)) {
+            const entry = byKey.get(`${SCHEMATIC_TYPE}:${decodeURIComponent(schematicEngagementMatch[1])}`)
+            if(!entry) {
+                writeJson(response, 404, { error: 'not_found' })
+                return
+            }
+            const action = schematicEngagementMatch[2]
+            if(action === 'like') entry.capabilities.liked = request.method === 'POST'
+            if(action === 'view') entry.stats.views += 1
+            writeJson(response, 200, {
+                schemaVersion: 2,
+                localOnly: true,
+                liked: entry.capabilities.liked,
+                likes: entry.stats.likes + (entry.capabilities.liked ? 1 : 0),
+                views: entry.stats.views
+            })
+            return
+        }
+        const schematicDetailMatch = url.pathname.match(/^\/v1\/schematics\/([^/]+)$/)
+        if(schematicDetailMatch && request.method === 'GET') {
+            const entry = byKey.get(`${SCHEMATIC_TYPE}:${decodeURIComponent(schematicDetailMatch[1])}`)
+            writeJson(response, entry ? 200 : 404, entry ? schematicDetail(entry) : { error: 'not_found' })
             return
         }
         const itemMatch = url.pathname.match(/^\/v1\/community\/items\/([^/]+)\/([^/]+)$/)
@@ -583,9 +767,9 @@ function injectShowroomDistribution(source, baseUrl) {
     distribution.community = { schemaVersion: 1, enabled: true, apiBaseUrl: baseUrl }
     distribution.schematics = {
         schemaVersion: 2,
-        enabled: false,
+        enabled: true,
         apiBaseUrl: baseUrl,
-        features: { core: false, collections: false, creators: false },
+        features: { core: true, collections: false, creators: false },
         allowedVisibilities: ['public']
     }
     if(distribution.access) {

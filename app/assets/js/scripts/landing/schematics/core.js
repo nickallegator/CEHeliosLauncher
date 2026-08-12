@@ -16,6 +16,7 @@ let {
 } = require('./assets/js/communitymanager')
 let schematicsFormatCore = loadCore()
 let { normalizeJsonSchematic, parseCanonicalSchematic } = schematicsFormatCore
+let schematicRegistryBase = require('./assets/js/schematics/registry')
 let communityContentRegistry = window.CommunityModules?.createDefaultCommunityContentRegistry?.() || null
 let communityEnabledContentTypes = []
 

@@ -13,6 +13,7 @@ const {
     assertSafeShowroomRoot,
     createShowroomEnvironment
 } = require('../../scripts/lib/community-showroom')
+const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
 const { parseArguments } = require('../../scripts/run-community-showroom')
 
 const appDirectory = path.resolve(__dirname, '..', '..')
@@ -49,11 +50,20 @@ test('local showroom serves representative read-only artifacts without productio
     assert.equal(capabilities.categories.every(value => value.writable === false), true)
 
     const catalog = await fetch(`${runtime.apiBaseUrl}/v1/community/catalog?category=all&sort=popular`).then(response => response.json())
-    assert.equal(catalog.items.length, 4)
-    assert.equal(new Set(catalog.items.map(value => value.type)).size, 4)
+    assert.equal(catalog.items.length, 5)
+    assert.equal(new Set(catalog.items.map(value => value.type)).size, 5)
     assert.equal(catalog.items.some(value => Object.hasOwn(value, 'artifact')), false)
 
-    for(const entry of catalog.items) {
+    const schematicEntry = catalog.items.find(entry => entry.type === 'schematics')
+    const schematicDetail = await fetch(`${runtime.apiBaseUrl}/v1/schematics/${schematicEntry.id}`).then(response => response.json())
+    const schematicArtifact = await fetch(`${runtime.apiBaseUrl}/v1/schematics/${schematicEntry.id}/download`).then(response => response.json())
+    const parsedSchematic = parseCanonicalSchematic(schematicArtifact)
+    assert.equal(schematicEntry.thumbnailUrl, null)
+    assert.equal(schematicDetail.schematic.format, 'cobblepower_schematic')
+    assert.equal(parsedSchematic.sha256, schematicEntry.revision.sha256)
+    assert.equal(parsedSchematic.blockCount, schematicEntry.typeData.blockCount)
+
+    for(const entry of catalog.items.filter(value => value.type !== 'schematics')) {
         const descriptor = await fetch(`${runtime.apiBaseUrl}/v1/community/items/${entry.type}/${entry.id}/download`).then(response => response.json())
         const artifact = Buffer.from(await fetch(descriptor.downloadUrl).then(response => response.arrayBuffer()))
         assert.equal(artifact.length, entry.revision.sizeBytes)
@@ -68,6 +78,8 @@ test('local showroom serves representative read-only artifacts without productio
     const profile = distribution.servers.find(server => server.id === SHOWROOM_PROFILE_ID)
     assert.ok(profile.modules.some(module => module.id === 'net.allegator.cobblepower:cobblepower:1.0.3-test.1'))
     assert.equal(distribution.community.apiBaseUrl, runtime.apiBaseUrl)
+    assert.equal(distribution.schematics.enabled, true)
+    assert.equal(distribution.schematics.features.core, true)
     assert.equal(runtime.environment.HELIOS_ACCESS_API_URL, runtime.apiBaseUrl)
     assert.ok(runtime.instanceRoot.startsWith(rootDirectory))
 })

@@ -67,7 +67,7 @@ The custom `Community-Use-1.0` terms are served by the API and stored with the r
 
 ## Local Community showroom
 
-Run `run-community-showroom.cmd` from the launcher repository to open a disposable, read-only catalog with representative Automation, Battle Trainer, Builder Preset, and Resource Pack artifacts. The showroom binds to `127.0.0.1`, redirects Community and access calls to its temporary local API, disables publication and game launch, and removes its temporary launcher and Minecraft data after the window closes.
+Run `run-community-showroom.cmd` from the launcher repository to open a disposable, read-only catalog with representative Schematic, Automation, Battle Trainer, Builder Preset, and Resource Pack artifacts. Schematics are complete block structures and retain their wireframe cube card icon and interactive 3D detail viewer; Builder Presets are separate gradient and block-palette configurations. The showroom binds to `127.0.0.1`, redirects Community and access calls to its temporary local API, disables publication and game launch, and removes its temporary launcher and Minecraft data after the window closes.
 
 Use `run-community-showroom.cmd --keep-data` to preserve the generated instance for inspection, or `run-community-showroom.cmd --data-dir <path>` to use an explicit persistent location. The showroom never reads or writes the installed launcher's profile, production PostgreSQL database, or R2 bucket.
 
