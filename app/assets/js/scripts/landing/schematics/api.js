@@ -742,7 +742,11 @@ function formatDownloadCount(value){
 }
 
 function getSchematicById(id){
-    return SCHEMATIC_INDEX.get(id)
+    return SCHEMATIC_INDEX.get(id) || SCHEMATIC_INDEX.get(`schematics:${id}`)
+}
+
+function getCommunityEntryByKey(key){
+    return SCHEMATIC_INDEX.get(key) || null
 }
 
 async function fetchSchematicFromUrl(url, options = {}){

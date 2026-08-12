@@ -65,6 +65,7 @@ jobs:
           mkdir -p release-asset
           gh release download "$MOD_TAG" --repo nickallegator/Cobble-Power-1.21.X --dir release-asset
           (cd release-asset && sha256sum --check SHA256SUMS.txt)
+          (cd release-asset && sha256sum --check community-contracts.sha256)
 
       - name: Prepare deterministic release
         id: prepare
@@ -94,6 +95,7 @@ jobs:
             --source-tag "$MOD_TAG" \
             --source-commit "$SOURCE_COMMIT" \
             --source-repo mod-source \
+            --community-contract release-asset/community-contracts.json \
             --release-id "$RELEASE_ID" \
             --output "dist/release-prepared/$RELEASE_ID"
           echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"

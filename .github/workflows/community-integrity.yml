@@ -1,0 +1,40 @@
+name: Community storage integrity
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+    inputs:
+      verify_hashes:
+        description: Download and verify complete artifact hashes
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix backend
+      - name: Check immutable Community objects
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.COMMUNITY_DATABASE_URL }}
+          COMMUNITY_ENABLED: 'true'
+          COMMUNITY_STORAGE_PROVIDER: r2
+          COMMUNITY_STORAGE_BUCKET: ${{ secrets.COMMUNITY_STORAGE_BUCKET }}
+          COMMUNITY_STORAGE_REGION: auto
+          COMMUNITY_STORAGE_ENDPOINT: ${{ secrets.COMMUNITY_STORAGE_ENDPOINT }}
+          COMMUNITY_STORAGE_ACCESS_KEY_ID: ${{ secrets.COMMUNITY_STORAGE_ACCESS_KEY_ID }}
+          COMMUNITY_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.COMMUNITY_STORAGE_SECRET_ACCESS_KEY }}
+        run: |
+          HASH_ARGUMENT=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.verify_hashes }}" = "true" ]; then HASH_ARGUMENT="--verify-hash"; fi
+          if [ "$(date -u +%u)" = "7" ]; then HASH_ARGUMENT="--verify-hash"; fi
+          npm --prefix backend run community:scan -- $HASH_ARGUMENT

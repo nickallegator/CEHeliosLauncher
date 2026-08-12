@@ -143,6 +143,16 @@ test('schematics module follows existing distribution and environment capabiliti
     assert.equal(isSchematicsEnabled({}, { HELIOS_SCHEMATICS_API_URL: 'https://schematics.example.test' }), true)
     const registry = createDefaultCommunityContentRegistry({ environment: {} })
     assert.equal((await registry.enabled({ rawDistribution: {} })).length, 0)
+    const categories = await registry.enabled({
+        rawDistribution: { schematics: { schemaVersion: 2, enabled: true, features: { core: true } } },
+        capabilities: { categories: [
+            { id: 'schematics' }, { id: 'automation' }, { id: 'battle-trainers' },
+            { id: 'builder-presets' }, { id: 'resource-packs' }, { id: 'future-unknown' }
+        ] }
+    })
+    assert.deepEqual(categories.map(type => type.id), [
+        'schematics', 'automation', 'battle-trainers', 'builder-presets', 'resource-packs'
+    ])
 })
 
 test('Community template opens a unified catalog and keeps Collections deferred', async () => {

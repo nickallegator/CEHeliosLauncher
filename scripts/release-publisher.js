@@ -33,6 +33,7 @@ async function main(argv = process.argv) {
             sourceTag: required(args, 'source-tag'),
             sourceCommit: required(args, 'source-commit'),
             sourceRepo: args['source-repo'] ? path.resolve(args['source-repo']) : null,
+            communityContractPath: args['community-contract'] ? path.resolve(args['community-contract']) : null,
             releaseId: args['release-id'],
             expectedPreviousReleaseId: args['expected-previous'],
             outputDir: args.output,

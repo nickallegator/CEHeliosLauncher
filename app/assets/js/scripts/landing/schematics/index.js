@@ -19,10 +19,14 @@ function initSchematics(){
         if(!card){
             return
         }
-        const entry = getSchematicById(card.getAttribute('data-schematic-id'))
+        const entry = getCommunityEntryByKey(card.getAttribute('data-community-key'))
+            || getSchematicById(card.getAttribute('data-schematic-id'))
         if(entry){
             const definition = communityContentRegistry?.get(entry.communityType || 'schematics')
-            definition?.openDetail(entry, { openSchematicDetail })
+            definition?.openDetail(entry, {
+                openSchematicDetail,
+                openGenericCommunityDetail: window.openGenericCommunityDetail
+            })
         }
     })
     resolveSchematicsServiceConfig().then(() => {
@@ -115,6 +119,7 @@ function initSchematics(){
         schematicsCreatorClose.addEventListener('click', closeCreatorPanel)
     }
     setCommunitySection('content', { skipFetch: true })
+    if(typeof initGenericCommunityContent === 'function') initGenericCommunityContent()
     setCommunityCategory(schematicsState.category || 'all', { skipFetch: true })
     communityCategoryFilters?.addEventListener('click', (event) => {
         const button = event.target.closest('[data-community-category]')

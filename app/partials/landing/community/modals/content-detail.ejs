@@ -1,0 +1,40 @@
+<div id="communityContentDetail" class="schematicsModalRoot" aria-hidden="true">
+    <div id="communityContentDetailScrim" class="schematicsModalScrim"></div>
+    <div id="communityContentDetailPanel" class="schematicsModalPanel communityContentDetailPanel" role="dialog" aria-modal="true" aria-labelledby="communityContentDetailTitle" tabindex="-1">
+        <header class="communityContentDetailHeader">
+            <div>
+                <div id="communityContentDetailType" class="schematicsCollectionsEyebrow"><%- lang('community.communityCreation') %></div>
+                <h2 id="communityContentDetailTitle"><%- lang('community.communityCreation') %></h2>
+                <div id="communityContentDetailCreator" class="schematicsDetailCreator"></div>
+            </div>
+            <button id="communityContentDetailClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
+        </header>
+        <div class="communityContentDetailBody">
+            <div class="communityContentDetailMedia">
+                <img id="communityContentDetailImage" alt="" />
+            </div>
+            <div class="communityContentDetailCopy">
+                <p id="communityContentDetailDescription"></p>
+                <dl class="communityContentMetadataGrid">
+                    <div><dt><%- lang('community.license') %></dt><dd id="communityContentDetailLicense">â€”</dd></div>
+                    <div><dt><%- lang('community.rightsStatusLabel') %></dt><dd id="communityContentDetailRights">â€”</dd></div>
+                    <div><dt><%- lang('community.revision') %></dt><dd id="communityContentDetailRevision">â€”</dd></div>
+                    <div><dt><%- lang('community.compatibility') %></dt><dd id="communityContentDetailCompatibility">â€”</dd></div>
+                    <div><dt><%- lang('community.dependencies') %></dt><dd id="communityContentDetailDependencies">0</dd></div>
+                </dl>
+                <div id="communityContentDetailStatus" class="communityContentStatus" role="status"></div>
+                <div class="communityContentDetailActions">
+                    <button id="communityContentInstall" type="button" class="schematicsDetailButton primary"><%- lang('community.install') %></button>
+                    <button id="communityContentRemove" type="button" class="schematicsDetailButton"><%- lang('community.remove') %></button>
+                    <button id="communityContentEnable" type="button" class="schematicsDetailButton" hidden><%- lang('community.enable') %></button>
+                    <button id="communityContentDisable" type="button" class="schematicsDetailButton" hidden><%- lang('community.disable') %></button>
+                    <button id="communityContentPriorityHigher" type="button" class="schematicsDetailButton" hidden><%- lang('community.priorityHigher') %></button>
+                    <button id="communityContentPriorityLower" type="button" class="schematicsDetailButton" hidden><%- lang('community.priorityLower') %></button>
+                    <button id="communityContentLike" type="button" class="schematicsDetailButton"><%- lang('community.like') %></button>
+                    <button id="communityContentPublishRevision" type="button" class="schematicsDetailButton" hidden><%- lang('community.publishRevision') %></button>
+                    <button id="communityContentReport" type="button" class="schematicsDetailButton"><%- lang('community.report') %></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

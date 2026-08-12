@@ -10,21 +10,30 @@ const { createReleaseStorage } = require('../services/releaseStorage')
 const router = express.Router()
 const distributionLimit = createRateLimit({ windowMs: 60_000, limit: 30 })
 
-function injectSchematicsService(distribution, schematicsConfig = config.schematics) {
-    if(!schematicsConfig.publicApiUrl) return distribution
-    distribution.schematics = {
-        schemaVersion: 2,
-        enabled: true,
-        apiBaseUrl: schematicsConfig.publicApiUrl.replace(/\/+$/, ''),
-        features: schematicsConfig.features,
-        allowedVisibilities: ['public']
+function injectSchematicsService(distribution, schematicsConfig = config.schematics, communityConfig = config.community) {
+    if(schematicsConfig.publicApiUrl) {
+        distribution.schematics = {
+            schemaVersion: 2,
+            enabled: true,
+            apiBaseUrl: schematicsConfig.publicApiUrl.replace(/\/+$/, ''),
+            features: schematicsConfig.features,
+            allowedVisibilities: ['public']
+        }
     }
-    distribution.community = {
-        schemaVersion: 1,
-        enabled: true,
-        apiBaseUrl: schematicsConfig.publicApiUrl.replace(/\/+$/, ''),
-        features: {
-            catalog: true
+    const communityApiUrl = communityConfig.publicApiUrl || schematicsConfig.publicApiUrl
+    if(communityApiUrl) {
+        distribution.community = {
+            schemaVersion: 1,
+            enabled: true,
+            apiBaseUrl: communityApiUrl.replace(/\/+$/, ''),
+            features: {
+                catalog: true,
+                publishing: communityConfig.writeMode !== 'disabled'
+            },
+            supportedTypes: [
+                ...(schematicsConfig.enabled ? ['schematics'] : []),
+                ...Object.entries(communityConfig.types || {}).filter(([, enabled]) => enabled).map(([id]) => id)
+            ]
         }
     }
     return distribution

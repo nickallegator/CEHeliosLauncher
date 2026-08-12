@@ -1,0 +1,19 @@
+Community-Use License 1.0
+
+Copyright remains with the content creator.
+
+By publishing material under this license, the creator grants every recipient a
+worldwide, royalty-free, non-exclusive, irrevocable license to use, reproduce,
+display, perform, adapt, and redistribute the material for use with Allegator
+Games Community content, Cobble Power, Cobblemon, and compatible Minecraft
+installations. Redistribution must retain the creator attribution, this license
+notice, and any included third-party notices.
+
+This license grants no right to use Allegator Games, Cobble Power, Cobblemon,
+Minecraft, or creator trademarks except as needed to describe compatibility.
+Third-party material remains subject to its own license. The publisher confirms
+that they have the rights required to make this grant.
+
+THE MATERIAL IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM
+EXTENT PERMITTED BY LAW, THE CREATOR AND DISTRIBUTOR ARE NOT LIABLE FOR CLAIMS,
+DAMAGES, OR OTHER LIABILITY ARISING FROM THE MATERIAL OR ITS USE.

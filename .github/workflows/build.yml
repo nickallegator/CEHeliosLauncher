@@ -58,7 +58,7 @@ jobs:
           SCHEMATICS_INTEGRATION_STORAGE_BUCKET: cobblepower-schematics-test
           SCHEMATICS_INTEGRATION_STORAGE_ACCESS_KEY_ID: cobblepower-test
           SCHEMATICS_INTEGRATION_STORAGE_SECRET_ACCESS_KEY: cobblepower-test-secret
-        run: node --test tests/backend/schematicsIntegration.test.js
+        run: node --test --test-concurrency=1 tests/backend/schematicsIntegration.test.js tests/backend/communityIntegration.test.js
 
   release:
     needs: schematics-integration

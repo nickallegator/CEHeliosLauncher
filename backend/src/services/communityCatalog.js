@@ -1,6 +1,7 @@
 'use strict'
 
 const crypto = require('crypto')
+const { DEFAULT_COMPATIBILITY, FORMAT_CONTRACTS, TYPES } = require('@allegator-games/community-core')
 
 const CATEGORY_ALL = 'all'
 const CATEGORY_SCHEMATICS = 'schematics'
@@ -91,6 +92,23 @@ function normalizeSchematicRow(row) {
             like: true,
             report: true
         },
+        license: null,
+        compatibility: {
+            minecraft: '1.21.1',
+            loader: 'neoforge',
+            cobblePower: row.release_version || null,
+            cobblemon: null
+        },
+        revision: row.revision_id ? {
+            id: row.revision_id,
+            number: Number(row.revision_number),
+            sha256: row.sha256,
+            sizeBytes: Number(row.revision_size_bytes),
+            formatId: row.format_id,
+            formatVersion: Number(row.format_version)
+        } : null,
+        dependencies: [],
+        typeData: { blockCount: Number(row.block_count || 0) },
         schematic: {
             version: row.release_version || null,
             revision: row.revision_id ? {
@@ -103,6 +121,50 @@ function normalizeSchematicRow(row) {
                 formatVersion: Number(row.format_version)
             } : null
         }
+    }
+}
+
+function normalizeCommunityRow(row) {
+    const compatibility = typeof row.compatibility === 'string' ? JSON.parse(row.compatibility) : (row.compatibility || {})
+    const typeData = typeof row.type_data === 'string' ? JSON.parse(row.type_data) : (row.type_data || {})
+    const dependencies = typeof row.dependencies === 'string' ? JSON.parse(row.dependencies) : (row.dependencies || [])
+    return {
+        key: `${row.type}:${row.id}`,
+        type: row.type,
+        id: row.id,
+        title: row.title,
+        description: row.description || '',
+        creator: {
+            id: row.owner_id == null ? null : String(row.owner_id),
+            name: row.creator_display_name || 'Minecraft Player'
+        },
+        tags: row.tags || [],
+        thumbnailUrl: `/v1/community/items/${row.type}/${row.id}/preview?size=tiny`,
+        publishedAt: row.created_at,
+        updatedAt: row.updated_at,
+        stats: {
+            likes: Number(row.likes || 0),
+            downloads: Number(row.downloads || 0),
+            views: Number(row.views || 0)
+        },
+        capabilities: {
+            install: true,
+            revision: true,
+            like: true,
+            report: true
+        },
+        license: row.license,
+        compatibility,
+        revision: {
+            id: row.revision_id,
+            number: Number(row.revision_number),
+            sha256: row.sha256,
+            sizeBytes: Number(row.revision_size_bytes),
+            formatId: row.format_id,
+            formatVersion: Number(row.format_version)
+        },
+        dependencies,
+        typeData
     }
 }
 
@@ -211,6 +273,91 @@ function createSchematicProvider(options) {
     }
 }
 
+function createCommunityProvider(options) {
+    const database = options.database
+    const settings = options.settings
+    const id = options.id
+    if(!database?.query) throw new TypeError('Community content providers require a database.')
+    if(!FORMAT_CONTRACTS[id]) throw new TypeError(`Unknown Community content provider: ${id}`)
+    return {
+        id,
+        isEnabled: () => settings.enabled === true && settings.types?.[id] === true,
+        capability: () => ({
+            id,
+            readable: true,
+            writable: settings.writeMode !== 'disabled',
+            format: FORMAT_CONTRACTS[id],
+            compatibility: DEFAULT_COMPATIBILITY,
+            features: {
+                install: true,
+                revisions: true,
+                dependencies: id === TYPES.AUTOMATION || id === TYPES.BATTLE_TRAINERS,
+                autoEnable: id === TYPES.RESOURCE_PACKS
+            }
+        }),
+        async list(input) {
+            const params = []
+            const where = ['i.type = $1', 'i.visibility = \'public\'', 'i.status = \'active\'']
+            params.push(id)
+            const add = value => {
+                params.push(value)
+                return `$${params.length}`
+            }
+            if(input.query) {
+                const placeholder = add(`%${input.query}%`)
+                where.push(`(i.title ilike ${placeholder} or i.description ilike ${placeholder} or coalesce(u.display_name, '') ilike ${placeholder})`)
+            }
+            if(input.creator) where.push(`coalesce(u.display_name, '') ilike ${add(`%${input.creator}%`)}`)
+            if(input.tags.length > 0) where.push(`i.tags @> ${add(input.tags)}::text[]`)
+            if(input.ownerId != null) where.push(`i.owner_id = ${add(input.ownerId)}`)
+            if(input.cursor) {
+                const likes = add(input.cursor.likes)
+                const updatedAt = add(input.cursor.updatedAt)
+                const sameRankAfterCursor = id > input.cursor.type
+                    ? 'true'
+                    : (id === input.cursor.type ? `i.id > ${add(input.cursor.id)}` : 'false')
+                if(input.sort === SORT_POPULAR) {
+                    where.push(`(i.likes < ${likes}
+                        or (i.likes = ${likes} and i.updated_at < ${updatedAt})
+                        or (i.likes = ${likes} and i.updated_at = ${updatedAt} and ${sameRankAfterCursor}))`)
+                } else {
+                    where.push(`(i.updated_at < ${updatedAt} or (i.updated_at = ${updatedAt} and ${sameRankAfterCursor}))`)
+                }
+            }
+            const order = input.sort === SORT_RECENT
+                ? 'i.updated_at desc, i.id asc'
+                : 'i.likes desc, i.updated_at desc, i.id asc'
+            const limit = add(input.limit + 1)
+            const result = await database.query(
+                `select i.id, i.type, i.owner_id, i.title, i.description, i.tags, i.license,
+                        i.created_at, i.updated_at, i.likes, i.views, i.downloads,
+                        u.display_name as creator_display_name,
+                        r.id as revision_id, r.revision_number, r.sha256,
+                        r.size_bytes as revision_size_bytes, r.format_id, r.format_version,
+                        r.compatibility, r.type_data,
+                        coalesce((
+                            select jsonb_agg(jsonb_build_object(
+                                'type', d.dependency_type,
+                                'itemId', d.dependency_item_id,
+                                'revisionId', d.dependency_revision_id,
+                                'required', d.required,
+                                'installOrder', d.install_order
+                            ) order by d.install_order, d.dependency_type, d.dependency_item_id)
+                            from community_revision_dependencies d where d.revision_id = r.id
+                        ), '[]'::jsonb) as dependencies
+                 from community_items i
+                 join community_revisions r on r.id = i.current_revision_id
+                 left join users u on u.id = i.owner_id
+                 where ${where.join(' and ')}
+                 order by ${order}
+                 limit ${limit}`,
+                params
+            )
+            return result.rows.map(normalizeCommunityRow)
+        }
+    }
+}
+
 function compareCatalogEntries(left, right, sort) {
     const updated = Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
     if(sort === SORT_POPULAR) {
@@ -222,9 +369,11 @@ function compareCatalogEntries(left, right, sort) {
 }
 
 function createCommunityCatalog(options) {
-    const settings = options.settings
+    const schematicSettings = options.schematicSettings || options.settings || { enabled: false }
+    const communitySettings = options.communitySettings || { enabled: false, types: {} }
     const registry = options.registry || new CommunityCatalogRegistry([
-        createSchematicProvider({ database: options.database, settings })
+        createSchematicProvider({ database: options.database, settings: schematicSettings }),
+        ...Object.values(TYPES).map(id => createCommunityProvider({ database: options.database, settings: communitySettings, id }))
     ])
 
     return {
@@ -233,11 +382,11 @@ function createCommunityCatalog(options) {
                 schemaVersion: 1,
                 defaultCategory: CATEGORY_ALL,
                 defaultSort: SORT_POPULAR,
-                categories: registry.capabilities({ settings })
+                categories: registry.capabilities({ schematicSettings, communitySettings })
             }
         },
         async list(input = {}) {
-            const availableProviders = registry.enabled({ settings })
+            const availableProviders = registry.enabled({ schematicSettings, communitySettings })
             const category = normalizeCategory(input.category, availableProviders.map(provider => provider.id))
             const sort = normalizeSort(input.sort)
             const limit = Math.min(MAX_LIMIT, Math.max(1, Number(input.limit) || 24))
@@ -290,10 +439,12 @@ module.exports = {
     cleanTags,
     compareCatalogEntries,
     createCommunityCatalog,
+    createCommunityProvider,
     createSchematicProvider,
     decodeCursor,
     encodeCursor,
     normalizeCategory,
     normalizeSchematicRow,
+    normalizeCommunityRow,
     normalizeSort
 }

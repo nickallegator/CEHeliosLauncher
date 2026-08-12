@@ -649,9 +649,10 @@ function closeCommunityPublishPicker(){
 
 function openCommunityPublisher(){
     const selected = communityContentRegistry?.get(schematicsState.category)
-    if(selected?.publish) return selected.publish({ openSchematicUpload })
+    const publisherContext = { openSchematicUpload, openGenericCommunityPublisher: window.openGenericCommunityPublisher }
+    if(selected?.publish) return selected.publish(publisherContext)
     const writableTypes = getWritableCommunityTypes()
-    if(writableTypes.length === 1) return writableTypes[0].publish({ openSchematicUpload })
+    if(writableTypes.length === 1) return writableTypes[0].publish(publisherContext)
     if(writableTypes.length === 0) return
     if(!communityPublishPickerOptions || !communityPublishPicker) return
     communityPublishPickerOptions.replaceChildren()
@@ -662,7 +663,7 @@ function openCommunityPublisher(){
         button.textContent = Lang.query(definition.labelKey)
         button.addEventListener('click', () => {
             closeCommunityPublishPicker()
-            definition.publish({ openSchematicUpload })
+            definition.publish(publisherContext)
         })
         communityPublishPickerOptions.appendChild(button)
     })
@@ -2422,7 +2423,9 @@ async function prepareTextureAtlasForSchematic(schematic, { skipAlphaAnalysis = 
 }
 
 function updateSchematicIndex(entries){
-    const incomingById = new Map(entries.filter(entry => entry?.id).map(entry => [entry.id, entry]))
+    const incomingById = new Map(entries
+        .filter(entry => entry?.id && (entry.communityType || 'schematics') === 'schematics')
+        .map(entry => [entry.id, entry]))
     const incomingIds = new Set(incomingById.keys())
     for(const [id, current] of SCHEMATIC_INDEX){
         const incoming = incomingById.get(id)
@@ -2437,7 +2440,9 @@ function updateSchematicIndex(entries){
     SCHEMATIC_INDEX.clear()
     entries.forEach(entry => {
         if(entry?.id){
-            SCHEMATIC_INDEX.set(entry.id, entry)
+            const key = entry.communityKey || `${entry.communityType || 'schematics'}:${entry.id}`
+            SCHEMATIC_INDEX.set(key, entry)
+            if((entry.communityType || 'schematics') === 'schematics') SCHEMATIC_INDEX.set(entry.id, entry)
         }
     })
 }

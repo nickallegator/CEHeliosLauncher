@@ -47,6 +47,22 @@ side="BOTH"
     return jarPath
 }
 
+function createTestCommunityContract(root, version) {
+    const contractPath = path.join(root, 'community-contracts.json')
+    fs.writeFileSync(contractPath, JSON.stringify({
+        schemaVersion: 1,
+        modId: 'cobblepower',
+        modVersion: version,
+        types: {
+            automation: { formatId: 'cobblepower_automation_bundle', formatVersion: 1 },
+            'battle-trainers': { formatId: 'cobblepower_battle_projector_trainer', formatVersion: 1 },
+            'builder-presets': { formatId: 'cobblepower_gradient', formatVersion: 1 },
+            'resource-packs': { formatId: 'minecraft_resource_pack', formatVersion: 1 }
+        }
+    }))
+    return contractPath
+}
+
 test('publisher rejects tag, metadata, and non-prerelease version disagreement', () => {
     assert.throws(() => validateVersionAgreement({
         version: '1.0.0',
@@ -85,6 +101,7 @@ test('prepare produces deterministic templates, descriptors, and publish state',
     const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'cobblepower-publisher-'))
     const version = '1.0.1-test.1'
     const jarPath = createTestMod(fixture, version)
+    const communityContractPath = createTestCommunityContract(fixture, version)
     const sourceRepo = path.join(fixture, 'source')
     fs.mkdirSync(sourceRepo)
     fs.writeFileSync(path.join(sourceRepo, 'gradle.properties'), `mod_version=${version}\n`)
@@ -109,6 +126,7 @@ test('prepare produces deterministic templates, descriptors, and publish state',
         sourceTag: `v${version}`,
         sourceCommit,
         sourceRepo,
+        communityContractPath,
         createdAt: '2026-08-09T00:00:00.000Z'
     }
     await prepareRelease({ ...options, outputDir: outputA })
@@ -121,6 +139,11 @@ test('prepare produces deterministic templates, descriptors, and publish state',
     assert.match(serialized, /r2:\/\/maven\/net\/allegator\/cobblepower/)
     assert.match(serialized, /r2:\/\/third-party\/com\/cobblemon/)
     assert.equal(serialized.includes('publisher.invalid'), false)
+    const descriptor = JSON.parse(fs.readFileSync(path.join(outputA, 'release.json'), 'utf8'))
+    assert.deepEqual(descriptor.communityContracts.supportedTypes, [
+        'automation', 'battle-trainers', 'builder-presets', 'resource-packs'
+    ])
+    assert.equal(descriptor.communityContracts.sha256.length, 64)
 })
 
 test('streaming file hashing reports both launcher and release digests', async (t) => {

@@ -1,6 +1,7 @@
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 COPY libraries/schematics-core ./libraries/schematics-core
+COPY libraries/community-core ./libraries/community-core
 WORKDIR /app/backend
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
@@ -10,7 +11,10 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=dependencies /app/backend/node_modules ./backend/node_modules
 COPY libraries/schematics-core ./libraries/schematics-core
+COPY libraries/community-core ./libraries/community-core
 COPY backend/package.json ./backend/
+COPY backend/config ./backend/config
+COPY backend/licenses ./backend/licenses
 COPY backend/migrations ./backend/migrations
 COPY backend/scripts ./backend/scripts
 COPY backend/src ./backend/src

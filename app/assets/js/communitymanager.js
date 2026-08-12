@@ -51,8 +51,9 @@ function deduplicateCommunityEntries(entries = []) {
 }
 
 function createCommunitySessionState(value = {}) {
+    const rawCategory = String(value.category || 'all').trim().toLowerCase()
     return {
-        category: value.category === 'schematics' ? 'schematics' : 'all',
+        category: /^[a-z0-9-]{1,40}$/.test(rawCategory) ? rawCategory : 'all',
         query: String(value.query || ''),
         sort: value.sort === 'recent' ? 'recent' : 'popular',
         filters: {
@@ -141,6 +142,77 @@ class CommunityApiClient extends SchematicApiClient {
             }
             throw error
         }
+    }
+
+    async detail(type, id, options = {}) {
+        const { data } = await this.request(`/v1/community/items/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, {
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+            signal: options.signal
+        })
+        return normalizeCommunityEntry(data)
+    }
+
+    async download(type, id, options = {}) {
+        const { data: descriptor } = await this.request(`/v1/community/items/${encodeURIComponent(type)}/${encodeURIComponent(id)}/download`, {
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+            signal: options.signal
+        })
+        const response = await this.fetch(descriptor.downloadUrl, { method: 'GET', signal: options.signal })
+        if(!response.ok) throw new Error(`Community artifact download returned HTTP ${response.status}.`)
+        return { descriptor, artifact: Buffer.from(await response.arrayBuffer()) }
+    }
+
+    async createUpload(metadata, options = {}) {
+        const { data } = await this.request('/v1/community/uploads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) },
+            body: JSON.stringify(metadata),
+            signal: options.signal
+        })
+        return data
+    }
+
+    async uploadSigned(url, body, mimeType, options = {}) {
+        const response = await this.fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': mimeType },
+            body,
+            signal: options.signal
+        })
+        if(!response.ok) throw new Error(`Community upload returned HTTP ${response.status}.`)
+    }
+
+    async finalizeUpload(token, options = {}) {
+        const { data } = await this.request(`/v1/community/uploads/${encodeURIComponent(token)}/finalize`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+            signal: options.signal
+        })
+        return normalizeCommunityEntry(data)
+    }
+
+    async publish(metadata, artifact, preview, options = {}) {
+        const session = await this.createUpload({
+            ...metadata,
+            previewMime: preview?.mimeType || (metadata.type === 'resource-packs' ? null : 'image/png')
+        }, options)
+        await this.uploadSigned(session.uploads.artifact.uploadUrl, artifact, session.uploads.artifact.mimeType, options)
+        if(session.uploads.preview) {
+            if(!preview?.bytes) throw new Error('A preview image is required for this Community content type.')
+            await this.uploadSigned(session.uploads.preview.uploadUrl, preview.bytes, session.uploads.preview.mimeType, options)
+        }
+        return this.finalizeUpload(session.token, options)
+    }
+
+    async engagement(type, id, action, options = {}) {
+        const method = options.method || 'POST'
+        const { data } = await this.request(`/v1/community/items/${encodeURIComponent(type)}/${encodeURIComponent(id)}/${action}`, {
+            method,
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) },
+            body: options.body == null ? undefined : JSON.stringify(options.body),
+            signal: options.signal
+        })
+        return data
     }
 }
 

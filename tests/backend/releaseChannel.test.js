@@ -92,8 +92,13 @@ test('release storage resolves current template and returns its release ID', asy
 test('authorized distribution service discovery is injected without rebuilding the launcher', () => {
     const distribution = { version: '1', servers: [] }
     injectSchematicsService(distribution, {
+        enabled: true,
         publicApiUrl: 'https://schematics.example.test/',
         features: { core: true, collections: false, creators: false }
+    }, {
+        publicApiUrl: 'https://community.example.test/',
+        writeMode: 'authenticated',
+        types: { automation: true, 'battle-trainers': false }
     })
     assert.deepEqual(distribution.schematics, {
         schemaVersion: 2,
@@ -105,8 +110,9 @@ test('authorized distribution service discovery is injected without rebuilding t
     assert.deepEqual(distribution.community, {
         schemaVersion: 1,
         enabled: true,
-        apiBaseUrl: 'https://schematics.example.test',
-        features: { catalog: true }
+        apiBaseUrl: 'https://community.example.test',
+        features: { catalog: true, publishing: true },
+        supportedTypes: ['schematics', 'automation']
     })
     assert.deepEqual(injectSchematicsService({ servers: [] }, { publicApiUrl: '' }), { servers: [] })
 })

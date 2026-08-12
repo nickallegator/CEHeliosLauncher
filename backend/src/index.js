@@ -12,6 +12,8 @@ const releaseRoutes = require('./routes/releases')
 const db = require('./db')
 const { createReleaseStorage } = require('./services/releaseStorage')
 const { getSchematicsObjectStorage } = require('./services/schematicsObjectStorage')
+const { getCommunityObjectStorage } = require('./services/communityObjectStorage')
+const { createDefaultCommunityTypeRegistry } = require('./services/communityTypes')
 const { safeError } = require('./services/logSafety')
 
 const app = express()
@@ -66,6 +68,21 @@ app.get('/ready', async (_req, res) => {
     } else {
         checks.schematics = 'disabled'
     }
+    if(config.community.enabled && Object.values(config.community.types).some(Boolean)) {
+        try {
+            const handlers = createDefaultCommunityTypeRegistry()
+            for(const [type, enabled] of Object.entries(config.community.types)) {
+                if(enabled && !handlers.get(type)) throw new Error(`Missing Community handler: ${type}`)
+            }
+            await db.query('select 1 from community_revisions limit 1')
+            await getCommunityObjectStorage().ready()
+            checks.community = 'ok'
+        } catch(_err) {
+            checks.community = 'error'
+        }
+    } else {
+        checks.community = 'disabled'
+    }
     const ready = !Object.values(checks).includes('error')
     res.status(ready ? 200 : 503).json({ ok: ready, checks })
 })
@@ -74,10 +91,12 @@ app.use('/auth/patreon', authRoutes)
 app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
-if(config.schematics.enabled) {
+if(config.schematics.enabled || config.community.enabled) {
     const communityRoutes = require('./routes/community')
-    const schematicsRoutes = require('./routes/schematics')
     app.use('/v1', communityRoutes)
+}
+if(config.schematics.enabled) {
+    const schematicsRoutes = require('./routes/schematics')
     app.use('/v1', schematicsRoutes)
     if(config.schematics.features.collections) {
         const collectionsRoutes = require('./routes/collections')
@@ -94,6 +113,15 @@ app.use((err, req, res, _next) => {
     if(err?.name === 'SchematicValidationError') {
         res.status(400).json({
             error: err.code || 'schematic_validation_failed',
+            message: err.message,
+            details: err.details || undefined,
+            requestId: req.requestId
+        })
+        return
+    }
+    if(err?.name === 'CommunityValidationError') {
+        res.status(400).json({
+            error: err.code || 'community_validation_failed',
             message: err.message,
             details: err.details || undefined,
             requestId: req.requestId

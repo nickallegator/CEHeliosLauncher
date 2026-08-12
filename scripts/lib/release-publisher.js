@@ -85,6 +85,27 @@ function validateCompatibility(metadata, packManifest) {
     }
 }
 
+function validateCommunityContract(contractPath, version) {
+    if(!contractPath) throw new Error('A Community contract artifact is required')
+    const contract = readJson(path.resolve(contractPath))
+    if(contract.schemaVersion !== 1 || contract.modId !== 'cobblepower' || contract.modVersion !== version) {
+        throw new Error(`Community contract does not identify Cobble Power ${version}`)
+    }
+    const expected = {
+        automation: ['cobblepower_automation_bundle', 1],
+        'battle-trainers': ['cobblepower_battle_projector_trainer', 1],
+        'builder-presets': ['cobblepower_gradient', 1],
+        'resource-packs': ['minecraft_resource_pack', 1]
+    }
+    for(const [type, [formatId, formatVersion]] of Object.entries(expected)) {
+        const actual = contract.types?.[type]
+        if(actual?.formatId !== formatId || Number(actual?.formatVersion) !== formatVersion) {
+            throw new Error(`Community contract is missing supported ${type} format ${formatId} v${formatVersion}`)
+        }
+    }
+    return contract
+}
+
 function seedCache(filePath, integrity, cacheDir) {
     fs.mkdirSync(cacheDir, { recursive: true })
     const target = path.join(cacheDir, integrity.sha256)
@@ -155,6 +176,9 @@ async function prepareRelease(options) {
     validateVersionAgreement({ version, tag, metadata: parsedMetadata, sourceRepo: options.sourceRepo })
     validateCompatibility(parsedMetadata, baseManifest)
     const modIntegrity = await hashFile(modPath)
+    const communityContractPath = options.communityContractPath ? path.resolve(options.communityContractPath) : null
+    const communityContract = validateCommunityContract(communityContractPath, version)
+    const communityContractIntegrity = await hashFile(communityContractPath)
 
     const outputDir = assertOutputDirectory(options.outputDir || path.join(PACK_ROOT, 'dist', 'release-prepared', releaseId))
     const tempRoot = `${outputDir}.${process.pid}.${Date.now()}.tmp`
@@ -196,6 +220,7 @@ async function prepareRelease(options) {
         if(!cobblemon) throw new Error('Pack lock does not contain the required Cobblemon artifact')
         const cobblemonKey = `third-party/com/cobblemon/neoforge/${cobblemon.version}/neoforge-${cobblemon.version}.jar`
         const modObjectKey = `maven/net/allegator/cobblepower/cobblepower/${version}/cobblepower-${version}.jar`
+        const communityContractKey = `maven/net/allegator/cobblepower/cobblepower/${version}/community-contracts.json`
         replaceModuleUrl(distribution, cobblemon.id, cobblemonKey)
         replaceModuleUrl(distribution, modId, modObjectKey)
         writeJsonAtomic(distributionPath, distribution)
@@ -204,6 +229,7 @@ async function prepareRelease(options) {
         if(!fs.existsSync(cobblemonCachePath)) throw new Error('Locked Cobblemon snapshot is missing from the checksum cache')
         const objects = [
             { key: modObjectKey, sourcePath: modPath, integrity: modIntegrity, contentType: 'application/java-archive' },
+            { key: communityContractKey, sourcePath: communityContractPath, integrity: communityContractIntegrity, contentType: 'application/json' },
             { key: cobblemonKey, sourcePath: cobblemonCachePath, integrity: cobblemon.integrity, contentType: 'application/java-archive' }
         ].sort((a, b) => a.key.localeCompare(b.key))
         for(const object of objects) object.file = copyObject(tempRoot, object.key, object.sourcePath)
@@ -225,6 +251,12 @@ async function prepareRelease(options) {
             packVersion: manifest.pack.version,
             modVersion: version,
             source: { repository: sourceRepository, tag, commit },
+            communityContracts: {
+                objectKey: communityContractKey,
+                schemaVersion: communityContract.schemaVersion,
+                supportedTypes: Object.keys(communityContract.types).sort(),
+                ...communityContractIntegrity
+            },
             createdAt: options.createdAt || new Date().toISOString(),
             notices: [{
                 name: 'Cobblemon',
@@ -314,6 +346,7 @@ module.exports = {
     replaceModuleUrl,
     stableJson,
     validateCompatibility,
+    validateCommunityContract,
     validateSourceCommit,
     validateVersionAgreement
 }

@@ -1,6 +1,6 @@
 # Allegator Games Launcher Backend
 
-Shared Node 22/PostgreSQL backend for authenticated launcher releases and the optional public schematic community. Releases and schematics have independent feature flags, health dependencies, R2 buckets, and credentials.
+Shared Node 22/PostgreSQL backend for authenticated launcher releases and the public multi-type Community catalog. Release objects remain isolated; Schematics and the generic Community types can share a private content bucket through separate prefixes and configuration namespaces.
 
 ## Local setup
 
@@ -92,3 +92,21 @@ Schematic reads are public; mutations require a Minecraft backend session:
 The Community catalog is a read-only provider facade; existing schematic routes remain the source of type-specific details and mutations. Public catalog responses use ETags and stable cursor ordering. Personalized `mine=true` responses require a backend session and are never publicly cacheable.
 
 Collections remain unmounted unless `SCHEMATICS_COLLECTIONS_ENABLED=true`. Their API/data is preserved, but the launcher intentionally hides Collection and Creator-profile navigation until a future cross-type Community destination is enabled.
+
+## Multi-type Community content
+
+`COMMUNITY_ENABLED=true` activates the generic Community platform. Each provider is independently gated by `COMMUNITY_AUTOMATION_ENABLED`, `COMMUNITY_BATTLE_TRAINERS_ENABLED`, `COMMUNITY_BUILDER_PRESETS_ENABLED`, and `COMMUNITY_RESOURCE_PACKS_ENABLED`. Start with all four false, then enable Builder Presets, Battle Trainers, Automation, and Resource Packs in that order after pilots pass.
+
+The backend validates against the committed Cobble Power 1.0.3 contract matrix in `config/community-compatibility-1.0.3-test.1.json`. Uploads require a Minecraft-authenticated session, an approved license, rights attestation, and public visibility. Artifacts and previews are immutable after finalization; updates create revisions.
+
+Use `COMMUNITY_STORAGE_*` for the shared Community bucket. During migration, omitted values fall back one-for-one to `SCHEMATICS_STORAGE_*`. Signed upload and download URLs expire after 15 minutes. Resource Pack ZIPs are streamed through bounded temporary files and are never expanded into memory.
+
+Generic endpoints are:
+
+- `GET /v1/community/items/:type/:id`
+- `GET /v1/community/items/:type/:id/download`
+- `GET /v1/community/items/:type/:id/preview`
+- `POST /v1/community/uploads` and `POST /v1/community/uploads/:token/finalize`
+- Owner metadata, deletion, engagement, report, and administrator moderation routes under `/v1/community`
+
+Deployment, installation-safety, and staged rollout details are documented in `docs/community-content-platform.md` at the repository root.

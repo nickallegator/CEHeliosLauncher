@@ -1,5 +1,9 @@
 const { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+const crypto = require('crypto')
+const fs = require('fs')
+const { pipeline } = require('stream/promises')
+const { Transform } = require('stream')
 
 function validateSettings(settings, label = 'object storage') {
     const missing = ['bucket', 'accessKeyId', 'secretAccessKey'].filter(key => !settings?.[key])
@@ -39,6 +43,25 @@ async function streamToBuffer(body, maxBytes = null) {
     return bytes
 }
 
+async function hashStream(body, maxBytes = null) {
+    if(body == null || typeof body[Symbol.asyncIterator] !== 'function') throw new Error('Object storage response is not streamable.')
+    const limit = Number.isFinite(Number(maxBytes)) ? Number(maxBytes) : null
+    const hash = crypto.createHash('sha256')
+    let sizeBytes = 0
+    for await (const chunk of body) {
+        const value = Buffer.from(chunk)
+        sizeBytes += value.length
+        if(limit != null && sizeBytes > limit) {
+            if(typeof body.destroy === 'function') body.destroy()
+            const error = new Error(`Object exceeds the ${limit} byte limit.`)
+            error.code = 'OBJECT_TOO_LARGE'
+            throw error
+        }
+        hash.update(value)
+    }
+    return { sizeBytes, sha256: hash.digest('hex') }
+}
+
 function createS3Client(settings, label = 'object storage') {
     validateSettings(settings, label)
     return new S3Client({
@@ -67,6 +90,34 @@ function createObjectStorage(settings, label = 'object storage') {
             const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
             return streamToBuffer(response.Body, options.maxBytes)
         },
+        async getToFile(key, filePath, options = {}) {
+            const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+            const maxBytes = Number.isFinite(Number(options.maxBytes)) ? Number(options.maxBytes) : null
+            let received = 0
+            const limiter = new Transform({
+                transform(chunk, _encoding, callback) {
+                    received += chunk.length
+                    if(maxBytes != null && received > maxBytes) {
+                        const error = new Error(`Object exceeds the ${maxBytes} byte limit.`)
+                        error.code = 'OBJECT_TOO_LARGE'
+                        callback(error)
+                        return
+                    }
+                    callback(null, chunk)
+                }
+            })
+            try {
+                await pipeline(response.Body, limiter, fs.createWriteStream(filePath, { flags: 'wx' }))
+            } catch(error) {
+                await fs.promises.rm(filePath, { force: true }).catch(() => {})
+                throw error
+            }
+            return { sizeBytes: received, contentType: response.ContentType || null }
+        },
+        async hash(key, options = {}) {
+            const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+            return hashStream(response.Body, options.maxBytes)
+        },
         async getJson(key) {
             const body = await this.getBuffer(key)
             return JSON.parse(body.toString('utf8'))
@@ -76,6 +127,7 @@ function createObjectStorage(settings, label = 'object storage') {
                 Bucket: bucket,
                 Key: key,
                 Body: body,
+                ContentLength: options.contentLength,
                 ContentType: options.contentType,
                 CacheControl: options.cacheControl,
                 Metadata: options.metadata
@@ -106,4 +158,4 @@ function createObjectStorage(settings, label = 'object storage') {
     }
 }
 
-module.exports = { createObjectStorage, createS3Client, streamToBuffer, validateSettings }
+module.exports = { createObjectStorage, createS3Client, hashStream, streamToBuffer, validateSettings }

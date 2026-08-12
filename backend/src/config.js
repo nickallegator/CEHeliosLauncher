@@ -45,6 +45,17 @@ function objectStorageConfig(prefix, defaults = {}) {
     }
 }
 
+function inheritedObjectStorageConfig(primaryPrefix, fallbackPrefix, defaults = {}) {
+    const preferred = objectStorageConfig(primaryPrefix, defaults)
+    const fallback = objectStorageConfig(fallbackPrefix, defaults)
+    return Object.fromEntries(Object.keys({ ...fallback, ...preferred }).map(key => [
+        key,
+        process.env[`${primaryPrefix}_${key.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase()}`] != null
+            ? preferred[key]
+            : fallback[key]
+    ]))
+}
+
 const config = {
     port: parseNumber(getEnv('PORT', '8080'), 8080),
     baseUrl: getEnv('BASE_URL', 'http://localhost:8080'),
@@ -87,6 +98,27 @@ const config = {
             redirectCacheControl: getEnv('SCHEMATICS_STORAGE_REDIRECT_CACHE_CONTROL', 'public, max-age=86400')
         }
     },
+    community: {
+        enabled: parseBoolean(getEnv('COMMUNITY_ENABLED', getEnv('SCHEMATICS_ENABLED', 'false'))),
+        publicApiUrl: getEnv('COMMUNITY_PUBLIC_API_URL', getEnv('SCHEMATICS_PUBLIC_API_URL', null)),
+        writeMode: getEnv('COMMUNITY_WRITE_MODE', getEnv('SCHEMATICS_WRITE_MODE', 'admin')).trim().toLowerCase(),
+        uploadRateLimit: parseNumber(getEnv('COMMUNITY_UPLOADS_PER_HOUR', '10'), 10),
+        reportRateLimit: parseNumber(getEnv('COMMUNITY_REPORTS_PER_DAY', '10'), 10),
+        types: {
+            automation: parseBoolean(getEnv('COMMUNITY_AUTOMATION_ENABLED', 'false')),
+            'battle-trainers': parseBoolean(getEnv('COMMUNITY_BATTLE_TRAINERS_ENABLED', 'false')),
+            'builder-presets': parseBoolean(getEnv('COMMUNITY_BUILDER_PRESETS_ENABLED', 'false')),
+            'resource-packs': parseBoolean(getEnv('COMMUNITY_RESOURCE_PACKS_ENABLED', 'false'))
+        },
+        allowedLicenses: parseList(getEnv(
+            'COMMUNITY_ALLOWED_LICENSES',
+            'Community-Use-1.0,CC0-1.0,CC-BY-4.0,CC-BY-SA-4.0,MIT,MPL-2.0'
+        )),
+        objectStorage: inheritedObjectStorageConfig('COMMUNITY_STORAGE', 'SCHEMATICS_STORAGE', {
+            getTtlSeconds: 900,
+            putTtlSeconds: 900
+        })
+    },
     patreon: {
         clientId: getEnv('PATREON_CLIENT_ID', null),
         clientSecret: getEnv('PATREON_CLIENT_SECRET', null),
@@ -107,11 +139,23 @@ if(!['disabled', 'admin', 'authenticated'].includes(config.schematics.writeMode)
     throw new Error('SCHEMATICS_WRITE_MODE must be disabled, admin, or authenticated')
 }
 
+if(!['disabled', 'admin', 'authenticated'].includes(config.community.writeMode)) {
+    throw new Error('COMMUNITY_WRITE_MODE must be disabled, admin, or authenticated')
+}
+
 if(config.schematics.enabled && process.env.NODE_ENV === 'production') {
     const storage = config.schematics.objectStorage
     const missing = ['provider', 'bucket', 'endpoint', 'accessKeyId', 'secretAccessKey'].filter(key => !storage[key])
     if(missing.length > 0) {
         throw new Error(`Schematics are enabled in production but storage is missing: ${missing.join(', ')}`)
+    }
+}
+
+if(config.community.enabled && Object.values(config.community.types).some(Boolean) && process.env.NODE_ENV === 'production') {
+    const storage = config.community.objectStorage
+    const missing = ['provider', 'bucket', 'endpoint', 'accessKeyId', 'secretAccessKey'].filter(key => !storage[key])
+    if(missing.length > 0) {
+        throw new Error(`Community content is enabled in production but storage is missing: ${missing.join(', ')}`)
     }
 }
 

@@ -9,7 +9,7 @@ process.env.SCHEMATICS_ENABLED = 'false'
 const { cleanMetadata, hashToken, imageVariants } = require('../../backend/src/routes/schematics')
 const { floorWindow } = require('../../backend/src/services/schematicsRateLimits')
 const { createSchematicsObjectStorage } = require('../../backend/src/services/schematicsObjectStorage')
-const { streamToBuffer } = require('../../backend/src/services/s3ObjectStorage')
+const { hashStream, streamToBuffer } = require('../../backend/src/services/s3ObjectStorage')
 
 test('schematic metadata permits only public visibility', () => {
     assert.deepEqual(cleanMetadata({ name: ' Pilot ', tags: 'one, Two, one', visibility: 'public' }), {
@@ -85,4 +85,15 @@ test('object downloads are unlimited when no byte limit is supplied', async () =
     assert.equal((await streamToBuffer(chunks())).toString('utf8'), 'distribution-template')
     assert.equal((await streamToBuffer(chunks(), null)).toString('utf8'), 'distribution-template')
     await assert.rejects(() => streamToBuffer(chunks(), 0), error => error.code === 'OBJECT_TOO_LARGE')
+})
+
+test('streamed object verification computes SHA-256 without buffering artifacts', async () => {
+    async function* chunks() {
+        yield Buffer.from('community-')
+        yield Buffer.from('artifact')
+    }
+    const result = await hashStream(chunks(), 64)
+    assert.equal(result.sizeBytes, 18)
+    assert.equal(result.sha256, crypto.createHash('sha256').update('community-artifact').digest('hex'))
+    await assert.rejects(() => hashStream(chunks(), 17), error => error.code === 'OBJECT_TOO_LARGE')
 })

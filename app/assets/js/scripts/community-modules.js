@@ -16,6 +16,11 @@ class CommunityContentTypeRegistry {
         if(typeof definition.isEnabled !== 'function' || typeof definition.normalize !== 'function' || typeof definition.openDetail !== 'function'){
             throw new TypeError(`Community content type ${definition.id} requires isEnabled, normalize, and openDetail functions.`)
         }
+        for(const hook of ['publish', 'install', 'update', 'remove', 'manageInstalled']){
+            if(definition[hook] != null && typeof definition[hook] !== 'function'){
+                throw new TypeError(`Community content type ${definition.id} hook ${hook} must be a function.`)
+            }
+        }
         this.definitions.set(definition.id, Object.freeze({ ...definition }))
         return this
     }
@@ -68,6 +73,68 @@ function normalizeSchematicCatalogEntry(entry){
     }
 }
 
+function normalizeGenericCatalogEntry(entry, expectedType){
+    if(entry?.type !== expectedType || !entry.id) return null
+    return {
+        ...entry,
+        id: entry.id,
+        communityKey: entry.key || `${expectedType}:${entry.id}`,
+        communityType: expectedType,
+        name: entry.title,
+        title: entry.title,
+        description: entry.description || '',
+        creator: entry.creator?.name || 'Minecraft Player',
+        creatorId: entry.creator?.id || null,
+        ownerId: entry.creator?.id || null,
+        tags: Array.isArray(entry.tags) ? entry.tags : [],
+        thumbnailUrl: entry.thumbnailUrl || null,
+        release: entry.publishedAt || entry.updatedAt || null,
+        updatedAt: entry.updatedAt || entry.publishedAt || null,
+        downloads: Number(entry.stats?.downloads || 0),
+        likes: Number(entry.stats?.likes || 0),
+        views: Number(entry.stats?.views || 0),
+        revision: entry.revision || null,
+        license: entry.license || null,
+        compatibility: entry.compatibility || {},
+        dependencies: Array.isArray(entry.dependencies) ? entry.dependencies : [],
+        typeData: entry.typeData || {},
+        capabilities: entry.capabilities || {}
+    }
+}
+
+function genericTypeDefinition(id, labelKey, icon){
+    return {
+        id,
+        labelKey,
+        icon,
+        async isEnabled(context){
+            const serverTypes = Array.isArray(context.capabilities?.categories)
+                ? context.capabilities.categories.map(category => category.id)
+                : []
+            return serverTypes.includes(id)
+        },
+        normalize: entry => normalizeGenericCatalogEntry(entry, id),
+        openDetail(entry, context){
+            return context.openGenericCommunityDetail?.(entry)
+        },
+        publish(context){
+            return context.openGenericCommunityPublisher?.(id)
+        },
+        install(entry, context){
+            return context.installGenericCommunityItem?.(entry)
+        },
+        update(entry, context){
+            return context.installGenericCommunityItem?.(entry)
+        },
+        remove(entry, context){
+            return context.removeGenericCommunityItem?.(entry)
+        },
+        manageInstalled(context){
+            return context.openGenericInstalledManager?.(id)
+        }
+    }
+}
+
 function createDefaultCommunityContentRegistry(options = {}){
     const environment = options.environment || (typeof process !== 'undefined' ? process.env : {})
     return new CommunityContentTypeRegistry([
@@ -89,7 +156,11 @@ function createDefaultCommunityContentRegistry(options = {}){
             publish(context){
                 return context.openSchematicUpload?.()
             }
-        }
+        },
+        genericTypeDefinition('automation', 'ejs.community.automation', 'automation'),
+        genericTypeDefinition('battle-trainers', 'ejs.community.battleTrainers', 'trainer'),
+        genericTypeDefinition('builder-presets', 'ejs.community.builderPresets', 'palette'),
+        genericTypeDefinition('resource-packs', 'ejs.community.resourcePacks', 'resource-pack')
     ])
 }
 
@@ -101,6 +172,8 @@ if(typeof window !== 'undefined'){
         CommunityContentTypeRegistry,
         createDefaultCommunityRegistry,
         createDefaultCommunityContentRegistry,
+        genericTypeDefinition,
+        normalizeGenericCatalogEntry,
         normalizeSchematicCatalogEntry,
         isSchematicsEnabled
     }
@@ -111,6 +184,8 @@ if(typeof module !== 'undefined'){
         CommunityContentTypeRegistry,
         createDefaultCommunityRegistry,
         createDefaultCommunityContentRegistry,
+        genericTypeDefinition,
+        normalizeGenericCatalogEntry,
         normalizeSchematicCatalogEntry,
         isSchematicsEnabled
     }

@@ -25,11 +25,46 @@ function getLatestReleaseDate(entries){
     return latest
 }
 
+function communityTypeSummary(entry){
+    const data = entry.typeData || {}
+    if(entry.communityType === 'automation'){
+        return communityCopy('automationCardMeta', {
+            subtype: communityCopy(data.subtype === 'shared_space' ? 'automationSubtypeSharedSpace' : 'automationSubtypeOperation'),
+            nodes: Number(data.nodeCount || 0),
+            dependencies: Number(data.dependencyCount || 0)
+        })
+    }
+    if(entry.communityType === 'battle-trainers'){
+        return communityCopy('trainerCardMeta', {
+            party: Number(data.partySize || 0),
+            minimum: Number(data.minLevel || 0),
+            maximum: Number(data.maxLevel || 0),
+            skill: Number(data.skill || 0)
+        })
+    }
+    if(entry.communityType === 'builder-presets'){
+        return communityCopy('presetCardMeta', {
+            type: String(data.gradientType || communityCopy('gradientFallback')),
+            nodes: Number(data.nodeCount || 0),
+            materials: Array.isArray(data.pinnedBlocks) ? data.pinnedBlocks.length : 0
+        })
+    }
+    if(entry.communityType === 'resource-packs'){
+        return communityCopy('resourcePackCardMeta', {
+            namespaces: Array.isArray(data.namespaces) ? data.namespaces.join(', ') : communityCopy('resourcePackFallbackNamespace'),
+            entries: Number(data.entryCount || 0),
+            format: Number(data.packFormat || 0)
+        })
+    }
+    return ''
+}
+
 function createSchematicCard(entry){
     const card = document.createElement('button')
     card.type = 'button'
     card.className = 'schematicCard'
     card.setAttribute('data-schematic-id', entry.id || '')
+    card.setAttribute('data-community-key', entry.communityKey || `${entry.communityType || 'schematics'}:${entry.id || ''}`)
     card.setAttribute('aria-label', `${entry.name} by ${entry.creator}`)
     card.setAttribute('title', entry.name)
     if(entry.accent){
@@ -73,7 +108,7 @@ function createSchematicCard(entry){
     metaRow.appendChild(creator)
     const userId = getCurrentUserId()
     const isOwner = Boolean(userId && entry.ownerId && Number(entry.ownerId) === Number(userId))
-    if(isOwner){
+    if(isOwner && (entry.communityType || 'schematics') === 'schematics'){
         const edit = document.createElement('button')
         edit.type = 'button'
         edit.className = 'schematicCreatorButton schematicEditButton'
@@ -86,16 +121,41 @@ function createSchematicCard(entry){
         metaRow.appendChild(edit)
     }
 
+    if((entry.communityType || 'schematics') !== 'schematics'){
+        const typeBadge = document.createElement('span')
+        typeBadge.className = 'communityTypeBadge'
+        const definition = communityContentRegistry?.get(entry.communityType)
+        typeBadge.textContent = definition ? Lang.query(definition.labelKey) : entry.communityType
+        details.appendChild(typeBadge)
+        const typeSummary = document.createElement('span')
+        typeSummary.className = 'communityTypeSummary'
+        typeSummary.textContent = communityTypeSummary(entry)
+        details.appendChild(typeSummary)
+    }
     details.appendChild(name)
-    const installed = entry.id ? getInstalledSchematic(entry.id) : null
+    let installed = entry.id ? getInstalledSchematic(entry.id) : null
+    let genericStatus = null
+    if((entry.communityType || 'schematics') !== 'schematics'
+        && typeof genericCommunityInstallManager !== 'undefined'
+        && genericCommunityInstallManager){
+        const selectedAccount = ConfigManager.getSelectedAccount()
+        try {
+            genericStatus = genericCommunityInstallManager.status(
+                ConfigManager.getSelectedServer(), selectedAccount?.uuid, entry
+            )
+            installed = genericStatus.record
+        } catch(_error) {
+            genericStatus = null
+        }
+    }
     if(installed){
         card.setAttribute('data-installed', 'true')
         const installedBadge = document.createElement('span')
         installedBadge.className = 'schematicInstalledBadge'
         const account = ConfigManager.getSelectedAccount()
-        const status = schematicsInstallManager && account?.uuid
+        const status = genericStatus?.state || (schematicsInstallManager && account?.uuid
             ? schematicsInstallManager.status(ConfigManager.getSelectedServer(), account.uuid, entry).state
-            : 'installed'
+            : 'installed')
         installedBadge.textContent = status === 'update' ? communityCopy('updateAvailable') : (status === 'repair' ? communityCopy('repairNeeded') : communityCopy('installed'))
         details.appendChild(installedBadge)
     }

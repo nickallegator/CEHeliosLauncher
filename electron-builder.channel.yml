@@ -4,10 +4,10 @@ appId: 'net.allegator.games.launcher'
 productName: 'Allegator Games Launcher'
 executableName: 'AG Launcher'
 artifactName: 'AG-Launcher-Test-setup-${version}.${ext}'
-copyright: 'Copyright © 2026 Allegator Games'
+copyright: 'Copyright (c) 2026 Allegator Games'
 
 extraMetadata:
-  version: '2.3.1-test.2'
+  version: '2.4.0-test.1'
   productName: 'Allegator Games Launcher'
 
 extraResources:

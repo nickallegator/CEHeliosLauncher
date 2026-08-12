@@ -98,3 +98,151 @@
     background: var(--workshop-surface-raised) !important;
     box-shadow: var(--workshop-shadow) !important;
 }
+
+.communityTypeBadge {
+    align-self: flex-start;
+    margin: 0 0 7px;
+    padding: 3px 8px;
+    color: var(--workshop-mint);
+    background: rgba(51, 139, 120, .2);
+    border: 1px solid rgba(116, 222, 195, .35);
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.communityTypeSummary {
+    color: var(--workshop-text-muted);
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    margin-top: 0.16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.communityContentDetailPanel,
+.communityContentPublishPanel {
+    width: min(820px, calc(100vw - 70px));
+    max-height: min(620px, calc(100vh - 70px));
+    overflow: auto;
+}
+
+.communityContentDetailHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.communityContentDetailHeader h2 {
+    margin: 4px 0;
+    color: var(--workshop-text);
+    font-family: 'Pixelify Sans', sans-serif;
+}
+
+.communityContentDetailBody {
+    display: grid;
+    grid-template-columns: minmax(220px, .85fr) minmax(300px, 1.15fr);
+    gap: 22px;
+}
+
+.communityContentDetailMedia {
+    display: grid;
+    min-height: 280px;
+    place-items: center;
+    overflow: hidden;
+    background: var(--workshop-surface-soft);
+    border: 1px solid var(--workshop-line-strong);
+}
+
+.communityContentDetailMedia img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.communityContentMetadataGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.communityContentMetadataGrid div {
+    padding: 10px;
+    background: var(--workshop-surface-soft);
+    border: 1px solid var(--workshop-line);
+}
+
+.communityContentMetadataGrid dt {
+    color: var(--workshop-text-muted);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.communityContentMetadataGrid dd {
+    margin: 4px 0 0;
+    color: var(--workshop-text);
+}
+
+.communityContentDetailActions,
+.schematicsDetailEditActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.communityContentStatus {
+    min-height: 22px;
+    margin: 12px 0;
+    color: var(--workshop-mint);
+}
+
+.communityContentPublishForm {
+    display: grid;
+    gap: 12px;
+}
+
+.communityContentPreviewConfirmation {
+    background: var(--workshop-deep);
+    border: 1px solid var(--workshop-line);
+    margin: 0;
+    padding: 0.65rem;
+}
+
+.communityContentPreviewConfirmation img {
+    aspect-ratio: 16 / 9;
+    background: var(--workshop-ink);
+    display: block;
+    height: 112px;
+    margin-bottom: 0.55rem;
+    object-fit: contain;
+    width: 100%;
+}
+
+.communityContentPreviewConfirmation label {
+    align-items: flex-start;
+    color: var(--workshop-text-muted);
+    display: flex;
+    font-size: 0.76rem;
+    gap: 0.5rem;
+    line-height: 1.35;
+}
+
+.communityRightsAttestation {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--workshop-text-muted);
+    line-height: 1.35;
+}
+
+@media (max-width: 1020px) {
+    .communityContentDetailBody { grid-template-columns: 1fr; }
+    .communityContentDetailMedia { min-height: 180px; max-height: 240px; }
+}
