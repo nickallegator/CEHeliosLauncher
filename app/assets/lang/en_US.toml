@@ -546,6 +546,8 @@ pleaseWait = "Please wait.."
 failureTitle = "Error During Launch"
 failureText = "See console (CTRL + Shift + i) for more details."
 okay = "Okay"
+showroomMode = "SHOWROOM"
+showroomModeTitle = "Game launch is disabled in the local Community showroom."
 
 [js.landing.selectedAccount]
 noAccountSelected = "No Account Selected"

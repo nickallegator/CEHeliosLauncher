@@ -65,6 +65,12 @@ Browsing is public. Publishing and engagement require a valid Minecraft backend 
 
 The custom `Community-Use-1.0` terms are served by the API and stored with the repository. SPDX license identifiers redirect to their canonical license page.
 
+## Local Community showroom
+
+Run `run-community-showroom.cmd` from the launcher repository to open a disposable, read-only catalog with representative Automation, Battle Trainer, Builder Preset, and Resource Pack artifacts. The showroom binds to `127.0.0.1`, redirects Community and access calls to its temporary local API, disables publication and game launch, and removes its temporary launcher and Minecraft data after the window closes.
+
+Use `run-community-showroom.cmd --keep-data` to preserve the generated instance for inspection, or `run-community-showroom.cmd --data-dir <path>` to use an explicit persistent location. The showroom never reads or writes the installed launcher's profile, production PostgreSQL database, or R2 bucket.
+
 ## Rollout
 
 1. Apply migrations and deploy the backend with all new provider flags disabled.

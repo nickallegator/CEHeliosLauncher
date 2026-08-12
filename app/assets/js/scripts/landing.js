@@ -49,6 +49,7 @@ const user_text               = document.getElementById('user_text')
 
 const loggerLanding = LoggerUtil.getLogger('Landing')
 let settingsReadyPromise = null
+const communityShowroomMode = process.env.AG_COMMUNITY_SHOWROOM === '1'
 
 async function ensureSettingsScriptLoaded(){
     if(typeof prepareSettings === 'function'){
@@ -125,11 +126,19 @@ function setDownloadPercentage(percent){
  * @param {boolean} val True to enable, false to disable.
  */
 function setLaunchEnabled(val){
-    document.getElementById('launch_button').disabled = !val
+    document.getElementById('launch_button').disabled = communityShowroomMode || !val
+}
+
+if(communityShowroomMode){
+    const launchButton = document.getElementById('launch_button')
+    launchButton.disabled = true
+    launchButton.title = Lang.queryJS('landing.launch.showroomModeTitle')
+    launchButton.querySelector('span').textContent = Lang.queryJS('landing.launch.showroomMode')
 }
 
 // Bind launch button
 document.getElementById('launch_button').addEventListener('click', async e => {
+    if(communityShowroomMode) return
     loggerLanding.info('Launching game..')
     try {
         if(ChannelManager.isRemoteChannel()) {
