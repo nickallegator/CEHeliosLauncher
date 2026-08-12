@@ -3,11 +3,22 @@
  */
 
 let pathUtil = require('path')
+let fs = require('fs-extra')
+let { Worker: SchematicMeshWorker } = require('worker_threads')
 let {
     buildSchematicMesh,
     collectTextureIdsForSchematic
 } = require(pathUtil.resolve(process.cwd(), 'libraries', 'schematics-visualizer'))
 let { colorForState: schematicPreviewColorForState } = require(pathUtil.resolve(process.cwd(), 'libraries', 'schematics-preview'))
+let {
+    DirectoryResourceProvider,
+    JarResourceProvider,
+    createResourceStack,
+    discoverProfileResources,
+    loadBlockstate,
+    loadModel,
+    loadTexture
+} = require(pathUtil.resolve(process.cwd(), 'libraries', 'minecraft-resources'))
 let {
     SchematicApiClient,
     SchematicApiError,
@@ -795,9 +806,17 @@ const SCHEMATICS_PLATFORM_ORDER = String(process.env.SCHEMATICS_MOD_PLATFORM_ORD
     .filter(Boolean)
 const SCHEMATICS_PLATFORM_TIMEOUT_MS = 10000
 const SCHEMATICS_MOD_DEBUG = String(process.env.SCHEMATICS_MOD_DEBUG || '').toLowerCase() === '1'
+const SCHEMATICS_RESOURCE_SIGNATURE_TTL_MS = 5000
+const SCHEMATICS_EXTERNAL_RESOURCE_DATA_DIR = process.env.AG_COMMUNITY_SHOWROOM === '1'
+    && String(process.env.AG_COMMUNITY_RESOURCE_DATA_DIRECTORY || '').trim()
+    ? pathUtil.resolve(process.env.AG_COMMUNITY_RESOURCE_DATA_DIRECTORY)
+    : null
 
 let schematicsResourceStack = null
 let schematicsResourceStackKey = null
+let schematicsResourceContextKey = null
+let schematicsResourceSignatureCheckedAt = 0
+let schematicsResourceDiagnostics = { status: 'idle', providerCount: 0, error: null }
 let schematicsRemoteAssetsRevision = 0
 let schematicsModsIndexLoaded = false
 let schematicsModsByNamespace = new Map()
@@ -814,6 +833,7 @@ let schematicsRuntimeRegistry = {
 let schematicsLoadedBlockstates = new Set(Object.keys(schematicsRuntimeRegistry.blockstates))
 let schematicsLoadedModels = new Set(Object.keys(schematicsRuntimeRegistry.models))
 let schematicsTextureAtlas = null
+let schematicsTextureAtlasDiagnostics = { requestedTextures: 0, resolvedTextures: 0 }
 const SCHEMATICS_ATLAS_CACHE_LIMIT = 3
 const schematicsTextureAtlasCache = new Map()
 const SCHEMATICS_ALPHA_CACHE_LIMIT = 300
@@ -1852,6 +1872,42 @@ class RemoteJarResourceProvider {
     }
 }
 
+function appendResourceProvider(providers, sourceEntries, seenPaths, type, resourcePath){
+    if(!resourcePath) return
+    const resolvedPath = pathUtil.resolve(resourcePath)
+    const key = process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath
+    if(seenPaths.has(key)) return
+    seenPaths.add(key)
+    providers.push(type === 'directory'
+        ? new DirectoryResourceProvider(resolvedPath)
+        : new JarResourceProvider(resolvedPath))
+    sourceEntries.push({ type, path: resolvedPath })
+}
+
+async function appendInstanceResources(providers, sourceEntries, seenPaths, instanceDir){
+    const resourcepacksDir = pathUtil.join(instanceDir, 'resourcepacks')
+    if(await fs.pathExists(resourcepacksDir)){
+        const entries = await fs.readdir(resourcepacksDir, { withFileTypes: true })
+        for(const entry of entries){
+            const entryPath = pathUtil.join(resourcepacksDir, entry.name)
+            if(entry.isDirectory()) appendResourceProvider(providers, sourceEntries, seenPaths, 'directory', entryPath)
+            else if(entry.isFile() && /\.(zip|jar)$/i.test(entry.name)){
+                appendResourceProvider(providers, sourceEntries, seenPaths, 'jar', entryPath)
+            }
+        }
+    }
+
+    const modsDir = pathUtil.join(instanceDir, 'mods')
+    if(await fs.pathExists(modsDir)){
+        const entries = await fs.readdir(modsDir, { withFileTypes: true })
+        for(const entry of entries){
+            if(entry.isFile() && entry.name.toLowerCase().endsWith('.jar')){
+                appendResourceProvider(providers, sourceEntries, seenPaths, 'jar', pathUtil.join(modsDir, entry.name))
+            }
+        }
+    }
+}
+
 async function buildSchematicsResourceStack(){
     try {
         await rebuildSchematicsCacheIfNeeded()
@@ -1859,39 +1915,45 @@ async function buildSchematicsResourceStack(){
         const server = distro?.getServerById(ConfigManager.getSelectedServer())
         const serverId = server?.rawServer?.id || 'default'
         const mcVersion = server?.rawServer?.minecraftVersion
-        const cacheKey = `${serverId}:${mcVersion || 'unknown'}`
-        if(schematicsResourceStack && schematicsResourceStackKey === cacheKey){
+        const cacheKey = `${serverId}:${mcVersion || 'unknown'}:${SCHEMATICS_EXTERNAL_RESOURCE_DATA_DIR || 'local'}`
+        if(schematicsResourceStack
+            && schematicsResourceContextKey === cacheKey
+            && Date.now() - schematicsResourceSignatureCheckedAt < SCHEMATICS_RESOURCE_SIGNATURE_TTL_MS){
             return schematicsResourceStack
         }
+        schematicsResourceDiagnostics = { status: 'loading', providerCount: 0, error: null }
 
         const providers = []
         const sourceEntries = []
+        const seenPaths = new Set()
         const instanceDir = pathUtil.join(ConfigManager.getInstanceDirectory(), serverId)
+        await appendInstanceResources(providers, sourceEntries, seenPaths, instanceDir)
 
-        const resourcepacksDir = pathUtil.join(instanceDir, 'resourcepacks')
-        if(await fs.pathExists(resourcepacksDir)){
-            const entries = await fs.readdir(resourcepacksDir, { withFileTypes: true })
-            for(const entry of entries){
-                const entryPath = pathUtil.join(resourcepacksDir, entry.name)
-                if(entry.isDirectory()){
-                    providers.push(new DirectoryResourceProvider(entryPath))
-                    sourceEntries.push({ type: 'dir', path: entryPath })
-                } else if(entry.isFile() && (entry.name.endsWith('.zip') || entry.name.endsWith('.jar'))){
-                    providers.push(new JarResourceProvider(entryPath))
-                    sourceEntries.push({ type: 'jar', path: entryPath })
-                }
+        let externalResources = null
+        if(SCHEMATICS_EXTERNAL_RESOURCE_DATA_DIR && mcVersion){
+            externalResources = await discoverProfileResources({
+                dataDirectory: SCHEMATICS_EXTERNAL_RESOURCE_DATA_DIR,
+                profileId: serverId,
+                minecraftVersion: mcVersion
+            })
+            schematicsModDebug('external resource source discovered.', {
+                profileId: serverId,
+                minecraftVersion: mcVersion,
+                looseResources: externalResources.looseResources.length,
+                activeModJars: externalResources.activeModJars.length,
+                hasMinecraftJar: Boolean(externalResources.minecraftJar),
+                missingCoordinates: externalResources.missingCoordinates.length
+            })
+            for(const entry of externalResources.looseResources){
+                appendResourceProvider(providers, sourceEntries, seenPaths, entry.type, entry.path)
             }
-        }
-
-        const modsDir = pathUtil.join(instanceDir, 'mods')
-        if(await fs.pathExists(modsDir)){
-            const entries = await fs.readdir(modsDir, { withFileTypes: true })
-            for(const entry of entries){
-                if(entry.isFile() && entry.name.endsWith('.jar')){
-                    const modPath = pathUtil.join(modsDir, entry.name)
-                    providers.push(new JarResourceProvider(modPath))
-                    sourceEntries.push({ type: 'jar', path: modPath })
-                }
+            for(const jarPath of externalResources.activeModJars){
+                appendResourceProvider(providers, sourceEntries, seenPaths, 'jar', jarPath)
+            }
+            if(externalResources.missingCoordinates.length > 0){
+                loggerLanding.warn('[schematics] Some active external mod assets were unavailable.', {
+                    count: externalResources.missingCoordinates.length
+                })
             }
         }
 
@@ -1904,22 +1966,39 @@ async function buildSchematicsResourceStack(){
         if(mcVersion){
             const versionJar = pathUtil.join(ConfigManager.getCommonDirectory(), 'versions', mcVersion, `${mcVersion}.jar`)
             if(await fs.pathExists(versionJar)){
-                providers.push(new JarResourceProvider(versionJar))
-                sourceEntries.push({ type: 'jar', path: versionJar })
+                appendResourceProvider(providers, sourceEntries, seenPaths, 'jar', versionJar)
             }
+            appendResourceProvider(providers, sourceEntries, seenPaths, 'jar', externalResources?.minecraftJar)
         }
 
         const signature = await computeResourceStackSignature(sourceEntries, cacheKey)
+        if(schematicsResourceStack
+            && schematicsResourceContextKey === cacheKey
+            && schematicsResourceStackKey === signature){
+            schematicsResourceSignatureCheckedAt = Date.now()
+            schematicsResourceDiagnostics = { status: 'ready', providerCount: providers.length, error: null }
+            return schematicsResourceStack
+        }
         if(schematicsResourceStackKey && schematicsResourceStackKey !== signature){
             resetSchematicsResourceCaches()
         }
         schematicsResourceStack = createResourceStack(providers)
         schematicsResourceStackKey = signature
+        schematicsResourceContextKey = cacheKey
+        schematicsResourceSignatureCheckedAt = Date.now()
+        schematicsResourceDiagnostics = { status: 'ready', providerCount: providers.length, error: null }
         return schematicsResourceStack
     } catch (err) {
         loggerLanding.warn('Failed to build schematics resource stack.', err)
+        schematicsResourceDiagnostics = {
+            status: 'error',
+            providerCount: 0,
+            error: err?.message || String(err)
+        }
         schematicsResourceStack = null
         schematicsResourceStackKey = null
+        schematicsResourceContextKey = null
+        schematicsResourceSignatureCheckedAt = 0
         return null
     }
 }
@@ -1950,6 +2029,8 @@ async function computeResourceStackSignature(entries, cacheKey){
 
 function resetSchematicsResourceCaches(){
     schematicsTextureAtlas = null
+    schematicsResourceContextKey = null
+    schematicsResourceSignatureCheckedAt = 0
     schematicsTextureAtlasCache.clear()
     schematicsTextureAlphaCache.clear()
     schematicsLangNamespaceCache.clear()
@@ -2266,9 +2347,11 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
         schematicsTextureAtlasCache.delete(key)
         schematicsTextureAtlasCache.set(key, cached)
         schematicsTextureAtlas = cached
+        schematicsTextureAtlasDiagnostics.resolvedTextures = cached?.resolvedTextureCount || 0
         return cached
     }
     if(skipAlphaAnalysis && schematicsTextureAtlas?.key === key){
+        schematicsTextureAtlasDiagnostics.resolvedTextures = schematicsTextureAtlas.resolvedTextureCount || 0
         return schematicsTextureAtlas
     }
 
@@ -2286,7 +2369,13 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
                 const ctx = canvas.getContext('2d')
                 ctx.imageSmoothingEnabled = false
                 ctx.drawImage(image, 0, 0)
-                const atlas = { key, canvas, mapping: meta.mapping }
+                const atlas = {
+                    key,
+                    canvas,
+                    mapping: meta.mapping,
+                    resolvedTextureCount: Number(meta.resolvedTextureCount) || textureIds.length
+                }
+                schematicsTextureAtlasDiagnostics.resolvedTextures = atlas.resolvedTextureCount
                 schematicsTextureAtlas = atlas
                 schematicsTextureAtlasCache.set(key, atlas)
                 try {
@@ -2365,6 +2454,11 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
     }
 
     if(resolvedTextureCount === 0){
+        schematicsTextureAtlasDiagnostics.resolvedTextures = 0
+        schematicsModDebug('texture atlas used palette fallback because no texture bytes resolved.', {
+            requestedTextures: textureIds.length,
+            resourceStackKey: schematicsResourceStackKey
+        })
         schematicsTextureAtlas = null
         schematicsTextureAtlasCache.set(key, null)
         if(schematicsTextureAtlasCache.size > SCHEMATICS_ATLAS_CACHE_LIMIT){
@@ -2374,7 +2468,14 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
         return null
     }
 
-    const atlas = { key, canvas, mapping }
+    schematicsTextureAtlasDiagnostics.resolvedTextures = resolvedTextureCount
+    schematicsModDebug('texture atlas resolved.', {
+        requestedTextures: textureIds.length,
+        resolvedTextures: resolvedTextureCount,
+        resourceStackKey: schematicsResourceStackKey
+    })
+
+    const atlas = { key, canvas, mapping, resolvedTextureCount }
     schematicsTextureAtlas = atlas
     schematicsTextureAtlasCache.set(key, atlas)
     if(schematicsTextureAtlasCache.size > SCHEMATICS_ATLAS_CACHE_LIMIT){
@@ -2389,7 +2490,7 @@ async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {})
         const arrayBuffer = await blob.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
         await fs.writeFile(imagePath, buffer)
-        await fs.writeJson(metaPath, { mapping }, { spaces: 0 })
+        await fs.writeJson(metaPath, { mapping, resolvedTextureCount }, { spaces: 0 })
         await touchAtlasCacheFiles(imagePath, metaPath)
         await evictAtlasCacheFiles()
     } catch (err) {
@@ -2452,6 +2553,10 @@ async function prepareTextureAtlasForSchematic(schematic, { skipAlphaAnalysis = 
         return null
     }
     const textureIds = Array.from(collectTextureIdsForSchematic(schematic, schematicsRuntimeRegistry))
+    schematicsTextureAtlasDiagnostics = {
+        requestedTextures: textureIds.length,
+        resolvedTextures: 0
+    }
     if(textureIds.length === 0){
         schematicsTextureAtlas = null
         return null

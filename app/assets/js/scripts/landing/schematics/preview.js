@@ -4,7 +4,7 @@ function ensureSchematicsMeshWorker(){
     }
     try {
         const workerPath = pathUtil.resolve(process.cwd(), 'app', 'assets', 'js', 'schematics', 'mesh-worker.js')
-        schematicsMeshWorker = new Worker(workerPath)
+        schematicsMeshWorker = new SchematicMeshWorker(workerPath)
         schematicsMeshWorker.on('message', (message) => {
             if(!message || typeof message !== 'object'){
                 return
@@ -118,6 +118,7 @@ function renderPreviewPlaceholder(text, state = 'loading'){
         return
     }
     schematicsDetailPreview.removeAttribute('data-mesh')
+    schematicsDetailPreview.removeAttribute('data-texture-source')
     schematicsDetailPreview.setAttribute('data-preview-state', state)
     schematicsDetailPreview.setAttribute('data-rendered', 'false')
     const renderer = ensureSchematicPreviewRenderer()

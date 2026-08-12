@@ -826,6 +826,9 @@ function createShowroomConfig(gameDataDirectory) {
 
 async function createShowroomEnvironment(options = {}) {
     const appDirectory = path.resolve(options.appDirectory || path.join(__dirname, '..', '..'))
+    const resourceDataDirectory = options.resourceDataDirectory
+        ? validateResourceDataDirectory(options.resourceDataDirectory)
+        : null
     const rootDirectory = options.rootDirectory
         ? path.resolve(options.rootDirectory)
         : fs.mkdtempSync(path.join(os.tmpdir(), 'ag-community-showroom-'))
@@ -856,6 +859,7 @@ async function createShowroomEnvironment(options = {}) {
             instanceRoot,
             distributionPath,
             apiBaseUrl: api.baseUrl,
+            resourceDataDirectory,
             entries: entries.map(entry => ({ type: entry.type, id: entry.id, title: entry.title, sha256: entry.revision.sha256 }))
         }
         fs.writeFileSync(path.join(rootDirectory, SHOWROOM_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
@@ -868,6 +872,7 @@ async function createShowroomEnvironment(options = {}) {
                 ...process.env,
                 NODE_ENV: 'test',
                 AG_COMMUNITY_SHOWROOM: '1',
+                ...(resourceDataDirectory ? { AG_COMMUNITY_RESOURCE_DATA_DIRECTORY: resourceDataDirectory } : {}),
                 HELIOS_DISTRO_DEV: '1',
                 HELIOS_DISTRO_LOCAL_PATH: distributionPath,
                 HELIOS_SCHEMATICS_API_URL: api.baseUrl,
@@ -881,6 +886,20 @@ async function createShowroomEnvironment(options = {}) {
         await api.close().catch(() => {})
         throw error
     }
+}
+
+function validateResourceDataDirectory(value) {
+    const directory = path.resolve(String(value || ''))
+    if(!value || !fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
+        throw new Error(`Community showroom resource directory does not exist: ${directory}`)
+    }
+    for(const required of ['common', 'instances']) {
+        const requiredPath = path.join(directory, required)
+        if(!fs.existsSync(requiredPath) || !fs.statSync(requiredPath).isDirectory()) {
+            throw new Error(`Community showroom resource directory is missing ${required}: ${directory}`)
+        }
+    }
+    return directory
 }
 
 function assertSafeShowroomRoot(rootDirectory) {
@@ -911,6 +930,7 @@ module.exports = {
     SHOWROOM_TYPES,
     assertSafeShowroomRoot,
     createShowroomEnvironment,
+    validateResourceDataDirectory,
     createShowroomFixtures,
     decodeCursor,
     filterCatalog,

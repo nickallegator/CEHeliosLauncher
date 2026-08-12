@@ -10,6 +10,9 @@ const fs = require('fs/promises')
 const path = require('path')
 const AdmZip = require('adm-zip')
 
+const SAFE_PROFILE_ID = /^[a-zA-Z0-9._+-]+$/
+const SAFE_MAVEN_PART = /^[a-zA-Z0-9._+-]+$/
+
 class JarResourceProvider {
     constructor(jarPath) {
         if(!jarPath){
@@ -119,6 +122,108 @@ function createResourceStack(providers){
     }
 }
 
+async function pathIsFile(filePath){
+    try {
+        return (await fs.stat(filePath)).isFile()
+    } catch (err) {
+        if(err.code === 'ENOENT') return false
+        throw err
+    }
+}
+
+async function listResourceContainers(directory){
+    try {
+        const entries = await fs.readdir(directory, { withFileTypes: true })
+        return entries
+            .filter(entry => entry.isDirectory() || (entry.isFile() && /\.(jar|zip)$/i.test(entry.name)))
+            .map(entry => ({
+                type: entry.isDirectory() ? 'directory' : 'jar',
+                path: path.join(directory, entry.name)
+            }))
+            .sort((left, right) => left.path.localeCompare(right.path))
+    } catch (err) {
+        if(err.code === 'ENOENT') return []
+        throw err
+    }
+}
+
+function parseMavenCoordinate(value){
+    const coordinate = String(value || '').trim()
+    const parts = coordinate.split(':')
+    if(parts.length < 3 || parts.length > 4 || parts.some(part => !SAFE_MAVEN_PART.test(part))){
+        return null
+    }
+    const [group, artifact, version, classifier = null] = parts
+    return { coordinate, group, artifact, version, classifier }
+}
+
+function resolveModstoreArtifactPath(modstoreDirectory, coordinate){
+    const parsed = parseMavenCoordinate(coordinate)
+    if(!parsed) return null
+    const fileName = `${parsed.artifact}-${parsed.version}${parsed.classifier ? `-${parsed.classifier}` : ''}.jar`
+    const candidate = path.resolve(
+        modstoreDirectory,
+        ...parsed.group.split('.'),
+        parsed.artifact,
+        parsed.version,
+        fileName
+    )
+    const root = path.resolve(modstoreDirectory)
+    const relative = path.relative(root, candidate)
+    if(!relative || relative.startsWith('..') || path.isAbsolute(relative)) return null
+    return candidate
+}
+
+async function readActiveModCoordinates(instanceDirectory){
+    const listPath = path.join(instanceDirectory, 'forgeMods.list')
+    try {
+        const content = await fs.readFile(listPath, 'utf8')
+        return content
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#'))
+    } catch (err) {
+        if(err.code === 'ENOENT') return []
+        throw err
+    }
+}
+
+async function discoverProfileResources({ dataDirectory, profileId, minecraftVersion }){
+    const resolvedDataDirectory = path.resolve(String(dataDirectory || ''))
+    const resolvedProfileId = String(profileId || '').trim()
+    const resolvedMinecraftVersion = String(minecraftVersion || '').trim()
+    if(!dataDirectory || !resolvedDataDirectory) throw new Error('A Minecraft data directory is required.')
+    if(!SAFE_PROFILE_ID.test(resolvedProfileId)) throw new Error('Profile id contains unsupported path characters.')
+    if(!SAFE_MAVEN_PART.test(resolvedMinecraftVersion)) throw new Error('Minecraft version contains unsupported path characters.')
+
+    const instanceDirectory = path.join(resolvedDataDirectory, 'instances', resolvedProfileId)
+    const commonDirectory = path.join(resolvedDataDirectory, 'common')
+    const looseResources = [
+        ...await listResourceContainers(path.join(instanceDirectory, 'resourcepacks')),
+        ...(await listResourceContainers(path.join(instanceDirectory, 'mods'))).filter(entry => entry.type === 'jar')
+    ]
+    const activeCoordinates = await readActiveModCoordinates(instanceDirectory)
+    const modstoreDirectory = path.join(commonDirectory, 'modstore')
+    const activeModJars = []
+    const missingCoordinates = []
+    for(const coordinate of activeCoordinates){
+        const artifactPath = resolveModstoreArtifactPath(modstoreDirectory, coordinate)
+        if(artifactPath && await pathIsFile(artifactPath)) activeModJars.push(artifactPath)
+        else missingCoordinates.push(coordinate)
+    }
+    const minecraftJar = path.join(commonDirectory, 'versions', resolvedMinecraftVersion, `${resolvedMinecraftVersion}.jar`)
+
+    return {
+        dataDirectory: resolvedDataDirectory,
+        profileId: resolvedProfileId,
+        minecraftVersion: resolvedMinecraftVersion,
+        looseResources,
+        activeModJars: [...new Set(activeModJars)],
+        missingCoordinates,
+        minecraftJar: await pathIsFile(minecraftJar) ? minecraftJar : null
+    }
+}
+
 function resolveBlockstatePath(namespace, block){
     return `assets/${namespace}/blockstates/${block}.json`
 }
@@ -150,6 +255,9 @@ module.exports = {
     JarResourceProvider,
     DirectoryResourceProvider,
     createResourceStack,
+    discoverProfileResources,
+    parseMavenCoordinate,
+    resolveModstoreArtifactPath,
     resolveBlockstatePath,
     resolveModelPath,
     resolveTexturePath,

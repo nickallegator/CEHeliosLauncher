@@ -11,7 +11,8 @@ const {
     SHOWROOM_PROFILE_ID,
     SHOWROOM_TYPES,
     assertSafeShowroomRoot,
-    createShowroomEnvironment
+    createShowroomEnvironment,
+    validateResourceDataDirectory
 } = require('../../scripts/lib/community-showroom')
 const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
 const { parseArguments } = require('../../scripts/run-community-showroom')
@@ -23,12 +24,29 @@ function digest(value) {
 }
 
 test('showroom arguments preserve explicit directories and reject unknown switches', () => {
-    const value = parseArguments(['--keep-data', '--verify', '--data-dir', 'fixture-output'])
+    const value = parseArguments([
+        '--keep-data',
+        '--verify',
+        '--data-dir', 'fixture-output',
+        '--resources-from', 'installed-game-data'
+    ])
     assert.equal(value.keepData, true)
     assert.equal(value.verify, true)
     assert.equal(value.dataDirectory, path.resolve('fixture-output'))
+    assert.equal(value.resourceDataDirectory, path.resolve('installed-game-data'))
     assert.throws(() => parseArguments(['--unknown']), /Unknown argument/)
     assert.throws(() => parseArguments(['--data-dir']), /requires a path/)
+    assert.throws(() => parseArguments(['--resources-from']), /requires a path/)
+})
+
+test('showroom resource roots require existing common and instances directories', t => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-resource-root-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    assert.throws(() => validateResourceDataDirectory(directory), /missing common/)
+    fs.mkdirSync(path.join(directory, 'common'))
+    assert.throws(() => validateResourceDataDirectory(directory), /missing instances/)
+    fs.mkdirSync(path.join(directory, 'instances'))
+    assert.equal(validateResourceDataDirectory(directory), directory)
 })
 
 test('showroom refuses to reuse unrelated non-empty directories', t => {

@@ -331,6 +331,13 @@ async function openSchematicDetail(entry){
             schematicsDetailSize.textContent = `${size[0]} x ${size[1]} x ${size[2]}`
         }
         const resourceStack = await resourceStackPromise
+        schematicsDetailPreview?.setAttribute('data-resource-stack', schematicsResourceDiagnostics.status)
+        schematicsDetailPreview?.setAttribute('data-resource-providers', String(schematicsResourceDiagnostics.providerCount))
+        if(schematicsResourceDiagnostics.error){
+            schematicsDetailPreview?.setAttribute('data-resource-error', schematicsResourceDiagnostics.error)
+        } else {
+            schematicsDetailPreview?.removeAttribute('data-resource-error')
+        }
         if(detailTaskToken !== schematicDetailTaskToken || schematicDetailActiveId !== entry.id){
             return
         }
@@ -348,6 +355,9 @@ async function openSchematicDetail(entry){
         if(renderer && renderer.isWebGL){
             renderer.setTextureAtlas(atlas?.canvas || null)
         }
+        schematicsDetailPreview?.setAttribute('data-texture-source', atlas?.canvas ? 'resources' : 'palette')
+        schematicsDetailPreview?.setAttribute('data-textures-requested', String(schematicsTextureAtlasDiagnostics.requestedTextures))
+        schematicsDetailPreview?.setAttribute('data-textures-resolved', String(schematicsTextureAtlasDiagnostics.resolvedTextures))
         renderSchematicPreview(normalized)
         await Promise.all([blockListRenderTask, modsListRenderTask])
     } catch (err) {

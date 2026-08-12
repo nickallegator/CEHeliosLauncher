@@ -9,17 +9,18 @@ const { createShowroomEnvironment } = require('./lib/community-showroom')
 
 function usage() {
     return [
-        'Usage: run-community-showroom.cmd [--keep-data] [--data-dir <path>]',
+        'Usage: run-community-showroom.cmd [--keep-data] [--data-dir <path>] [--resources-from <path>]',
         '',
         '  --keep-data       Keep the disposable showroom directory after exit.',
         '  --data-dir <path> Use an explicit directory and never remove it automatically.',
+        '  --resources-from  Read block models and textures from an existing AG Launcher game-data directory.',
         '  --verify          Open, verify the catalog, then close automatically.',
         '  --help            Show this help.'
     ].join('\n')
 }
 
 function parseArguments(argv) {
-    const options = { keepData: false, dataDirectory: null, verify: false, help: false }
+    const options = { keepData: false, dataDirectory: null, resourceDataDirectory: null, verify: false, help: false }
     for(let index = 0; index < argv.length; index += 1) {
         const argument = argv[index]
         if(argument === '--keep-data') options.keepData = true
@@ -31,6 +32,11 @@ function parseArguments(argv) {
             options.dataDirectory = path.resolve(value)
             options.keepData = true
             index += 1
+        } else if(argument === '--resources-from') {
+            const value = argv[index + 1]
+            if(!value || value.startsWith('--')) throw new Error('--resources-from requires a path.')
+            options.resourceDataDirectory = path.resolve(value)
+            index += 1
         } else throw new Error(`Unknown argument: ${argument}`)
     }
     return options
@@ -38,6 +44,17 @@ function parseArguments(argv) {
 
 async function waitForApplicationClose(application) {
     await new Promise(resolve => application.once('close', resolve))
+}
+
+async function waitForAttribute(locator, name, expected, timeoutMs = 20_000) {
+    const deadline = Date.now() + timeoutMs
+    let value = null
+    while(Date.now() < deadline) {
+        value = await locator.getAttribute(name)
+        if(value === expected) return value
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    throw new Error(`Timed out waiting for ${name}=${expected}; received ${value || 'unset'}.`)
 }
 
 async function run(argv = process.argv.slice(2)) {
@@ -53,7 +70,8 @@ async function run(argv = process.argv.slice(2)) {
     }
     const runtime = await createShowroomEnvironment({
         appDirectory,
-        ...(options.dataDirectory ? { rootDirectory: options.dataDirectory } : {})
+        ...(options.dataDirectory ? { rootDirectory: options.dataDirectory } : {}),
+        ...(options.resourceDataDirectory ? { resourceDataDirectory: options.resourceDataDirectory } : {})
     })
     let application = null
     let shuttingDown = false
@@ -77,6 +95,7 @@ async function run(argv = process.argv.slice(2)) {
         console.log(`  API:      ${runtime.apiBaseUrl}`)
         console.log(`  Data:     ${runtime.rootDirectory}`)
         console.log(`  Instance: ${runtime.instanceRoot}`)
+        console.log(`  Resources:${runtime.resourceDataDirectory ? ` ${runtime.resourceDataDirectory}` : ' palette fallback'}`)
         console.log(`  Cleanup:  ${options.keepData ? 'preserved after exit' : 'automatic after exit'}`)
         console.log('  Safety:   publishing and game launch are disabled')
         console.log('')
@@ -87,12 +106,23 @@ async function run(argv = process.argv.slice(2)) {
             env: runtime.environment
         })
         const page = await application.firstWindow()
+        const rendererErrors = []
+        page.on('pageerror', error => rendererErrors.push(error?.message || String(error)))
         await page.waitForLoadState('domcontentloaded')
         await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 20_000 })
         await page.locator('#shellNavCommunity').click()
         await page.locator('.schematicCard').first().waitFor({ state: 'visible', timeout: 10_000 })
         console.log(`Showroom ready with ${runtime.entries.length} representative creations.`)
         if(options.verify) {
+            if(runtime.resourceDataDirectory) {
+                const schematicCard = page.locator('.schematicCard[data-community-key^="schematics:"]').first()
+                await schematicCard.locator('.schematicPreview').click()
+                const detailPreview = page.locator('#schematicsDetailPreview')
+                await detailPreview.waitFor({ state: 'visible', timeout: 10_000 })
+                await waitForAttribute(detailPreview, 'data-texture-source', 'resources')
+                console.log('Verified Minecraft block models and textures from the read-only resource source.')
+            }
+            if(rendererErrors.length > 0) throw new Error(`Renderer error during showroom verification: ${rendererErrors[0]}`)
             await application.close()
             application = null
             console.log('Showroom verification completed successfully.')
@@ -116,4 +146,4 @@ if(require.main === module) {
     })
 }
 
-module.exports = { parseArguments, run, usage, waitForApplicationClose }
+module.exports = { parseArguments, run, usage, waitForApplicationClose, waitForAttribute }
