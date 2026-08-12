@@ -53,7 +53,47 @@ function prepare(apiBase, options = {}) {
     return build
 }
 
-function buildInstaller(apiBase) {
+function verifyOutput(apiBase, build, options = {}) {
+    const targetOutputRoot = options.outputRoot ? path.resolve(options.outputRoot) : outputRoot
+    const testerRoot = path.join(targetOutputRoot, 'win-unpacked', 'resources', 'tester')
+    const channelPath = path.join(testerRoot, 'tester-channel.json')
+    const bootstrapPath = path.join(testerRoot, build.channel.bootstrapDistribution)
+    const installerPath = path.join(
+        targetOutputRoot,
+        `AG-Launcher-Test-setup-${build.launcherVersion}.exe`
+    )
+    const executablePath = path.join(targetOutputRoot, 'win-unpacked', 'AG Launcher.exe')
+
+    for(const requiredPath of [channelPath, bootstrapPath, executablePath, installerPath]) {
+        if(!fs.existsSync(requiredPath)) {
+            throw new Error(`Channel build is incomplete: ${requiredPath} is missing`)
+        }
+    }
+
+    const channel = JSON.parse(fs.readFileSync(channelPath, 'utf8'))
+    const expectedDistributionUrl = `${apiBase}/v1/releases/channels/${encodeURIComponent(build.channel.channel)}/distribution`
+    if(channel.schemaVersion !== 2 || channel.id !== build.channel.id) {
+        throw new Error('Packaged tester-channel.json does not match the configured schema or channel ID')
+    }
+    if(channel.remoteDistributionUrl !== expectedDistributionUrl) {
+        throw new Error(`Packaged channel URL is invalid: expected ${expectedDistributionUrl}`)
+    }
+
+    const bootstrap = JSON.parse(fs.readFileSync(bootstrapPath, 'utf8'))
+    const profile = Array.isArray(bootstrap.servers)
+        ? bootstrap.servers.find(server => server.id === build.profileId)
+        : null
+    if(profile == null) {
+        throw new Error(`Packaged bootstrap distribution is missing ${build.profileId}`)
+    }
+    if(fs.statSync(installerPath).size === 0) {
+        throw new Error(`Channel installer is empty: ${installerPath}`)
+    }
+
+    return { installerPath, executablePath, channelPath, bootstrapPath }
+}
+
+function buildInstaller(apiBase, build) {
     const node = process.execPath
     const cli = path.join(root, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js')
     const toolDirectory = path.join(root, 'dist', 'channel-tools')
@@ -80,14 +120,16 @@ function buildInstaller(apiBase) {
             'utf8'
         )
     }
+    return verifyOutput(apiBase, build)
 }
 
 function main() {
     const args = parseArgs(process.argv)
     const apiBase = validateApiBase(args['api-url'] || process.env.COBBLEPOWER_API_BASE_URL || '')
     const build = prepare(apiBase)
-    if(!args['prepare-only']) buildInstaller(apiBase)
+    const output = args['prepare-only'] ? null : buildInstaller(apiBase, build)
     console.log(`Prepared authenticated channel launcher ${build.launcherVersion} for ${apiBase}`)
+    if(output != null) console.log(`Verified installer: ${output.installerPath}`)
 }
 
 if(require.main === module) {
@@ -97,4 +139,4 @@ if(require.main === module) {
     }
 }
 
-module.exports = { parseArgs, prepare, validateApiBase }
+module.exports = { parseArgs, prepare, validateApiBase, verifyOutput }

@@ -1,4 +1,15 @@
 function initSchematics(){
+    if(!schematicsRouteListenerBound){
+        window.addEventListener('helios:shell-route-change', (event) => {
+            if(event.detail?.route !== 'community'){
+                if(schematicsScroll) schematicsState.scrollTop = schematicsScroll.scrollTop
+                cancelSchematicsRouteWork()
+            } else if(schematicsScroll){
+                requestAnimationFrame(() => { schematicsScroll.scrollTop = schematicsState.scrollTop || 0 })
+            }
+        })
+        schematicsRouteListenerBound = true
+    }
     if(!schematicsGrid){
         return
     }
@@ -10,16 +21,12 @@ function initSchematics(){
         }
         const entry = getSchematicById(card.getAttribute('data-schematic-id'))
         if(entry){
-            openSchematicDetail(entry)
+            const definition = communityContentRegistry?.get(entry.communityType || 'schematics')
+            definition?.openDetail(entry, { openSchematicDetail })
         }
     })
-    resolveSchematicsServiceConfig().then((service) => {
-        if(schematicsCategorySelect){
-            const collectionsOption = schematicsCategorySelect.querySelector('option[value="collections"]')
-            if(collectionsOption) collectionsOption.hidden = !service.features.collections
-            if(!service.features.collections && schematicsCategorySelect.value === 'collections') schematicsCategorySelect.value = 'schematics'
-        }
-        if(schematicsDetailAddToCollection) schematicsDetailAddToCollection.hidden = !service.features.collections
+    resolveSchematicsServiceConfig().then(() => {
+        if(schematicsDetailAddToCollection) schematicsDetailAddToCollection.hidden = true
         if(schematicsUploadVisibility){
             schematicsUploadVisibility.value = 'public'
             schematicsUploadVisibility.disabled = true
@@ -107,12 +114,12 @@ function initSchematics(){
     if(schematicsCreatorClose){
         schematicsCreatorClose.addEventListener('click', closeCreatorPanel)
     }
-    if(schematicsCategorySelect){
-        schematicsCategorySelect.addEventListener('change', () => {
-            setContentTab(schematicsCategorySelect.value)
-        })
-    }
     setCommunitySection('content', { skipFetch: true })
+    setCommunityCategory(schematicsState.category || 'all', { skipFetch: true })
+    communityCategoryFilters?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-community-category]')
+        if(button && !button.hidden) setCommunityCategory(button.dataset.communityCategory)
+    })
     if(schematicsCollectionsSearchInput){
         schematicsCollectionsSearchInput.addEventListener('input', scheduleCollectionsBrowseFetch)
     }
@@ -225,6 +232,10 @@ function initSchematics(){
         if(event.key !== 'Escape'){
             return
         }
+        if(communityPublishPicker?.getAttribute('data-open') === 'true'){
+            closeCommunityPublishPicker()
+            return
+        }
         if(schematicsEditOpen){
             closeSchematicEdit()
             return
@@ -335,8 +346,10 @@ function initSchematics(){
         schematicsInstalledScrim.addEventListener('click', closeInstalledPanel)
     }
     if(schematicsUploadButton){
-        schematicsUploadButton.addEventListener('click', () => openSchematicUpload())
+        schematicsUploadButton.addEventListener('click', openCommunityPublisher)
     }
+    communityPublishPickerClose?.addEventListener('click', closeCommunityPublishPicker)
+    communityPublishPickerScrim?.addEventListener('click', closeCommunityPublishPicker)
     if(schematicsUploadClose){
         schematicsUploadClose.addEventListener('click', closeSchematicUpload)
     }
@@ -390,19 +403,15 @@ function initSchematics(){
     if(schematicsEditRevision){
         schematicsEditRevision.addEventListener('click', openSchematicRevisionUpload)
     }
-    if(schematicsPagePrev){
-        schematicsPagePrev.addEventListener('click', () => {
-            const nextPage = Math.max(1, schematicsState.page - 1)
-            fetchSchematicsList({ query: schematicsSearchInput?.value || '', sortKey: schematicsSortSelect?.value || SCHEMATICS_SORT_DEFAULT, page: nextPage })
-        })
-    }
-    if(schematicsPageNext){
-        schematicsPageNext.addEventListener('click', () => {
-            const total = Number.isFinite(Number(schematicsState.total)) ? Number(schematicsState.total) : 0
-            const pages = Math.max(1, Math.ceil(total / schematicsState.pageSize))
-            const nextPage = Math.min(pages, schematicsState.page + 1)
-            fetchSchematicsList({ query: schematicsSearchInput?.value || '', sortKey: schematicsSortSelect?.value || SCHEMATICS_SORT_DEFAULT, page: nextPage })
-        })
+    communityLoadMoreButton?.addEventListener('click', () => fetchSchematicsList({ append: true }))
+    schematicsScroll?.addEventListener('scroll', scheduleCommunityProgressiveLoad, { passive: true })
+    if(communityLoadSentinel && 'IntersectionObserver' in window){
+        const observer = new IntersectionObserver((entries) => {
+            if(entries.some(entry => entry.isIntersecting) && schematicsActive && schematicsState.nextCursor){
+                fetchSchematicsList({ append: true })
+            }
+        }, { root: schematicsScroll || null, rootMargin: '240px 0px' })
+        observer.observe(communityLoadSentinel)
     }
 
     updateSchematicsAdminVisibility()

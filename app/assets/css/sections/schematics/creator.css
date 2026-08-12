@@ -1,6 +1,5 @@
 #schematicsSearchInput,
 #schematicsSortSelect,
-#schematicsCategorySelect,
 #schematicsCollectionsSearchInput,
 #schematicsCollectionsSortSelect,
 #schematicsTagsInput,
@@ -26,7 +25,6 @@
 }
 #schematicsSearchInput:focus,
 #schematicsSortSelect:focus,
-#schematicsCategorySelect:focus,
 #schematicsCollectionsSearchInput:focus,
 #schematicsCollectionsSortSelect:focus,
 #schematicsDifficultySelect:focus,

@@ -84,7 +84,7 @@ function populateSchematicEditForm(entry){
     if(schematicsEditSubmit){
         schematicsEditSubmit.disabled = false
     }
-    updateSchematicEditStatus('Update fields and save your changes.', 'info')
+    updateSchematicEditStatus(communityCopy('readyToEdit'), 'info')
     renderSchematicEditSummary(entry)
 }
 
@@ -127,13 +127,13 @@ async function submitSchematicEdit(){
         return
     }
     if(!schematicsEditEntry?.id){
-        updateSchematicEditStatus('No schematic selected for editing.', 'error')
+        updateSchematicEditStatus(communityCopy('noEditSelection'), 'error')
         return
     }
 
     const name = schematicsEditNameInput?.value?.trim()
     if(!name){
-        updateSchematicEditStatus('Please provide a title for the schematic.', 'error')
+        updateSchematicEditStatus(communityCopy('titleRequired'), 'error')
         return
     }
 
@@ -149,7 +149,7 @@ async function submitSchematicEdit(){
     if(schematicsEditSubmit){
         schematicsEditSubmit.disabled = true
     }
-    updateSchematicEditStatus('Saving changes...', 'info')
+    updateSchematicEditStatus(communityCopy('savingChanges'), 'info')
 
     try {
         const updated = await saveSchematicEdits(schematicsEditEntry, payload)
@@ -160,7 +160,7 @@ async function submitSchematicEdit(){
         openSchematicDetail(updated)
     } catch (err) {
         loggerLanding.warn('Failed to save schematic edits.', err)
-        updateSchematicEditStatus('Unable to save changes. Please try again.', 'error')
+        updateSchematicEditStatus(communityCopy('saveFailed'), 'error')
     } finally {
         schematicsEditSubmitting = false
         if(schematicsEditSubmit){
@@ -171,7 +171,7 @@ async function submitSchematicEdit(){
 
 function openSchematicRevisionUpload(){
     if(!schematicsEditEntry?.id){
-        updateSchematicEditStatus('No schematic selected for revision.', 'error')
+        updateSchematicEditStatus(communityCopy('noRevisionSelection'), 'error')
         return
     }
     const target = schematicsEditEntry

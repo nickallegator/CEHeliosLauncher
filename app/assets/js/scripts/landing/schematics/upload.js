@@ -83,12 +83,12 @@ function resetSchematicUpload(){
         schematicsUploadSubmit.disabled = true
     }
     renderSchematicUploadWarnings([])
-    updateSchematicUploadStatus('Select a schematic to begin.', 'info')
+    updateSchematicUploadStatus(communityCopy('selectToBegin'), 'info')
     if(schematicsUploadPreview){
         schematicsUploadPreview.setAttribute('data-rendered', 'false')
     }
-    renderUploadPreviewPlaceholder('Select a schematic to preview.')
-    renderUploadBlockCountsPlaceholder('Select a schematic to see blocks.')
+    renderUploadPreviewPlaceholder(communityCopy('selectToPreview'))
+    renderUploadBlockCountsPlaceholder(communityCopy('selectToSeeBlocks'))
     if(schematicsUploadPreviewTimer){
         clearTimeout(schematicsUploadPreviewTimer)
         schematicsUploadPreviewTimer = null
@@ -101,22 +101,22 @@ async function handleSchematicUploadFile(file){
         return
     }
     if(file.size > SCHEMATICS_UPLOAD_MAX_BYTES){
-        updateSchematicUploadStatus(`File too large (${formatSchematicBytes(file.size)}). Max ${formatSchematicBytes(SCHEMATICS_UPLOAD_MAX_BYTES)}.`, 'error')
+        updateSchematicUploadStatus(communityCopy('fileTooLarge', { size: formatSchematicBytes(file.size), maximum: formatSchematicBytes(SCHEMATICS_UPLOAD_MAX_BYTES) }), 'error')
         if(schematicsUploadSubmit){
             schematicsUploadSubmit.disabled = true
         }
         return
     }
     try {
-        updateSchematicUploadStatus('Reading schematic...', 'info')
+        updateSchematicUploadStatus(communityCopy('readingSchematic'), 'info')
         const text = await file.text()
         const raw = JSON.parse(text)
         const { schematic, canonical, warnings } = await normalizeJsonSchematic(raw, { sourceBytes: file.size })
         if(schematicsUploadPreview){
             schematicsUploadPreview.setAttribute('data-rendered', 'false')
         }
-        renderUploadPreviewPlaceholder('Preparing preview...')
-        renderUploadBlockCountsPlaceholder('Loading block list...')
+        renderUploadPreviewPlaceholder(communityCopy('preparingPreview'))
+        renderUploadBlockCountsPlaceholder(communityCopy('loadingBlockList'))
         schematicsUploadState = {
             file,
             raw,
@@ -145,7 +145,7 @@ async function handleSchematicUploadFile(file){
             schematicsUploadTitleInput.value = schematic.name || file.name.replace(/\.[^/.]+$/, '')
         }
         renderSchematicUploadWarnings(warnings)
-        updateSchematicUploadStatus('Ready to upload.', 'success')
+        updateSchematicUploadStatus(communityCopy('readyToUpload'), 'success')
         if(schematicsUploadSubmit){
             schematicsUploadSubmit.disabled = false
         }
@@ -183,12 +183,12 @@ async function handleSchematicUploadFile(file){
         }, 120)
     } catch (err) {
         loggerLanding.warn('Failed to parse upload schematic.', err)
-        updateSchematicUploadStatus('Unable to parse schematic JSON. Please check the file.', 'error')
+        updateSchematicUploadStatus(communityCopy('unableToParse'), 'error')
         if(schematicsUploadSubmit){
             schematicsUploadSubmit.disabled = true
         }
-        renderUploadPreviewPlaceholder('Preview unavailable.')
-        renderUploadBlockCountsPlaceholder('No block data available.')
+        renderUploadPreviewPlaceholder(communityCopy('previewUnavailable'))
+        renderUploadBlockCountsPlaceholder(communityCopy('noBlockData'))
     }
 }
 
@@ -208,10 +208,10 @@ function openSchematicUpload(targetEntry = null){
         if(schematicsUploadTitleInput) schematicsUploadTitleInput.value = schematicsUploadTargetEntry.name || ''
         if(schematicsUploadDescription) schematicsUploadDescription.value = schematicsUploadTargetEntry.description || ''
         if(schematicsUploadTagsInput) schematicsUploadTagsInput.value = Array.isArray(schematicsUploadTargetEntry.tags) ? schematicsUploadTargetEntry.tags.join(', ') : ''
-        if(schematicsUploadSubmit) schematicsUploadSubmit.textContent = 'Publish Revision'
-        updateSchematicUploadStatus(`Select a replacement file for revision ${Number(schematicsUploadTargetEntry.revision?.number || 0) + 1}.`, 'info')
+        if(schematicsUploadSubmit) schematicsUploadSubmit.textContent = communityCopy('publishRevision')
+        updateSchematicUploadStatus(communityCopy('selectRevision', { revision: Number(schematicsUploadTargetEntry.revision?.number || 0) + 1 }), 'info')
     } else if(schematicsUploadSubmit){
-        schematicsUploadSubmit.textContent = 'Upload'
+        schematicsUploadSubmit.textContent = communityCopy('upload')
     }
     schematicsUploadOpen = true
     openModal(schematicsUpload, schematicsUploadPanel)
@@ -230,23 +230,23 @@ function closeSchematicUpload(){
 
 async function submitSchematicUpload(){
     if(!schematicsUploadState?.normalized){
-        updateSchematicUploadStatus('Please select a schematic before uploading.', 'error')
+        updateSchematicUploadStatus(communityCopy('selectBeforeUpload'), 'error')
         return
     }
     const title = schematicsUploadTitleInput?.value?.trim()
     if(!title){
-        updateSchematicUploadStatus('Please provide a title for the schematic.', 'error')
+        updateSchematicUploadStatus(communityCopy('titleRequired'), 'error')
         return
     }
     const base = await resolveSchematicsApiBase()
     if(!base){
-        updateSchematicUploadStatus('Schematics service is not configured.', 'error')
+        updateSchematicUploadStatus(communityCopy('notConfigured'), 'error')
         return
     }
 
     const file = schematicsUploadState.file
     if(!file){
-        updateSchematicUploadStatus('Missing schematic file data.', 'error')
+        updateSchematicUploadStatus(communityCopy('missingFileData'), 'error')
         return
     }
 
@@ -267,7 +267,7 @@ async function submitSchematicUpload(){
     }
 
     try {
-        updateSchematicUploadStatus('Capturing thumbnails...', 'info')
+        updateSchematicUploadStatus(communityCopy('capturingThumbnails'), 'info')
         let thumbnails = []
         let thumbnailBlobs = []
         const uploadRenderer = ensureUploadPreviewRenderer()
@@ -301,7 +301,7 @@ async function submitSchematicUpload(){
             }
         }
         if(thumbnails.length === 0){
-            updateSchematicUploadStatus('Unable to capture thumbnails. Please try again.', 'error')
+            updateSchematicUploadStatus(communityCopy('unableToCapture'), 'error')
             return
         }
 
@@ -310,7 +310,7 @@ async function submitSchematicUpload(){
             schematicsUploadPreviewTimer = null
         }
         schematicsUploadPreviewTask += 1
-        updateSchematicUploadStatus('Requesting upload slot...', 'info')
+        updateSchematicUploadStatus(communityCopy('requestingUpload'), 'info')
         await ensureSchematicsAuthSession(baseUrl)
         const uploadHash = schematicsUploadState?.normalized?.meta?.hash || null
         const preflightResponse = await fetch(`${baseUrl}/v1/schematics/preflight`, {
@@ -333,9 +333,9 @@ async function submitSchematicUpload(){
             const preflightData = await preflightResponse.json().catch(() => ({}))
             const maxBytes = preflightData?.maxBytes
             if(preflightResponse.status === 413 && maxBytes){
-                updateSchematicUploadStatus(`File too large. Max ${formatSchematicBytes(maxBytes)}.`, 'error')
+                updateSchematicUploadStatus(communityCopy('fileTooLargeMaximum', { maximum: formatSchematicBytes(maxBytes) }), 'error')
             } else {
-                updateSchematicUploadStatus('Unable to start upload. Please try again.', 'error')
+                updateSchematicUploadStatus(communityCopy('unableToStartUpload'), 'error')
             }
             return
         }
@@ -343,7 +343,7 @@ async function submitSchematicUpload(){
         const preflight = await preflightResponse.json()
         const uploadToken = preflight?.token
         if(!uploadToken){
-            updateSchematicUploadStatus('Upload slot unavailable. Please try again.', 'error')
+            updateSchematicUploadStatus(communityCopy('uploadSlotUnavailable'), 'error')
             return
         }
 
@@ -351,7 +351,7 @@ async function submitSchematicUpload(){
         if(preflight?.schematic){
             const uploadSchematic = preflight.schematic
             if(uploadSchematic.uploadUrl){
-                updateSchematicUploadStatus('Uploading schematic...', 'info')
+                updateSchematicUploadStatus(communityCopy('uploadingSchematic'), 'info')
                 const schematicPutResponse = await fetch(uploadSchematic.uploadUrl, {
                     method: 'PUT',
                     headers: {
@@ -360,18 +360,18 @@ async function submitSchematicUpload(){
                     body: file
                 })
                 if(!schematicPutResponse.ok){
-                    updateSchematicUploadStatus('Schematic upload failed. Please try again.', 'error')
+                    updateSchematicUploadStatus(communityCopy('schematicUploadFailed'), 'error')
                     return
                 }
             } else {
-                updateSchematicUploadStatus('Using existing schematic upload...', 'info')
+                updateSchematicUploadStatus(communityCopy('usingExistingUpload'), 'info')
             }
 
             const uploadedThumbs = []
             for(const thumb of preflight.thumbnails || []){
                 const blobEntry = thumbnailBlobs.find(item => item.label === thumb.label && item.mime === thumb.mime)
                 if(!blobEntry?.blob || !thumb.uploadUrl){
-                    updateSchematicUploadStatus('Thumbnail upload failed. Please try again.', 'error')
+                    updateSchematicUploadStatus(communityCopy('thumbnailUploadFailed'), 'error')
                     return
                 }
                 const thumbResponse = await fetch(thumb.uploadUrl, {
@@ -382,7 +382,7 @@ async function submitSchematicUpload(){
                     body: blobEntry.blob
                 })
                 if(!thumbResponse.ok){
-                    updateSchematicUploadStatus('Thumbnail upload failed. Please try again.', 'error')
+                    updateSchematicUploadStatus(communityCopy('thumbnailUploadFailed'), 'error')
                     return
                 }
                 uploadedThumbs.push({
@@ -420,17 +420,17 @@ async function submitSchematicUpload(){
             })
 
             if(!finalizeResponse.ok){
-                updateSchematicUploadStatus('Upload failed. Please check the file and try again.', 'error')
+                updateSchematicUploadStatus(communityCopy('uploadFailedCheckFile'), 'error')
                 return
             }
         } else {
             // Legacy local-storage flow
             const uploadUrl = preflight?.uploadUrl
             if(!uploadUrl){
-                updateSchematicUploadStatus('Upload slot unavailable. Please try again.', 'error')
+                updateSchematicUploadStatus(communityCopy('uploadSlotUnavailable'), 'error')
                 return
             }
-            updateSchematicUploadStatus('Uploading schematic...', 'info')
+            updateSchematicUploadStatus(communityCopy('uploadingSchematic'), 'info')
             const uploadEndpoint = uploadUrl.startsWith('http') ? uploadUrl : `${baseUrl}${uploadUrl}`
             const uploadResponse = await fetch(uploadEndpoint, {
                 method: 'POST',
@@ -455,17 +455,17 @@ async function submitSchematicUpload(){
                 })
             })
             if(!uploadResponse.ok){
-                updateSchematicUploadStatus('Upload failed. Please check the file and try again.', 'error')
+                updateSchematicUploadStatus(communityCopy('uploadFailedCheckFile'), 'error')
                 return
             }
         }
 
-        updateSchematicUploadStatus('Upload complete. Refreshing list...', 'success')
+        updateSchematicUploadStatus(communityCopy('uploadComplete'), 'success')
         await fetchSchematicsList({ query: schematicsState.query, sortKey: schematicsState.sortKey })
         closeSchematicUpload()
     } catch (err) {
         loggerLanding.warn('Failed to upload schematic.', err)
-        updateSchematicUploadStatus('Upload failed due to a network error.', 'error')
+        updateSchematicUploadStatus(communityCopy('networkUploadFailed'), 'error')
     } finally {
         if(schematicsUploadSubmit){
             schematicsUploadSubmit.disabled = false
@@ -475,34 +475,34 @@ async function submitSchematicUpload(){
 
 async function submitSchematicUploadV2(){
     if(!schematicsUploadState?.normalized || !schematicsUploadState?.canonical){
-        updateSchematicUploadStatus('Please select a valid schematic before uploading.', 'error')
+        updateSchematicUploadStatus(communityCopy('selectValidSchematic'), 'error')
         return
     }
     const title = schematicsUploadTitleInput?.value?.trim()
     if(!title){
-        updateSchematicUploadStatus('Please provide a title for the schematic.', 'error')
+        updateSchematicUploadStatus(communityCopy('titleRequired'), 'error')
         return
     }
     const base = await resolveSchematicsApiBase()
     if(!base){
-        updateSchematicUploadStatus('Schematics service is not configured.', 'error')
+        updateSchematicUploadStatus(communityCopy('notConfigured'), 'error')
         return
     }
     if(schematicsUploadSubmit) schematicsUploadSubmit.disabled = true
     try {
         await ensureSchematicsAuthSession(base)
-        if(!AccessGate.getSessionToken()) throw new Error('Sign in with Microsoft before publishing a schematic.')
-        updateSchematicUploadStatus('Capturing preview...', 'info')
+        if(!AccessGate.getSessionToken()) throw new Error(communityCopy('signInToPublish'))
+        updateSchematicUploadStatus(communityCopy('capturingPreview'), 'info')
         const renderer = ensureUploadPreviewRenderer()
-        if(!await waitForRendererMesh(renderer, 4500)) throw new Error('The schematic preview did not finish rendering.')
+        if(!await waitForRendererMesh(renderer, 4500)) throw new Error(communityCopy('previewNotFinished'))
         const size = getUploadThumbnailSizes().medium
         let previewBlob = await capturePreviewBlob(renderer, size.width, size.height, 'image/webp')
         if(!previewBlob || previewBlob.type !== 'image/webp'){
             previewBlob = await capturePreviewBlob(renderer, size.width, size.height, 'image/png')
         }
-        if(!previewBlob) throw new Error('Unable to capture a schematic preview.')
+        if(!previewBlob) throw new Error(communityCopy('previewCaptureFailed'))
 
-        updateSchematicUploadStatus('Requesting secure upload URLs...', 'info')
+        updateSchematicUploadStatus(communityCopy('requestingSecureUrls'), 'info')
         const session = await schematicApiRequest('/v1/schematics/uploads', {
             method: 'POST',
             headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -521,9 +521,9 @@ async function submitSchematicUploadV2(){
             { descriptor: session?.uploads?.schematic, body: schematicBlob },
             { descriptor: session?.uploads?.preview, body: previewBlob }
         ]
-        updateSchematicUploadStatus('Uploading validated source files...', 'info')
+        updateSchematicUploadStatus(communityCopy('uploadingValidatedFiles'), 'info')
         for(const upload of uploads){
-            if(!upload.descriptor?.uploadUrl) throw new Error('The service did not return a complete upload session.')
+            if(!upload.descriptor?.uploadUrl) throw new Error(communityCopy('incompleteUploadSession'))
             const response = await fetch(upload.descriptor.uploadUrl, {
                 method: 'PUT',
                 headers: { 'Content-Type': upload.descriptor.mime },
@@ -531,7 +531,7 @@ async function submitSchematicUploadV2(){
             })
             if(!response.ok) throw new Error(`R2 upload failed with HTTP ${response.status}.`)
         }
-        updateSchematicUploadStatus('Validating and publishing...', 'info')
+        updateSchematicUploadStatus(communityCopy('validatingPublishing'), 'info')
         const published = await schematicApiRequest(`/v1/schematics/uploads/${encodeURIComponent(session.token)}/finalize`, {
             method: 'POST',
             headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -539,7 +539,7 @@ async function submitSchematicUploadV2(){
         })
         const removed = Number(published?.sanitization?.blockEntityNbtRemoved || 0)
         updateSchematicUploadStatus(
-            removed > 0 ? `Published safely. Removed block-entity NBT from ${removed} blocks.` : 'Upload published successfully.',
+            removed > 0 ? communityCopy('publishedSanitized', { count: removed }) : communityCopy('published'),
             'success'
         )
         SCHEMATIC_DETAIL_CACHE.clear()
@@ -547,7 +547,7 @@ async function submitSchematicUploadV2(){
         closeSchematicUpload()
     } catch(err) {
         loggerLanding.warn('Failed to publish schematic.', { message: String(err?.message || err).replace(/https?:\/\/[^\s]+/g, '[redacted-url]') })
-        updateSchematicUploadStatus(err?.message || 'Upload failed due to a network error.', 'error')
+        updateSchematicUploadStatus(err?.message || communityCopy('networkUploadFailed'), 'error')
     } finally {
         if(schematicsUploadSubmit) schematicsUploadSubmit.disabled = false
     }

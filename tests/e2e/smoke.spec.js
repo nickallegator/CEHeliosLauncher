@@ -26,7 +26,7 @@ test('launcher smoke: schematics community flows', async () => {
     }
     await communityTrigger.click()
 
-    await expect(page.getByText(/schematics library/i)).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('[data-community-category="all"]')).toBeVisible({ timeout: 15000 })
 
     const grid = page.locator('#schematicsGrid')
     await expect(grid).toBeVisible({ timeout: 15000 })

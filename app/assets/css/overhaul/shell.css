@@ -1,0 +1,249 @@
+#appShell {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    grid-template-columns: var(--workshop-nav-width) minmax(0, 1fr);
+    background: transparent;
+}
+
+#appShellNavigation {
+    position: relative;
+    z-index: 1000;
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    padding: 14px 12px 12px;
+    border-right: 1px solid var(--workshop-line);
+    background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 7px),
+        linear-gradient(180deg, #1a2926, #101817);
+    box-shadow: 9px 0 24px rgba(0, 0, 0, 0.25);
+    box-sizing: border-box;
+}
+
+#appShellNavigation::after {
+    position: absolute;
+    right: -4px;
+    width: 7px;
+    height: 100%;
+    top: 0;
+    background: repeating-linear-gradient(180deg, transparent 0 18px, rgba(255, 102, 0, 0.4) 18px 20px, transparent 20px 38px);
+    content: '';
+    opacity: 0.24;
+    pointer-events: none;
+}
+
+.shellBrandButton {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-height: 82px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.shellBrandButton:hover { background: rgba(135, 222, 205, 0.035); }
+#image_seal {
+    display: block;
+    width: min(100%, 156px) !important;
+    height: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    filter: none !important;
+    object-fit: contain;
+}
+
+.shellBrandButton[update]::after {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--workshop-copper);
+    box-shadow: 0 0 0 3px rgba(255, 102, 0, .14);
+    content: '';
+}
+
+#shellPrimaryNavigation {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 24px;
+}
+
+.shellNavItem,
+.shellUtilityButton,
+.shellAccountButton {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-height: 42px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 11px;
+    border: 1px solid transparent;
+    border-radius: var(--workshop-radius-small);
+    background: transparent;
+    color: var(--workshop-text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+    transition: color var(--workshop-transition-fast), border-color var(--workshop-transition-fast), background var(--workshop-transition-fast), transform var(--workshop-transition-fast);
+}
+
+#avatarOverlay.shellAccountButton {
+    position: relative !important;
+    z-index: auto !important;
+    display: flex !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 54px;
+    justify-content: flex-start !important;
+    opacity: 1 !important;
+    border: 1px solid var(--workshop-line) !important;
+    border-radius: var(--workshop-radius-small) !important;
+    background: rgba(0, 0, 0, 0.16) !important;
+    letter-spacing: normal !important;
+}
+
+.shellNavItem svg,
+.shellUtilityButton svg {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    fill: currentColor;
+}
+
+.shellNavItem:hover,
+.shellUtilityButton:hover,
+.shellAccountButton:hover {
+    border-color: var(--workshop-line);
+    background: rgba(135, 222, 205, 0.055);
+    color: var(--workshop-text);
+    transform: translateX(1px);
+}
+
+.shellNavItem[aria-current="page"],
+.shellUtilityButton[aria-current="page"] {
+    border-color: rgba(135, 222, 205, 0.42);
+    background: linear-gradient(90deg, rgba(55, 200, 171, 0.18), rgba(55, 200, 171, 0.035));
+    color: var(--workshop-mint);
+    box-shadow: inset 3px 0 var(--workshop-copper);
+}
+
+.shellNavBadge {
+    position: absolute;
+    top: 7px;
+    left: 28px;
+    width: 7px;
+    height: 7px;
+    border: 2px solid var(--workshop-deep);
+    border-radius: 50%;
+    background: var(--workshop-copper);
+}
+
+#shellNavigationFooter {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: auto;
+}
+
+#shellServiceSummary {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 11px;
+    color: var(--workshop-text-muted);
+    font-size: 12px;
+}
+
+#mojang_status_icon { font-size: 24px !important; line-height: 12px; }
+#shellServiceSummary:hover #mojangStatusTooltip { display: block; opacity: 1; }
+
+#mojangStatusTooltip {
+    right: auto !important;
+    bottom: 38px !important;
+    left: 8px !important;
+    width: 260px !important;
+    border: 1px solid var(--workshop-line) !important;
+    border-radius: var(--workshop-radius) !important;
+    background: var(--workshop-surface-raised) !important;
+    box-shadow: var(--workshop-shadow) !important;
+}
+
+#shellLinks { position: relative; }
+#shellLinksMenu {
+    position: absolute;
+    z-index: 1100;
+    bottom: 44px;
+    left: 5px;
+    display: grid;
+    width: 158px;
+    padding: 7px;
+    border: 1px solid var(--workshop-line);
+    border-radius: var(--workshop-radius);
+    background: var(--workshop-surface-raised);
+    box-shadow: var(--workshop-shadow);
+}
+
+#shellLinksMenu a {
+    padding: 8px 9px;
+    border-radius: 3px;
+    color: var(--workshop-text-muted);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+#shellLinksMenu a:hover { background: var(--workshop-surface-soft); color: var(--workshop-mint); }
+
+.shellAccountButton {
+    min-height: 54px;
+    padding: 7px;
+    border-color: var(--workshop-line);
+    background: rgba(0, 0, 0, 0.16);
+}
+
+#avatarContainer {
+    display: block;
+    width: 38px !important;
+    height: 38px !important;
+    flex: 0 0 38px;
+    border: 1px solid var(--workshop-line-strong);
+    border-radius: 3px !important;
+    background-color: var(--workshop-deep);
+    background-position: center 18% !important;
+    background-size: 66px auto !important;
+}
+
+.shellAccountCopy { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; }
+.shellAccountCopy small { color: var(--workshop-text-muted); font-size: 10px; }
+.shellAccountCopy strong { overflow: hidden; color: var(--workshop-text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+#user_text {
+    position: static !important;
+    right: auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100%;
+    letter-spacing: normal !important;
+    text-align: left !important;
+    text-shadow: none !important;
+}
+
+#appShellViewport {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.legacyRouteActions { display: none !important; }

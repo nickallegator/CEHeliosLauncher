@@ -1,8 +1,9 @@
-appId: 'helioslauncher'
-productName: 'Helios Launcher'
-artifactName: '${productName}-setup-${version}.${ext}'
+appId: 'net.allegator.games.launcher'
+productName: 'Allegator Games Launcher'
+executableName: 'AG Launcher'
+artifactName: 'AG-Launcher-setup-${version}.${ext}'
 
-copyright: 'Copyright © 2018-2026 Daniel Scalzi'
+copyright: 'Copyright © 2026 Allegator Games'
 
 asar: true
 compression: 'maximum'
@@ -11,12 +12,14 @@ files:
   # Development, publishing, backend, and secret-bearing files must never be
   # embedded in a launcher installer.
   - '!{dist,.gitignore,.vscode,.github,docs,backend,tests,scripts,packs,patches,deps,dev-app-update.yml,.nvmrc,eslint.config.mjs}'
+  - '!build/branding'
 
 extraResources:
   - 'libraries'
 
 # Windows Configuration
-win: 
+win:
+  icon: 'build/icon.ico'
   target: 
     - target: 'nsis'
       arch: 'x64'
@@ -27,24 +30,29 @@ nsis:
   perMachine: false
   allowElevation: true
   allowToChangeInstallationDirectory: true
+  installerIcon: 'build/icon.ico'
+  uninstallerIcon: 'build/icon.ico'
+  installerHeaderIcon: 'build/icon.ico'
 
 # macOS Configuration
 mac:
+  icon: 'build/icon.icns'
   target:
     - target: 'dmg'
       arch:
         - 'x64'
         - 'arm64'
-  artifactName: '${productName}-setup-${version}-${arch}.${ext}'
+  artifactName: 'AG-Launcher-setup-${version}-${arch}.${ext}'
   category: 'public.app-category.games'
 
 # Linux Configuration
-linux: 
+linux:
+  icon: 'build/icon.png'
   target: 'AppImage'
-  maintainer: 'Daniel Scalzi'
-  vendor: 'Daniel Scalzi'
-  synopsis: 'Modded Minecraft Launcher'
-  description: 'Custom launcher which allows users to join modded servers. All mods, configurations, and updates are handled automatically.'
+  maintainer: 'Allegator Games'
+  vendor: 'Allegator Games'
+  synopsis: 'Allegator Games Launcher'
+  description: 'Managed launcher for Allegator Games modpacks, community content, and updates.'
   category: 'Game'
 
 

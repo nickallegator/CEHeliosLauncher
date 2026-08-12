@@ -79,7 +79,7 @@ if(!isDev && !testerBuild){
                 loggerAutoUpdater.info('New update available', info.version)
                 
                 if(process.platform === 'darwin'){
-                    info.darwindownload = `https://github.com/dscalzi/HeliosLauncher/releases/download/v${info.version}/Helios-Launcher-setup-${info.version}${process.arch === 'arm64' ? '-arm64' : '-x64'}.dmg`
+                    info.darwindownload = `https://github.com/nickallegator/CEHeliosLauncher/releases/download/v${info.version}/AG-Launcher-setup-${info.version}${process.arch === 'arm64' ? '-arm64' : '-x64'}.dmg`
                     showUpdateUI(info)
                 }
                 
@@ -227,17 +227,7 @@ function initCompleteUI(){
     }
     completeUIInitialized = true
 
-    //266.01
-    //170.8
-    //53.21
-    // Bind progress bar length to length of bot wrapper
-    //const targetWidth = document.getElementById("launch_content").getBoundingClientRect().width
-    //const targetWidth2 = document.getElementById("server_selection").getBoundingClientRect().width
-    //const targetWidth3 = document.getElementById("launch_button").getBoundingClientRect().width
-    document.getElementById('launch_details').style.maxWidth = 266.01
-    document.getElementById('launch_progress').style.width = 170.8
-    document.getElementById('launch_details_right').style.maxWidth = 170.8
-    document.getElementById('launch_progress_label').style.width = 53.21
+    document.body.setAttribute('data-renderer-ready', 'true')
 }
 
 function handleReadyState(){

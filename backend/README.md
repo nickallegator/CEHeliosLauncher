@@ -1,4 +1,4 @@
-# CEHelios Backend
+# Allegator Games Launcher Backend
 
 Shared Node 22/PostgreSQL backend for authenticated launcher releases and the optional public schematic community. Releases and schematics have independent feature flags, health dependencies, R2 buckets, and credentials.
 
@@ -76,6 +76,8 @@ Authentication and access:
 Schematic reads are public; mutations require a Minecraft backend session:
 
 - `GET /v1/schematics/capabilities`
+- `GET /v1/community/capabilities`
+- `GET /v1/community/catalog?category=all|schematics&sort=popular|recent&limit=<n>&cursor=<opaque>`
 - `GET /v1/schematics` and `GET /v1/schematics/:id`
 - `POST /v1/schematics/uploads`
 - `POST /v1/schematics/uploads/:token/finalize`
@@ -87,4 +89,6 @@ Schematic reads are public; mutations require a Minecraft backend session:
 - `/v1/schematics/admin/*` plus hide/restore/delete moderation
 - Legacy `preflight` and `upload/:token` endpoints temporarily adapt to the v2 pipeline
 
-Collections remain unmounted unless `SCHEMATICS_COLLECTIONS_ENABLED=true`. Creator-profile UI remains disabled unless its independent feature flag is enabled.
+The Community catalog is a read-only provider facade; existing schematic routes remain the source of type-specific details and mutations. Public catalog responses use ETags and stable cursor ordering. Personalized `mine=true` responses require a backend session and are never publicly cacheable.
+
+Collections remain unmounted unless `SCHEMATICS_COLLECTIONS_ENABLED=true`. Their API/data is preserved, but the launcher intentionally hides Collection and Creator-profile navigation until a future cross-type Community destination is enabled.

@@ -1,0 +1,232 @@
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--workshop-ink);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+    font-family: 'Atkinson Hyperlegible', sans-serif;
+}
+
+body {
+    color: var(--workshop-text);
+    background-color: var(--workshop-deep) !important;
+    background-image:
+        linear-gradient(rgba(135, 222, 205, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(135, 222, 205, 0.025) 1px, transparent 1px),
+        radial-gradient(circle at 70% 15%, rgba(55, 200, 171, 0.11), transparent 34%),
+        linear-gradient(135deg, #101817, #0b1110) !important;
+    background-size: 24px 24px, 24px 24px, 100% 100%, 100% 100% !important;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+    box-sizing: border-box;
+}
+
+button {
+    color: inherit;
+}
+
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--workshop-focus) !important;
+    outline-offset: 2px !important;
+}
+
+button:disabled {
+    cursor: not-allowed !important;
+    filter: saturate(0.3);
+    opacity: 0.55;
+}
+
+* {
+    scrollbar-color: var(--workshop-line-strong) var(--workshop-deep);
+    scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: var(--workshop-deep);
+}
+
+*::-webkit-scrollbar-thumb {
+    border: 2px solid var(--workshop-deep);
+    border-radius: 5px;
+    background: var(--workshop-line-strong);
+}
+
+#main {
+    top: var(--workshop-frame-height);
+    height: calc(100% - var(--workshop-frame-height)) !important;
+    overflow: hidden;
+}
+
+#main[overlay] {
+    filter: none !important;
+}
+
+.workshopEyebrow {
+    display: block;
+    color: var(--workshop-mint);
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    line-height: 1.1;
+    text-transform: uppercase;
+}
+
+.workshopPanel {
+    position: relative;
+    border: 1px solid var(--workshop-line);
+    border-radius: var(--workshop-radius);
+    background:
+        linear-gradient(135deg, rgba(135, 222, 205, 0.045), transparent 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 45%),
+        var(--workshop-surface);
+    box-shadow: var(--workshop-shadow-soft), inset 0 0 0 1px rgba(0, 0, 0, 0.24);
+}
+
+.workshopPanel::before,
+.workshopPanel::after {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border: 1px solid rgba(255, 163, 102, 0.48);
+    border-radius: 50%;
+    background: var(--workshop-copper-dark);
+    box-shadow: inset 0 0 0 1px rgba(255, 163, 102, 0.18);
+    content: '';
+}
+
+.workshopPanel::before { top: 8px; left: 8px; }
+.workshopPanel::after { right: 8px; bottom: 8px; }
+
+.workshopButton {
+    min-height: 38px;
+    padding: 8px 15px;
+    border: 1px solid var(--workshop-line-strong);
+    border-radius: var(--workshop-radius-small);
+    background: var(--workshop-surface-soft);
+    color: var(--workshop-text);
+    cursor: pointer;
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    transition: border-color var(--workshop-transition-fast), background var(--workshop-transition-fast), transform var(--workshop-transition-fast);
+}
+
+.workshopButton:hover {
+    border-color: var(--workshop-mint);
+    background: #2b403c;
+    transform: translateY(-1px);
+}
+
+.workshopButton.primary {
+    border-color: var(--workshop-copper-light);
+    background: linear-gradient(180deg, #ff7418, var(--workshop-copper));
+    color: #1a0b02;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(255, 102, 0, 0.2);
+}
+
+.panelChip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 3px 9px;
+    border: 1px solid var(--workshop-line);
+    border-radius: 99px;
+    background: rgba(11, 17, 16, 0.68);
+    color: var(--workshop-text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.panelChip[data-state="online"] { border-color: rgba(114, 212, 158, 0.55); color: var(--workshop-success); }
+.panelChip[data-state="offline"] { border-color: rgba(242, 190, 99, 0.55); color: var(--workshop-warning); }
+
+.itemSlot {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    border: 2px solid #0a100f;
+    border-right-color: var(--workshop-line-strong);
+    border-bottom-color: var(--workshop-line-strong);
+    border-radius: 3px;
+    background: #111a18;
+    box-shadow: inset 0 0 0 1px #263a36;
+}
+
+.itemSlot img,
+.itemSlot svg {
+    width: 34px;
+    height: 34px;
+    fill: var(--workshop-mint);
+}
+
+.routeHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.routeHeader h1 {
+    margin: 5px 0 6px;
+    color: var(--workshop-text);
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: clamp(29px, 3.2vw, 43px);
+    font-weight: 650;
+    line-height: 0.98;
+}
+
+.routeHeader p {
+    max-width: 650px;
+    margin: 0;
+    color: var(--workshop-text-muted);
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

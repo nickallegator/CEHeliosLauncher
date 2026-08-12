@@ -1,14 +1,14 @@
 extends: './electron-builder.yml'
 
-appId: 'net.allegator.cobblepower.launcher.test'
-productName: 'Cobble Power Test Launcher'
-executableName: 'Cobble Power Test Launcher'
-artifactName: 'Cobble-Power-Test-Launcher-setup-${version}.${ext}'
-copyright: 'Copyright © 2026 Allegator'
+appId: 'net.allegator.games.launcher'
+productName: 'Allegator Games Launcher'
+executableName: 'AG Launcher'
+artifactName: 'AG-Launcher-Standalone-Test-setup-${version}.${ext}'
+copyright: 'Copyright © 2026 Allegator Games'
 
 extraMetadata:
   version: '2.2.1-test.4'
-  productName: 'Cobble Power Test Launcher'
+  productName: 'Allegator Games Launcher'
 
 extraResources:
   - from: 'dist/tester-staging/tester'

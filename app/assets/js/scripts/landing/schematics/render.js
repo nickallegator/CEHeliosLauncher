@@ -59,17 +59,16 @@ function createSchematicCard(entry){
     const metaRow = document.createElement('div')
     metaRow.className = 'schematicMetaRow'
 
-    const creator = document.createElement(schematicsFeatureEnabled('creators') ? 'button' : 'span')
-    if(creator.tagName === 'BUTTON') creator.type = 'button'
+    const creator = document.createElement('button')
+    creator.type = 'button'
     creator.className = 'schematicCreatorButton'
     creator.textContent = `by ${entry.creator}`
-    if(schematicsFeatureEnabled('creators')){
-        creator.addEventListener('click', (event) => {
-            event.stopPropagation()
-            event.preventDefault()
-            openCreatorPanel(entry.creator)
-        })
-    }
+    creator.addEventListener('click', (event) => {
+        event.stopPropagation()
+        event.preventDefault()
+        if(schematicsCreatorInput) schematicsCreatorInput.value = entry.creator || ''
+        fetchSchematicsList({ page: 1 })
+    })
 
     metaRow.appendChild(creator)
     const userId = getCurrentUserId()
@@ -78,7 +77,7 @@ function createSchematicCard(entry){
         const edit = document.createElement('button')
         edit.type = 'button'
         edit.className = 'schematicCreatorButton schematicEditButton'
-        edit.textContent = 'Edit'
+        edit.textContent = communityCopy('edit')
         edit.addEventListener('click', (event) => {
             event.stopPropagation()
             event.preventDefault()
@@ -97,7 +96,7 @@ function createSchematicCard(entry){
         const status = schematicsInstallManager && account?.uuid
             ? schematicsInstallManager.status(ConfigManager.getSelectedServer(), account.uuid, entry).state
             : 'installed'
-        installedBadge.textContent = status === 'update' ? 'Update available' : (status === 'repair' ? 'Repair needed' : 'Installed')
+        installedBadge.textContent = status === 'update' ? communityCopy('updateAvailable') : (status === 'repair' ? communityCopy('repairNeeded') : communityCopy('installed'))
         details.appendChild(installedBadge)
     }
     details.appendChild(metaRow)
@@ -106,7 +105,7 @@ function createSchematicCard(entry){
     if(entry.release){
         const release = document.createElement('span')
         release.className = 'schematicRelease'
-        release.textContent = `Released ${formatSchematicDate(entry.release)}`
+        release.textContent = communityCopy('released', { date: formatSchematicDate(entry.release) })
         details.appendChild(release)
     }
     card.appendChild(preview)
@@ -158,7 +157,7 @@ function renderBlockCountsPlaceholder(message, totalText = '--'){
 function formatModNamespaceLabel(namespace){
     const key = normalizeNamespace(namespace)
     if(!key){
-        return 'Unknown Mod'
+        return communityCopy('unknownMod')
     }
     return key
         .replace(/[_-]+/g, ' ')
@@ -194,7 +193,7 @@ async function renderSchematicModsList(normalized){
         return
     }
     if(!normalized || !Array.isArray(normalized.blocks) || !Array.isArray(normalized.palette)){
-        renderModListPlaceholder('No mod data available.')
+        renderModListPlaceholder(communityCopy('noModData'))
         return
     }
 
@@ -224,7 +223,7 @@ async function renderSchematicModsList(normalized){
     schematicsDetailModsTotal.textContent = `${rows.length} mods`
     schematicsDetailModsList.innerHTML = ''
     if(rows.length === 0){
-        renderModListPlaceholder('No modded blocks detected.', '0 mods')
+        renderModListPlaceholder(communityCopy('noModdedBlocks'), '0 mods')
         return
     }
 
@@ -274,7 +273,7 @@ async function renderSchematicBlockCounts(normalized, { stack = null } = {}){
         return
     }
     if(!normalized || !Array.isArray(normalized.blocks) || !Array.isArray(normalized.palette)){
-        renderBlockCountsPlaceholder('No block data available.')
+        renderBlockCountsPlaceholder(communityCopy('noBlockData'))
         return
     }
 
@@ -313,7 +312,7 @@ async function renderSchematicBlockCounts(normalized, { stack = null } = {}){
 
     schematicsDetailBlocksList.innerHTML = ''
     if(rows.length === 0){
-        renderBlockCountsPlaceholder('No blocks detected.')
+        renderBlockCountsPlaceholder(communityCopy('noBlocks'))
         return
     }
     const fragment = document.createDocumentFragment()
@@ -357,7 +356,7 @@ function renderUploadBlockCounts(normalized){
         return
     }
     if(!normalized || !Array.isArray(normalized.blocks) || !Array.isArray(normalized.palette)){
-        renderUploadBlockCountsPlaceholder('No block data available.')
+        renderUploadBlockCountsPlaceholder(communityCopy('noBlockData'))
         return
     }
 
@@ -422,11 +421,11 @@ function renderSchematics(options = {}){
     schematicsGrid.innerHTML = ''
     const fragment = document.createDocumentFragment()
     if(schematicsState.status === 'loading'){
-        fragment.appendChild(createSchematicsMessage('Loading community schematics...'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('loadingSchematics')))
     } else if(schematicsState.status === 'error' && schematicsState.error){
         fragment.appendChild(createSchematicsMessage(schematicsState.error))
     } else if(sorted.length === 0){
-        fragment.appendChild(createSchematicsMessage(schematicsInstalledToggle?.checked ? 'No installed schematics yet.' : 'No schematics found.'))
+        fragment.appendChild(createSchematicsMessage(schematicsInstalledToggle?.checked ? communityCopy('noInstalledSchematics') : communityCopy('noSchematics')))
     }
     sorted.forEach((entry) => {
         fragment.appendChild(createSchematicCard(entry))
@@ -465,17 +464,15 @@ function scheduleSchematicsFetch(){
 }
 
 function updateSchematicsPagination(){
-    if(!schematicsPageStatus){
-        return
+    if(schematicsPageStatus){
+        const loaded = schematicsState.items.length
+        schematicsPageStatus.textContent = schematicsState.offline
+            ? `${loaded} · ${communityCopy('offlineCatalog')}`
+            : `${loaded} ${loaded === 1 ? 'creation' : 'creations'}`
     }
-    const total = Number.isFinite(Number(schematicsState.total)) ? Number(schematicsState.total) : 0
-    const pages = Math.max(1, Math.ceil(total / schematicsState.pageSize))
-    const page = Math.min(Math.max(1, schematicsState.page), pages)
-    schematicsPageStatus.textContent = `${page} / ${pages}`
-    if(schematicsPagePrev){
-        schematicsPagePrev.disabled = page <= 1
-    }
-    if(schematicsPageNext){
-        schematicsPageNext.disabled = page >= pages
+    if(communityLoadMoreButton){
+        communityLoadMoreButton.hidden = !schematicsState.nextCursor
+        communityLoadMoreButton.disabled = schematicsState.loadingMore
+        communityLoadMoreButton.setAttribute('aria-busy', String(schematicsState.loadingMore))
     }
 }

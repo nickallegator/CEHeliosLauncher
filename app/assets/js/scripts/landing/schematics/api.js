@@ -1,6 +1,9 @@
 let schematicsApiBaseLogged = false
 let schematicsServiceConfig = null
 let schematicsApiClient = null
+let communityServiceConfig = null
+let communityApiClient = null
+let communityCapabilities = null
 
 async function resolveSchematicsServiceConfig(){
     const envBase = String(process.env.HELIOS_SCHEMATICS_API_URL || '').trim()
@@ -18,6 +21,43 @@ async function resolveSchematicsServiceConfig(){
         allowedVisibilities: Array.isArray(raw.allowedVisibilities) ? raw.allowedVisibilities : ['public']
     }
     return schematicsServiceConfig
+}
+
+async function resolveCommunityServiceConfig(){
+    const envBase = String(process.env.HELIOS_SCHEMATICS_API_URL || '').trim()
+    const distro = await DistroAPI.getDistribution()
+    const rawDistribution = distro?.rawDistribution || {}
+    const raw = rawDistribution.community || {}
+    const fallback = rawDistribution.schematics || {}
+    communityServiceConfig = {
+        schemaVersion: Number(raw.schemaVersion || 1),
+        enabled: envBase ? true : (raw.enabled === true || (!rawDistribution.community && fallback.enabled === true)),
+        apiBaseUrl: (envBase || raw.apiBaseUrl || fallback.apiBaseUrl || '').replace(/\/+$/, '')
+    }
+    return communityServiceConfig
+}
+
+async function getCommunityApiClient(){
+    const service = await resolveCommunityServiceConfig()
+    const base = service.enabled && service.schemaVersion === 1 ? service.apiBaseUrl : null
+    if(!base) return null
+    if(!communityApiClient || communityApiClient.baseUrl !== base){
+        communityApiClient = new CommunityApiClient({
+            baseUrl: base,
+            cachePath: pathUtil.join(SCHEMATICS_CACHE_DIR, 'community-catalog-v1.json'),
+            timeoutMs: 10000
+        })
+        communityCapabilities = null
+    }
+    return communityApiClient
+}
+
+async function resolveCommunityCapabilities(options = {}){
+    if(communityCapabilities && !options.force) return communityCapabilities
+    const client = await getCommunityApiClient()
+    if(!client) return null
+    communityCapabilities = await client.capabilities({ signal: options.signal })
+    return communityCapabilities
 }
 
 function schematicsFeatureEnabled(name){
@@ -58,7 +98,7 @@ async function getSchematicsApiClient(){
 
 async function schematicApiRequest(pathname, options = {}){
     const client = await getSchematicsApiClient()
-    if(!client) throw new SchematicApiError('Schematics service is not configured.', { code: 'not_configured' })
+    if(!client) throw new SchematicApiError(communityCopy('notConfigured'), { code: 'not_configured' })
     const headers = { ...(options.headers || {}), ...getSchematicsAuthHeaders() }
     return (await client.request(pathname, { ...options, headers })).data
 }
@@ -91,7 +131,7 @@ function getCurrentCreatorName(){
     if(profile?.name){
         return profile.name
     }
-    return profile?.username || profile?.id || 'Creator'
+    return profile?.username || profile?.id || communityCopy('creator')
 }
 
 function isSchematicsAdmin(){
@@ -242,7 +282,7 @@ async function deleteSchematic(entry){
     if(!entry?.id){
         return
     }
-    const confirmed = window.confirm('Delete this schematic? This cannot be undone.')
+    const confirmed = window.confirm(communityCopy('deleteConfirm'))
     if(!confirmed){
         return
     }
@@ -273,7 +313,7 @@ async function reportSchematic(entry){
     if(!entry?.id){
         return
     }
-    const reason = prompt('Report reason (optional):') || ''
+    const reason = prompt(communityCopy('reportPrompt')) || ''
     const detail = reason.trim()
     const base = await resolveSchematicsApiBase()
     if(!base){
@@ -298,7 +338,7 @@ async function reportSchematic(entry){
 async function regenerateMissingThumbnails(options){
     const base = await resolveSchematicsApiBase()
     if(!base){
-        throw new Error('Schematics service not configured.')
+        throw new Error(communityCopy('notConfigured'))
     }
     await ensureSchematicsAuthSession(base)
     const payload = {
@@ -524,109 +564,110 @@ async function regenerateSchematicThumbnail(entry){
                 })
             }
         }
-        await fetchSchematicsList({ query: schematicsSearchInput?.value || '', sortKey: schematicsSortSelect?.value || SCHEMATICS_SORT_DEFAULT, page: schematicsState.page })
+        await fetchSchematicsList({ query: schematicsSearchInput?.value || '', sortKey: schematicsSortSelect?.value || SCHEMATICS_SORT_DEFAULT, page: 1 })
     } catch (err) {
         loggerLanding.warn('Failed to regenerate thumbnail.', err)
     }
 }
 
-async function fetchSchematicsList({ query, sortKey, page } = {}){
-    const normalizedQuery = normalizeSchematicQuery(query ?? schematicsState.query)
-    const nextSortKey = sortKey || schematicsState.sortKey
-    const nextPage = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : schematicsState.page
+async function fetchSchematicsList({ query, sortKey, page, append = false } = {}){
+    const requestedPage = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : 1
+    const shouldAppend = append === true || requestedPage > 1
+    if(shouldAppend && (!schematicsState.nextCursor || schematicsState.loadingMore)) return
+
+    const normalizedQuery = normalizeSchematicQuery(query ?? schematicsSearchInput?.value ?? schematicsState.query)
+    const requestedSort = sortKey || schematicsSortSelect?.value || schematicsState.sortKey
+    const nextSortKey = requestedSort === 'recent' || String(requestedSort).includes('release') ? 'recent' : 'popular'
     const filters = getSchematicsFilters()
     const calculatedPageSize = computeGridPageSize(schematicsGrid)
-    const limit = calculatedPageSize || schematicsState.pageSize || SCHEMATICS_PAGE_SIZE_FALLBACK
-    const effectivePage = calculatedPageSize && calculatedPageSize !== schematicsState.pageSize ? 1 : nextPage
-    if(schematicsFetchController){
-        schematicsFetchController.abort()
-    }
+    const limit = Math.max(12, calculatedPageSize || schematicsState.pageSize || SCHEMATICS_PAGE_SIZE_FALLBACK)
+
+    if(!shouldAppend && schematicsFetchController) schematicsFetchController.abort()
     schematicsFetchController = new AbortController()
+    const controller = schematicsFetchController
     schematicsState = {
         ...schematicsState,
-        status: 'loading',
+        status: shouldAppend ? schematicsState.status : 'loading',
+        loadingMore: shouldAppend,
         error: null,
+        items: shouldAppend ? schematicsState.items : [],
+        total: shouldAppend ? schematicsState.total : 0,
         query: normalizedQuery,
         sortKey: nextSortKey,
-        page: effectivePage,
         pageSize: limit,
-        filters
+        filters,
+        nextCursor: shouldAppend ? schematicsState.nextCursor : null
     }
     renderSchematics()
 
-    const base = await resolveSchematicsApiBase()
-    if(!base){
+    const client = await getCommunityApiClient()
+    if(!client){
         schematicsState = {
             ...schematicsState,
             status: 'error',
-            error: 'Schematics service not configured.',
-            items: [],
-            total: 0
+            loadingMore: false,
+            error: communityCopy('notConfigured')
         }
-        updateSchematicIndex(schematicsState.items)
         renderSchematics()
         return
     }
+    const base = client.baseUrl
     await ensureSchematicsAuthSession(base)
-    if(typeof updateSchematicsAdminVisibility === 'function'){
-        updateSchematicsAdminVisibility()
-    }
+    if(typeof updateSchematicsAdminVisibility === 'function') updateSchematicsAdminVisibility()
 
-    schematicsState = {
-        ...schematicsState,
-        apiBase: base
-    }
-
-    const sortParam = nextSortKey.includes('release') ? 'release' : 'likes'
-    const offset = (effectivePage - 1) * limit
     const params = new URLSearchParams()
-    params.set('query', normalizedQuery)
-    params.set('sort', sortParam)
+    params.set('category', schematicsState.category)
+    params.set('sort', nextSortKey)
     params.set('limit', String(limit))
-    params.set('offset', String(offset))
-    if(filters.tags){
-        params.set('tags', filters.tags)
-    }
-    if(filters.creator){
-        params.set('creator', filters.creator)
-    }
-    if(schematicsMineToggle?.checked){
-        params.set('mine', 'true')
-    }
+    if(normalizedQuery) params.set('query', normalizedQuery)
+    if(filters.tags) params.set('tags', filters.tags)
+    if(filters.creator) params.set('creator', filters.creator)
+    if(shouldAppend && schematicsState.nextCursor) params.set('cursor', schematicsState.nextCursor)
+    if(schematicsState.category === 'schematics' && schematicsMineToggle?.checked) params.set('mine', 'true')
+
     try {
-        const client = await getSchematicsApiClient()
-        const data = await client.list(params, {
-            signal: schematicsFetchController.signal,
+        const capabilities = await resolveCommunityCapabilities({ signal: controller.signal }).catch(() => null)
+        const distro = await DistroAPI.getDistribution()
+        const enabledTypes = communityContentRegistry
+            ? await communityContentRegistry.enabled({ rawDistribution: distro?.rawDistribution || {}, capabilities })
+            : []
+        syncCommunityCategoryFilters(enabledTypes)
+        const enabledById = new Map(enabledTypes.map(definition => [definition.id, definition]))
+        const data = await client.catalog(params, {
+            signal: controller.signal,
             headers: getSchematicsAuthHeaders()
         })
-        const items = Array.isArray(data?.items) ? data.items : []
+        const incoming = (Array.isArray(data?.items) ? data.items : [])
+            .map(entry => enabledById.get(entry.type)?.normalize(entry))
+            .filter(Boolean)
+        const combined = shouldAppend ? [...schematicsState.items, ...incoming] : incoming
+        const items = [...new Map(combined.map(entry => [entry.communityKey || `schematics:${entry.id}`, entry])).values()]
         schematicsState = {
             ...schematicsState,
             status: 'ready',
-            error: data.offline ? 'Offline — showing the last successfully loaded catalog.' : null,
+            loadingMore: false,
+            error: data.offline ? communityCopy('offlineCatalog') : null,
             items,
-            total: Number.isFinite(Number(data?.total)) ? Number(data.total) : items.length,
-            page: effectivePage,
-            pageSize: limit
+            total: items.length,
+            nextCursor: data?.nextCursor || null,
+            offline: data?.offline === true,
+            cached: data?.cached === true,
+            page: shouldAppend ? schematicsState.page + 1 : 1,
+            apiBase: base
         }
         updateSchematicIndex(items)
         renderSchematics()
-        updateSchematicsPagination()
+        scheduleCommunityProgressiveLoad()
     } catch (err) {
-        if(err.name === 'AbortError' || schematicsFetchController.signal.aborted){
-            return
-        }
-        loggerLanding.warn('Failed to load schematics list.', err)
+        if(err.name === 'AbortError' || controller.signal.aborted) return
+        loggerLanding.warn('Failed to load Community catalog.', err)
         schematicsState = {
             ...schematicsState,
-            status: 'error',
-            error: 'Unable to load schematics. No cached catalog is available.',
-            items: [],
-            total: 0
+            status: schematicsState.items.length > 0 ? 'ready' : 'error',
+            loadingMore: false,
+            error: schematicsState.items.length > 0 ? communityCopy('offlineCatalog') : communityCopy('unavailableNoCache')
         }
-        updateSchematicIndex(schematicsState.items)
         renderSchematics()
-        updateSchematicsPagination()
     }
 }
 

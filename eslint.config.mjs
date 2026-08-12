@@ -46,7 +46,10 @@ export default defineConfig(
     }
   },
   {
-    files: ['app/assets/js/scripts/*.js'],
+    // Renderer scripts are classic scripts loaded into one shared global scope.
+    // Nested feature modules (for example Schematics) intentionally reference
+    // bindings declared by sibling files after lazy loading.
+    files: ['app/assets/js/scripts/**/*.js'],
     rules: {
       'no-unused-vars': 'off',
       'no-undef': 'off'

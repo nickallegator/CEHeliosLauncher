@@ -1,0 +1,100 @@
+[data-community-deferred="collections"] { display: none !important; }
+
+.communityCategoryRow { align-self: end; }
+.communityCategoryFilters { display: flex; flex-wrap: wrap; gap: 8px; }
+.communityCategoryChip {
+    min-height: 34px;
+    padding: 7px 14px;
+    border: 1px solid var(--workshop-line-strong);
+    border-radius: 999px;
+    background: var(--workshop-surface-soft);
+    color: var(--workshop-text-muted);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.communityCategoryChip:hover,
+.communityCategoryChip:focus-visible { border-color: var(--workshop-mint); color: var(--workshop-text); }
+.communityCategoryChip.selected {
+    border-color: var(--workshop-copper-light);
+    background: var(--workshop-copper);
+    color: var(--workshop-ink);
+}
+.schematicsTypeFilterControls { display: contents; }
+.schematicsTypeFilterControls[hidden],
+#schematicsTypeManageControls[hidden],
+#communityLoadMoreButton[hidden] { display: none !important; }
+.communityProgressivePager .schematicsPagerControls { align-items: center; justify-content: center; }
+#communityLoadSentinel { width: 1px; height: 1px; }
+.communityPublishPickerPanel { width: min(520px, calc(100vw - 48px)); }
+.communityPublishPickerOptions { display: grid; gap: 10px; padding: 18px; }
+.communityPublishPickerOptions .schematicsDetailButton { justify-content: flex-start; min-height: 44px; }
+#schematicsContainer {
+    position: absolute !important;
+    z-index: 710 !important;
+    inset: 0 0 calc(var(--workshop-launch-height) + 10px) !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 18px 20px 8px !important;
+    background: transparent !important;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity var(--workshop-transition), transform var(--workshop-transition) !important;
+    box-sizing: border-box;
+}
+
+#schematicsContainer.routeActive { opacity: 1; transform: translateY(0); }
+#schematicsContainer > #schematicsContent {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 18px !important;
+    border: 1px solid var(--workshop-line) !important;
+    border-radius: var(--workshop-radius) !important;
+    background: linear-gradient(145deg, rgba(29, 43, 41, 0.98), rgba(14, 23, 21, 0.98)) !important;
+    box-shadow: var(--workshop-shadow) !important;
+    box-sizing: border-box;
+}
+
+#schematicsTitle,
+#schematicsDetailTitle,
+#schematicsUploadTitle,
+#schematicsEditTitle,
+#schematicsInstalledTitle,
+#schematicsCollectionsTitle,
+#schematicsCreatorTitle {
+    font-family: 'Pixelify Sans', sans-serif !important;
+}
+
+.schematicsMiniButton,
+.schematicsDetailButton,
+.schematicsIconButton {
+    border-color: var(--workshop-line-strong) !important;
+    border-radius: var(--workshop-radius-small) !important;
+    background: var(--workshop-surface-soft) !important;
+    color: var(--workshop-text) !important;
+}
+
+.schematicsMiniButton.primary,
+.schematicsDetailButton.primary {
+    border-color: var(--workshop-copper-light) !important;
+    background: var(--workshop-copper) !important;
+    color: var(--workshop-ink) !important;
+}
+
+.schematicCard {
+    border-color: var(--workshop-line) !important;
+    border-radius: var(--workshop-radius) !important;
+    background: var(--workshop-surface) !important;
+    box-shadow: var(--workshop-shadow-soft) !important;
+}
+
+.schematicCard:hover { border-color: var(--workshop-mint) !important; transform: translateY(-2px); }
+
+.schematicsModalPanel,
+#schematicsDetailContent,
+#schematicsCollectionsCard {
+    border: 1px solid var(--workshop-line) !important;
+    border-radius: var(--workshop-radius) !important;
+    background: var(--workshop-surface-raised) !important;
+    box-shadow: var(--workshop-shadow) !important;
+}

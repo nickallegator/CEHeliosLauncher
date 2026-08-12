@@ -63,7 +63,7 @@ function renderCreatorPanel(){
     if(!schematicsCreatorGrid || !schematicsCreatorTitle || !schematicsCreatorCount){
         return
     }
-    schematicsCreatorTitle.textContent = schematicsCreatorState.creator || 'Creator'
+    schematicsCreatorTitle.textContent = schematicsCreatorState.creator || communityCopy('creator')
     const total = schematicsCreatorState.total || schematicsCreatorState.items.length
     const shown = schematicsCreatorState.items.length
     schematicsCreatorCount.textContent = total ? `${shown} of ${total} creations` : '0 creations'
@@ -81,7 +81,7 @@ function renderCreatorPanel(){
         if(collections.length === 0){
             const empty = document.createElement('span')
             empty.className = 'schematicsCollectionPill'
-            empty.textContent = 'No collections'
+            empty.textContent = communityCopy('noCreatorCollections')
             empty.setAttribute('aria-disabled', 'true')
             schematicsCreatorCollectionsList.appendChild(empty)
         } else {
@@ -100,11 +100,11 @@ function renderCreatorPanel(){
 
     const fragment = document.createDocumentFragment()
     if(schematicsCreatorState.status === 'loading'){
-        fragment.appendChild(createSchematicsMessage('Loading creator schematics...'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('loadingCreatorSchematics')))
     } else if(schematicsCreatorState.status === 'error' && schematicsCreatorState.error){
         fragment.appendChild(createSchematicsMessage(schematicsCreatorState.error))
     } else if(schematicsCreatorState.items.length === 0){
-        fragment.appendChild(createSchematicsMessage('No schematics found for this creator.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCreatorSchematics')))
     } else {
         schematicsCreatorState.items.forEach((entry) => {
             fragment.appendChild(createSchematicCard(entry))
@@ -150,11 +150,11 @@ function renderCreatorsBrowse(){
     schematicsCreatorsGrid.innerHTML = ''
     const fragment = document.createDocumentFragment()
     if(schematicsCreatorsBrowseState.status === 'loading'){
-        fragment.appendChild(createSchematicsMessage('Loading creators...'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('loadingCreators')))
     } else if(schematicsCreatorsBrowseState.error){
         fragment.appendChild(createSchematicsMessage(schematicsCreatorsBrowseState.error))
     } else if(schematicsCreatorsBrowseState.items.length === 0){
-        fragment.appendChild(createSchematicsMessage('No creators found.'))
+        fragment.appendChild(createSchematicsMessage(communityCopy('noCreators')))
     } else {
         schematicsCreatorsBrowseState.items.forEach((creator) => {
             const card = document.createElement('button')
@@ -198,7 +198,7 @@ async function fetchCreatorsBrowse(){
         schematicsCreatorsBrowseState = {
             ...schematicsCreatorsBrowseState,
             status: 'error',
-            error: 'Schematics service not configured.',
+            error: communityCopy('notConfigured'),
             items: [],
             total: 0
         }
@@ -245,7 +245,7 @@ async function fetchCreatorsBrowse(){
         schematicsCreatorsBrowseState = {
             ...schematicsCreatorsBrowseState,
             status: 'error',
-            error: 'Unable to load creators.',
+            error: communityCopy('unableToLoadCreators'),
             items: [],
             total: 0
         }
@@ -295,7 +295,7 @@ async function fetchCreatorSchematics(creator, { page, sortKey } = {}){
         schematicsCreatorState = {
             ...schematicsCreatorState,
             status: 'error',
-            error: 'Schematics service not configured.',
+            error: communityCopy('notConfigured'),
             items: []
         }
         renderCreatorPanel()
@@ -361,7 +361,7 @@ async function fetchCreatorSchematics(creator, { page, sortKey } = {}){
         schematicsCreatorState = {
             ...schematicsCreatorState,
             status: 'error',
-            error: 'Unable to load creator schematics.',
+            error: communityCopy('unableToLoadCreatorSchematics'),
             items: []
         }
         renderCreatorPanel()

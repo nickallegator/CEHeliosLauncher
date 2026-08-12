@@ -1,0 +1,226 @@
+#frameBar {
+    height: var(--workshop-frame-height);
+    background: rgba(10, 18, 17, 0.98) !important;
+    border-bottom: 1px solid rgba(82, 115, 108, 0.36);
+    box-sizing: border-box;
+}
+
+#frameMain { height: 20px !important; }
+#frameTitleText { color: var(--workshop-text-muted); font-family: 'Atkinson Hyperlegible'; font-size: 12px; letter-spacing: 0.04em; }
+.frameButton { height: 20px !important; color: var(--workshop-text-muted); }
+.frameButton:hover { background: var(--workshop-surface-soft) !important; color: var(--workshop-text); }
+#frameButton_close:hover { background: #b6423b !important; }
+
+#newsContainer {
+    position: absolute !important;
+    z-index: 710 !important;
+    inset: 18px 20px calc(var(--workshop-launch-height) + 10px) !important;
+    display: block;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    border: 1px solid var(--workshop-line);
+    border-radius: var(--workshop-radius);
+    background: linear-gradient(145deg, rgba(29, 43, 41, 0.98), rgba(14, 23, 21, 0.98)) !important;
+    box-shadow: var(--workshop-shadow);
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(10px);
+    transition: opacity var(--workshop-transition), transform var(--workshop-transition) !important;
+}
+
+#newsContainer.routeActive { opacity: 1; transform: translateY(0); }
+#newsContent { height: 100% !important; }
+#newsTitleContainer { border-bottom-color: var(--workshop-line) !important; background: rgba(11, 17, 16, 0.5); }
+#newsArticleTitle { color: var(--workshop-text) !important; font-family: 'Pixelify Sans' !important; font-size: 27px !important; }
+#newsArticleDate,
+#newsArticleAuthor,
+#newsArticleComments,
+#newsNavigationStatus { color: var(--workshop-text-muted) !important; }
+#newsArticleContentScrollable { color: var(--workshop-text) !important; }
+#newsNavigateLeft,
+#newsNavigateRight,
+#newsErrorRetry { border-color: var(--workshop-line-strong) !important; color: var(--workshop-mint) !important; }
+
+#settingsContainer {
+    position: absolute !important;
+    inset: 0 !important;
+    display: flex;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+}
+
+#settingsContainerLeft {
+    width: 188px !important;
+    min-width: 188px;
+    border-right: 1px solid var(--workshop-line);
+    background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 2px, transparent 2px 8px),
+        var(--workshop-surface) !important;
+}
+
+#settingsContainerRight {
+    width: auto !important;
+    min-width: 0;
+    flex: 1;
+    background: linear-gradient(135deg, rgba(55, 200, 171, 0.035), transparent 40%) !important;
+}
+
+#settingsNavHeader { border-bottom: 1px solid var(--workshop-line); }
+#settingsNavHeaderText,
+.settingsTabHeaderText,
+#settingsAboutTitle,
+#settingsUpdateTitle { font-family: 'Pixelify Sans', sans-serif !important; }
+#settingsNavHeaderText { color: var(--workshop-copper-light) !important; letter-spacing: .08em; }
+
+.settingsNavItem {
+    margin: 3px 8px !important;
+    padding: 9px 11px !important;
+    border: 1px solid transparent !important;
+    border-radius: var(--workshop-radius-small) !important;
+    color: var(--workshop-text-muted) !important;
+}
+
+.settingsNavItem:hover { border-color: var(--workshop-line) !important; background: rgba(135,222,205,.05) !important; color: var(--workshop-text) !important; }
+.settingsNavItem[selected] { border-color: rgba(135,222,205,.4) !important; background: rgba(55,200,171,.13) !important; color: var(--workshop-mint) !important; box-shadow: inset 3px 0 var(--workshop-copper); }
+
+#settingsNavDone {
+    margin: 8px !important;
+    border: 1px solid var(--workshop-copper-light) !important;
+    border-radius: 3px !important;
+    background: var(--workshop-copper) !important;
+    color: var(--workshop-ink) !important;
+    font-family: 'Pixelify Sans' !important;
+}
+
+.settingsTab { padding: 24px 30px !important; color: var(--workshop-text); }
+.settingsTabHeader { border-bottom-color: var(--workshop-line) !important; }
+.settingsTabHeaderText { color: var(--workshop-text) !important; font-size: 27px !important; }
+.settingsTabHeaderDesc,
+.settingsFieldTitle,
+.settingsMemoryHeader,
+.settingsFileSelTitle { color: var(--workshop-text-muted) !important; }
+
+.settingsAuthAccountTypeContainer,
+.settingsFieldContainer,
+#settingsMemoryContainer,
+.settingsFileSelContainer,
+#settingsJVMOptsContainer,
+.settingsSelServContainer,
+#settingsModsContainer > div {
+    border-color: var(--workshop-line) !important;
+    border-radius: var(--workshop-radius) !important;
+    background: rgba(23, 35, 33, 0.82) !important;
+}
+
+#settingsContainer input[type=text],
+#settingsContainer input[type=number],
+#settingsContainer select,
+#settingsJVMOptsVal,
+.settingsFileSelVal {
+    border-color: var(--workshop-line-strong) !important;
+    border-radius: 3px !important;
+    background: var(--workshop-deep) !important;
+    color: var(--workshop-text) !important;
+}
+
+.settingsSwitchServerButton,
+.settingsAddAuthAccount,
+.settingsFileSelButton,
+#settingsDropinFileSystemButton,
+#settingsShaderpackButton,
+.settingsAboutButton,
+#settingsUpdateActionButton {
+    border-color: var(--workshop-line-strong) !important;
+    border-radius: 3px !important;
+    background: var(--workshop-surface-soft) !important;
+    color: var(--workshop-text) !important;
+}
+
+#welcomeContainer,
+#loginContainer,
+#loginOptionsContainer,
+#waitingContainer {
+    position: absolute !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    background:
+        radial-gradient(circle at 50% 28%, rgba(55, 200, 171, .14), transparent 28%),
+        linear-gradient(rgba(135, 222, 205, .028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(135, 222, 205, .028) 1px, transparent 1px),
+        var(--workshop-deep) !important;
+    background-size: 100% 100%, 24px 24px, 24px 24px, 100% 100% !important;
+}
+
+#loginOptionsContainer::before,
+#waitingContainer::before {
+    position: absolute;
+    top: 44px;
+    left: 50%;
+    width: 82px;
+    height: 82px;
+    background: url('../../brand/allegator-games-logo.svg') center/contain no-repeat;
+    content: '';
+    opacity: .9;
+    transform: translateX(-50%);
+}
+
+#welcomeHeader,
+#loginOptionsContainer h2,
+#waitingContainer h2 { color: var(--workshop-text) !important; font-family: 'Pixelify Sans' !important; }
+#welcomeDescription,
+#loginSubheader { color: var(--workshop-text-muted) !important; }
+
+#welcomeImageSeal,
+#loginImageSeal {
+    width: 180px !important;
+    height: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    object-fit: contain;
+}
+
+#settingsAboutLogo {
+    width: 72px !important;
+    height: 38px !important;
+    padding: 2px 4px !important;
+    object-fit: contain;
+}
+#welcomeButton,
+#loginButton,
+.loginOptionButton,
+#loginOptionCancelButton,
+#loginCancelButton {
+    border-color: var(--workshop-line-strong) !important;
+    border-radius: 3px !important;
+    color: var(--workshop-text) !important;
+}
+#welcomeButton,
+#loginButton { border-color: var(--workshop-copper-light) !important; background: var(--workshop-copper) !important; color: var(--workshop-ink) !important; }
+.loginField { border-color: var(--workshop-line-strong) !important; color: var(--workshop-text) !important; }
+
+#overlayContainer {
+    z-index: 1600 !important;
+    background: rgba(6, 10, 9, .78) !important;
+}
+
+#overlayContent,
+#serverSelectContent,
+#accountSelectContent {
+    border: 1px solid var(--workshop-line) !important;
+    border-radius: var(--workshop-radius) !important;
+    background: var(--workshop-surface-raised) !important;
+    box-shadow: var(--workshop-shadow) !important;
+}
+
+#overlayTitle,
+#serverSelectHeader,
+#accountSelectHeader { font-family: 'Pixelify Sans' !important; color: var(--workshop-text) !important; }
+.serverListing,
+.accountListing { border-color: var(--workshop-line) !important; background: var(--workshop-surface) !important; }
+.serverListing[selected],
+.accountListing[selected] { border-color: var(--workshop-mint) !important; background: rgba(55, 200, 171, .12) !important; }

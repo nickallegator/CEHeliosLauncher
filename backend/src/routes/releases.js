@@ -19,6 +19,14 @@ function injectSchematicsService(distribution, schematicsConfig = config.schemat
         features: schematicsConfig.features,
         allowedVisibilities: ['public']
     }
+    distribution.community = {
+        schemaVersion: 1,
+        enabled: true,
+        apiBaseUrl: schematicsConfig.publicApiUrl.replace(/\/+$/, ''),
+        features: {
+            catalog: true
+        }
+    }
     return distribution
 }
 

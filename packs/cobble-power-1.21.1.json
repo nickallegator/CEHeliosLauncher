@@ -7,7 +7,7 @@
         "version": "0.1.0-deps.5",
         "minecraftVersion": "1.21.1",
         "address": "localhost:25565",
-        "icon": "https://raw.githubusercontent.com/dscalzi/HeliosLauncher/master/build/icon.png",
+        "icon": "https://raw.githubusercontent.com/nickallegator/CEHeliosLauncher/master/app/assets/brand/allegator-games-app-icon.png",
         "mainServer": false,
         "autoconnect": false,
         "futureModuleId": "net.allegator.cobblepower:cobblepower:<version>",

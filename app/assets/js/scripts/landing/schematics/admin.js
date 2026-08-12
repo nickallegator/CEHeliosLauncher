@@ -50,7 +50,7 @@ function renderAdminResults(items){
     if(!Array.isArray(items) || items.length === 0){
         const empty = document.createElement('div')
         empty.className = 'schematicsAdminResultEmpty'
-        empty.textContent = 'No missing thumbnails found.'
+        empty.textContent = communityCopy('noMissingThumbnails')
         schematicsAdminResults.appendChild(empty)
         return
     }
@@ -63,7 +63,7 @@ function renderAdminResults(items){
 
         const title = document.createElement('div')
         title.className = 'schematicsAdminResultTitle'
-        title.textContent = item.id || 'Schematic'
+        title.textContent = item.id || communityCopy('schematic')
 
         const meta = document.createElement('div')
         meta.className = 'schematicsAdminResultMeta'
@@ -92,7 +92,7 @@ function renderAdminResults(items){
         if(missing.length === 0){
             const row = document.createElement('div')
             row.className = 'schematicsAdminResultRow empty'
-            row.textContent = 'No missing variants.'
+            row.textContent = communityCopy('noMissingVariants')
             list.appendChild(row)
         }
         card.appendChild(list)
@@ -118,7 +118,7 @@ function openSchematicsAdminPanel(){
     }
     resetAdminDefaults()
     schematicsAdminOpen = true
-    setAdminStatus('Ready.', 'info')
+    setAdminStatus(communityCopy('ready'), 'info')
     if(schematicsAdminResults){
         schematicsAdminResults.innerHTML = ''
     }
@@ -138,7 +138,7 @@ async function runSchematicsAdminRegeneration(){
         return
     }
     schematicsAdminRun.disabled = true
-    setAdminStatus('Running regeneration...', 'info')
+    setAdminStatus(communityCopy('runningRegeneration'), 'info')
     try {
         const payload = {
             ids: parseCsv(schematicsAdminIds?.value),
@@ -152,10 +152,10 @@ async function runSchematicsAdminRegeneration(){
         }
         const result = await regenerateMissingThumbnails(payload)
         renderAdminResults(result?.items || [])
-        setAdminStatus(`Done. ${result?.count || 0} schematics returned.`, 'success')
+        setAdminStatus(communityCopy('regenerationDone', { count: result?.count || 0 }), 'success')
     } catch (err) {
         loggerLanding.warn('Failed to regenerate thumbnails.', err)
-        setAdminStatus('Failed to run regeneration.', 'error')
+        setAdminStatus(communityCopy('regenerationFailed'), 'error')
     } finally {
         if(schematicsAdminRun){
             schematicsAdminRun.disabled = false

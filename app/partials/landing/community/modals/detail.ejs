@@ -4,14 +4,14 @@
         <div id="schematicsDetailHeader">
             <div id="schematicsDetailHeading">
                 <div id="schematicsDetailEyebrow"><%- lang('landing.schematicsDetailEyebrow') %></div>
-                <h2 id="schematicsDetailTitle">Schematic</h2>
-                <div id="schematicsDetailCreator">by --</div>
+                <h2 id="schematicsDetailTitle"><%- lang('community.schematic') %></h2>
+                <div id="schematicsDetailCreator"><%- lang('community.byUnknown') %></div>
             </div>
             <div id="schematicsDetailActions">
                 <button id="schematicsDetailInstall" type="button" class="schematicsDetailButton primary"><%- lang('landing.schematicsDetailInstall') %></button>
                 <button id="schematicsDetailRemove" type="button" class="schematicsDetailButton"><%- lang('landing.schematicsDetailRemove') %></button>
-                <button id="schematicsDetailAddToCollection" type="button" class="schematicsDetailButton">Add to Collection</button>
-                <button id="schematicsDetailLike" type="button" class="schematicsDetailButton">Like</button>
+                <button id="schematicsDetailAddToCollection" type="button" class="schematicsDetailButton" data-community-deferred="collections" hidden><%- lang('community.addToCollection') %></button>
+                <button id="schematicsDetailLike" type="button" class="schematicsDetailButton"><%- lang('community.like') %></button>
                 <div class="schematicsDetailShareAction">
                     <button id="schematicsDetailShareButton" type="button" class="schematicsDetailButton" aria-haspopup="menu" aria-expanded="false" aria-controls="schematicsDetailShareMenu"><%- lang('landing.schematicsDetailShare') %></button>
                     <div id="schematicsDetailShareMenu" class="schematicsDetailShareMenu" role="menu" aria-label="<%- lang('landing.schematicsDetailShareMenuTitle') %>" hidden>
@@ -22,34 +22,34 @@
                         <div class="schematicsDetailShareOptions">
                             <button type="button" class="schematicsDetailShareOption" data-schematic-share-option="copy-link" role="menuitem">
                                 <span><%- lang('landing.schematicsDetailShareOptionCopy') %></span>
-                                <span class="schematicsDetailShareOptionStatus">Soon</span>
+                                <span class="schematicsDetailShareOptionStatus"><%- lang('community.soon') %></span>
                             </button>
                             <button type="button" class="schematicsDetailShareOption" data-schematic-share-option="discord" role="menuitem">
                                 <span><%- lang('landing.schematicsDetailShareOptionDiscord') %></span>
-                                <span class="schematicsDetailShareOptionStatus">Soon</span>
+                                <span class="schematicsDetailShareOptionStatus"><%- lang('community.soon') %></span>
                             </button>
                             <button type="button" class="schematicsDetailShareOption" data-schematic-share-option="x" role="menuitem">
                                 <span><%- lang('landing.schematicsDetailShareOptionX') %></span>
-                                <span class="schematicsDetailShareOptionStatus">Soon</span>
+                                <span class="schematicsDetailShareOptionStatus"><%- lang('community.soon') %></span>
                             </button>
                             <button type="button" class="schematicsDetailShareOption" data-schematic-share-option="reddit" role="menuitem">
                                 <span><%- lang('landing.schematicsDetailShareOptionReddit') %></span>
-                                <span class="schematicsDetailShareOptionStatus">Soon</span>
+                                <span class="schematicsDetailShareOptionStatus"><%- lang('community.soon') %></span>
                             </button>
                             <button type="button" class="schematicsDetailShareOption" data-schematic-share-option="facebook" role="menuitem">
                                 <span><%- lang('landing.schematicsDetailShareOptionFacebook') %></span>
-                                <span class="schematicsDetailShareOptionStatus">Soon</span>
+                                <span class="schematicsDetailShareOptionStatus"><%- lang('community.soon') %></span>
                             </button>
                             <button type="button" class="schematicsDetailShareOption" data-schematic-share-option="email" role="menuitem">
                                 <span><%- lang('landing.schematicsDetailShareOptionEmail') %></span>
-                                <span class="schematicsDetailShareOptionStatus">Soon</span>
+                                <span class="schematicsDetailShareOptionStatus"><%- lang('community.soon') %></span>
                             </button>
                         </div>
                     </div>
                 </div>
-                <button id="schematicsDetailEdit" type="button" class="schematicsDetailButton">Edit</button>
-                <button id="schematicsDetailDelete" type="button" class="schematicsDetailButton">Delete</button>
-                <button id="schematicsDetailReport" type="button" class="schematicsDetailButton">Report</button>
+                <button id="schematicsDetailEdit" type="button" class="schematicsDetailButton"><%- lang('community.edit') %></button>
+                <button id="schematicsDetailDelete" type="button" class="schematicsDetailButton"><%- lang('community.delete') %></button>
+                <button id="schematicsDetailReport" type="button" class="schematicsDetailButton"><%- lang('community.report') %></button>
                 <button id="schematicsDetailClose" type="button" class="schematicsDetailButton"><%- lang('landing.schematicsDetailClose') %></button>
             </div>
         </div>
@@ -63,7 +63,7 @@
                 </svg>
                 <div class="schematicMeshOverlay" aria-hidden="true">
                     <div class="schematicMeshSpinner"></div>
-                    <div class="schematicMeshLabel">Building mesh...</div>
+                    <div class="schematicMeshLabel"><%- lang('community.buildingMesh') %></div>
                 </div>
             </div>
             <div id="schematicsDetailBlocks">
@@ -81,7 +81,7 @@
                 <div id="schematicsDetailModsList" class="schematicsDetailModList"></div>
             </div>
             <div id="schematicsDetailStats">
-                <div class="schematicsDetailInfoTitle">Details</div>
+                <div class="schematicsDetailInfoTitle"><%- lang('community.details') %></div>
                 <div class="schematicsDetailStat">
                     <span class="schematicsDetailStatLabel"><%- lang('landing.schematicsDetailRelease') %></span>
                     <span id="schematicsDetailRelease" class="schematicsDetailStatValue">--</span>

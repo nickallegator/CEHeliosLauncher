@@ -4,6 +4,7 @@ const semver = require('semver')
 
 const DropinModUtil  = require('./assets/js/dropinmodutil')
 const AccessManager  = require('./assets/js/accessmanager')
+const ServerBranding = require('./assets/js/serverbranding')
 const { MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR } = require('./assets/js/ipcconstants')
 
 const settingsState = {
@@ -1330,7 +1331,7 @@ async function loadSelectedServerOnModsTab(){
 
     for(const el of document.getElementsByClassName('settingsSelServContent')) {
         el.innerHTML = `
-            <img class="serverListingImg" src="${serv.rawServer.icon}"/>
+            <img class="serverListingImg" src="${ServerBranding.resolveServerIcon(serv.rawServer)}" alt=""/>
             <div class="serverListingDetails">
                 <span class="serverListingName">${serv.rawServer.name}</span>
                 <span class="serverListingDescription">${serv.rawServer.description}</span>
@@ -1718,7 +1719,7 @@ function populateAboutVersionInformation(){
  */
 function populateReleaseNotes(){
     $.ajax({
-        url: 'https://github.com/dscalzi/HeliosLauncher/releases.atom',
+        url: 'https://github.com/nickallegator/CEHeliosLauncher/releases.atom',
         success: (data) => {
             const version = 'v' + remote.app.getVersion()
             const entries = $(data).find('entry')

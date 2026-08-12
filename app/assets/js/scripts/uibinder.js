@@ -31,6 +31,13 @@ let mainUIInitializationPromise = null
 const LANDING_READY_EVENT = 'helios:landing-ready'
 const LANDING_READY_TIMEOUT_MS = 15000
 
+window.addEventListener('helios:startup-retry', () => {
+    remote.getCurrentWindow().reload()
+})
+window.addEventListener('helios:startup-close', () => {
+    remote.getCurrentWindow().close()
+})
+
 /**
  * Wait until landing.js has finished defining the functions used by this
  * binder. The distribution can finish loading while the document is still
@@ -82,14 +89,43 @@ let currentView
  * @param {*} onNextFade Optional. Callback function to execute when the next view
  * fades in.
  */
+async function transitionViewElement(selector, visible, requestedDuration){
+    const element = document.querySelector(selector)
+    if(!element) return
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+    const duration = reduceMotion ? 0 : Math.min(Number(requestedDuration) || 0, 220)
+    if(visible){
+        element.style.display = ''
+        if(getComputedStyle(element).display === 'none') element.style.display = 'block'
+    }
+    if(duration > 0 && typeof element.animate === 'function'){
+        const frames = visible
+            ? [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }]
+            : [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-4px)' }]
+        try {
+            await element.animate(frames, { duration, easing: 'ease-out' }).finished
+        } catch(err){
+            loggerUIBinder.debug('View transition was interrupted.', err?.message || err)
+        }
+    }
+    if(!visible) element.style.display = 'none'
+}
+
 function switchView(current, next, currentFadeTime = 500, nextFadeTime = 500, onCurrentFade = () => {}, onNextFade = () => {}){
     currentView = next
-    $(`${current}`).fadeOut(currentFadeTime, async () => {
+    const nextUsesShell = next === VIEWS.landing || next === VIEWS.settings
+    if(nextUsesShell && window.AppShell){
+        window.AppShell.setApplicationView(next)
+    }
+    ;(async () => {
+        await transitionViewElement(current, false, currentFadeTime)
         await onCurrentFade()
-        $(`${next}`).fadeIn(nextFadeTime, async () => {
-            await onNextFade()
-        })
-    })
+        if(!nextUsesShell && window.AppShell){
+            window.AppShell.setApplicationView(next)
+        }
+        await transitionViewElement(next, true, nextFadeTime)
+        await onNextFade()
+    })().catch((err) => loggerUIBinder.error('Failed to switch launcher views.', err))
 }
 
 /**
@@ -104,6 +140,7 @@ function getCurrentView(){
 async function showMainUI(data){
     await waitForLandingReady()
     debugLog('showMainUI start')
+    window.StartupPresentation?.setStage('account')
 
     if(!isDev && !testerBuild){
         loggerAutoUpdater.info('Initializing..')
@@ -112,42 +149,36 @@ async function showMainUI(data){
 
     updateSelectedServer(data.getServerById(ConfigManager.getSelectedServer()))
     refreshServerStatus()
-    setTimeout(() => {
-        document.getElementById('frameBar').style.backgroundColor = 'rgba(0, 0, 0, 0.5)'
-        document.body.style.backgroundImage = `url('assets/images/backgrounds/${document.body.getAttribute('bkid')}.jpg')`
-        $('#main').show()
+    document.getElementById('frameBar').style.backgroundColor = 'rgba(10, 18, 17, 0.98)'
+    $('#main').show()
 
-        const isLoggedIn = Object.keys(ConfigManager.getAuthAccounts()).length > 0
+    const isLoggedIn = Object.keys(ConfigManager.getAuthAccounts()).length > 0
 
-        // If this is enabled in a development environment we'll get ratelimited.
-        // The relaunch frequency is usually far too high.
-        if(!isDev && isLoggedIn){
-            validateSelectedAccount()
-        }
+    // If this is enabled in a development environment we'll get ratelimited.
+    // The relaunch frequency is usually far too high.
+    if(!isDev && isLoggedIn){
+        validateSelectedAccount()
+    }
 
-        if(ConfigManager.isFirstLaunch()){
-            currentView = VIEWS.welcome
-            $(VIEWS.welcome).fadeIn(1000)
+    if(ConfigManager.isFirstLaunch()){
+        currentView = VIEWS.welcome
+        $(VIEWS.welcome).show()
+    } else {
+        if(isLoggedIn){
+            currentView = VIEWS.landing
+            window.AppShell?.setApplicationView(VIEWS.landing)
+            $(VIEWS.landing).show()
         } else {
-            if(isLoggedIn){
-                currentView = VIEWS.landing
-                $(VIEWS.landing).fadeIn(1000)
-            } else {
-                loginOptionsCancelEnabled(false)
-                loginOptionsViewOnLoginSuccess = VIEWS.landing
-                loginOptionsViewOnLoginCancel = VIEWS.loginOptions
-                currentView = VIEWS.loginOptions
-                $(VIEWS.loginOptions).fadeIn(1000)
-            }
+            loginOptionsCancelEnabled(false)
+            loginOptionsViewOnLoginSuccess = VIEWS.landing
+            loginOptionsViewOnLoginCancel = VIEWS.loginOptions
+            currentView = VIEWS.loginOptions
+            $(VIEWS.loginOptions).show()
         }
+    }
 
-        setTimeout(() => {
-            $('#loadingContainer').fadeOut(500, () => {
-                $('#loadSpinnerImage').removeClass('rotating')
-            })
-        }, 250)
-        
-    }, 750)
+    window.AppShell?.setApplicationView(currentView)
+    requestAnimationFrame(() => window.StartupPresentation?.markReady())
     debugLog('showMainUI end')
 }
 
@@ -168,21 +199,10 @@ async function initializeMainUI(data){
 }
 
 function showFatalStartupError(){
-    setTimeout(() => {
-        $('#loadingContainer').fadeOut(250, () => {
-            document.getElementById('overlayContainer').style.background = 'none'
-            setOverlayContent(
-                Lang.queryJS('uibinder.startup.fatalErrorTitle'),
-                Lang.queryJS('uibinder.startup.fatalErrorMessage'),
-                Lang.queryJS('uibinder.startup.closeButton')
-            )
-            setOverlayHandler(() => {
-                const window = remote.getCurrentWindow()
-                window.close()
-            })
-            toggleOverlay(true)
-        })
-    }, 750)
+    window.StartupPresentation?.setFatal(
+        Lang.queryJS('uibinder.startup.fatalErrorTitle'),
+        Lang.queryJS('uibinder.startup.fatalErrorMessage')
+    )
 }
 
 /**
@@ -198,6 +218,7 @@ function onDistroRefresh(data){
     }
     syncModConfigurations(data)
     ensureJavaSettings(data)
+    window.dispatchEvent(new CustomEvent('helios:distribution-refresh', { detail: { data } }))
 }
 
 /**
@@ -532,6 +553,7 @@ ipcRenderer.on('distributionIndexDone', async (event, res) => {
 
 // The preload can complete before this page script is evaluated. Announce
 // listener readiness so the main process can replay an already-cached result.
+window.StartupPresentation?.setStage('distribution')
 ipcRenderer.send('distributionIndexReady')
 
 // Local-distribution fallback for development and self-contained tester builds.

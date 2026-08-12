@@ -34,7 +34,7 @@ async function exchangeCode(code) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'CEHelios-Launcher-Access'
+            'User-Agent': 'AG-Launcher-Access'
         },
         body
     })
@@ -58,7 +58,7 @@ async function fetchIdentity(accessToken) {
     const res = await fetch(`${config.patreon.apiBase}/identity?${params.toString()}`, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
-            'User-Agent': 'CEHelios-Launcher-Access'
+            'User-Agent': 'AG-Launcher-Access'
         }
     })
 

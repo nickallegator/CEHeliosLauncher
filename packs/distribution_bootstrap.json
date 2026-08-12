@@ -6,7 +6,7 @@
             "id": "Cobble-Power-1.21.1",
             "name": "Cobble Power Test (Authorization Required)",
             "description": "Sign in with an approved Microsoft account to load the private test channel.",
-            "icon": "https://raw.githubusercontent.com/dscalzi/HeliosLauncher/master/build/icon.png",
+            "icon": "assets/brand/allegator-games-app-icon.png",
             "version": "bootstrap",
             "address": "localhost:25565",
             "minecraftVersion": "1.21.1",

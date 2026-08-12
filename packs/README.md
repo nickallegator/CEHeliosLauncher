@@ -54,5 +54,5 @@ tester distribution, bundles the mod for offline repair, and writes the final
 handoff folder under `dist/Cobble-Power-Tester-<profile-version>`. The handoff
 folder contains only the NSIS installer, SHA-256 checksum, release manifest,
 and tester instructions. Tester builds use a separate application identity and
-`%APPDATA%\.cobblepower-test-launcher` data directory and do not modify the
+`%APPDATA%\.ag-launcher` data directory and do not modify the
 production distribution channel.

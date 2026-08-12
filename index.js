@@ -5,7 +5,6 @@ remoteMain.initialize()
 const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron')
 const autoUpdater                       = require('electron-updater').autoUpdater
 const ejse                              = require('ejs-electron')
-const fs                                = require('fs')
 const http                              = require('http')
 const isDev                             = require('./app/assets/js/isdev')
 const path                              = require('path')
@@ -15,6 +14,31 @@ const { AZURE_CLIENT_ID, MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR, SHELL_OPCODE 
 const LangLoader                        = require('./app/assets/js/langloader')
 const { MICROSOFT_AUTH_REDIRECT_URI, parseMicrosoftAuthRedirect } = require('./app/assets/js/microsoftauthredirect')
 const { isTesterBuild }                 = require('./app/assets/js/testerchannel')
+const Brand                             = require('./app/assets/js/brand')
+const { migrateBrandUserData }          = require('./app/assets/js/brandmigration')
+
+app.setName(Brand.productName)
+app.setAppUserModelId(Brand.appId)
+
+try {
+    const appDataDirectory = path.resolve(app.getPath('appData'))
+    const targetDirectory = path.resolve(app.getPath('userData'))
+    const defaultTargetDirectory = path.join(appDataDirectory, Brand.userDataDirectoryName)
+    if(targetDirectory.toLowerCase() === defaultTargetDirectory.toLowerCase()) {
+        const migration = migrateBrandUserData({
+            appDataDirectory,
+            targetDirectory,
+            legacyNames: Brand.legacyUserDataDirectoryNames
+        })
+        if(migration.migrated) {
+            console.log(`[Brand] Migrated durable launcher state from ${migration.sourceDirectory}`)
+        }
+    }
+} catch(error) {
+    // A migration failure must not prevent first launch. The old state remains
+    // untouched and can be copied after the underlying filesystem issue clears.
+    console.error('[Brand] Unable to migrate previous launcher state.', error)
+}
 
 // Setup Lang
 LangLoader.setupLanguage()
@@ -219,7 +243,7 @@ ipcMain.on(MSFT_OPCODE.OPEN_LOGIN, (ipcEvent, ...arguments_) => {
         width: 520,
         height: 600,
         frame: true,
-        icon: getPlatformIcon('SealCircle')
+        icon: getPlatformIcon()
     })
 
     msftAuthWindow.on('closed', () => {
@@ -266,7 +290,7 @@ ipcMain.on(MSFT_OPCODE.OPEN_LOGOUT, (ipcEvent, uuid, isLastAccount) => {
         width: 520,
         height: 600,
         frame: true,
-        icon: getPlatformIcon('SealCircle')
+        icon: getPlatformIcon()
     })
 
     msftLogoutWindow.on('closed', () => {
@@ -310,9 +334,11 @@ let win
 function createWindow() {
 
     win = new BrowserWindow({
-        width: 980,
-        height: 552,
-        icon: getPlatformIcon('SealCircle'),
+        width: 1180,
+        height: 680,
+        minWidth: 980,
+        minHeight: 600,
+        icon: getPlatformIcon(),
         frame: false,
         webPreferences: {
             preload: path.join(__dirname, 'app', 'assets', 'js', 'preloader.js'),
@@ -324,7 +350,6 @@ function createWindow() {
     remoteMain.enable(win.webContents)
 
     const data = {
-        bkid: Math.floor((Math.random() * fs.readdirSync(path.join(__dirname, 'app', 'assets', 'images', 'backgrounds')).length)),
         lang: (str, placeHolders) => LangLoader.queryEJS(str, placeHolders)
     }
     Object.entries(data).forEach(([key, val]) => ejse.data(key, val))
@@ -408,20 +433,8 @@ function createMenu() {
 
 }
 
-function getPlatformIcon(filename){
-    let ext
-    switch(process.platform) {
-        case 'win32':
-            ext = 'ico'
-            break
-        case 'darwin':
-        case 'linux':
-        default:
-            ext = 'png'
-            break
-    }
-
-    return path.join(__dirname, 'app', 'assets', 'images', `${filename}.${ext}`)
+function getPlatformIcon(){
+    return path.join(__dirname, 'app', 'assets', 'brand', 'allegator-games-app-icon.png')
 }
 
 app.on('ready', createWindow)
