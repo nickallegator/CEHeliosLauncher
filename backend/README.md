@@ -44,6 +44,20 @@ npm run testers:list
 
 `GET /v1/releases/channels/test/distribution` requires an authenticated backend session and `cobblepower:test`.
 
+Minecraft access tokens are verified locally as RS256 JWTs against the reviewed
+`config/minecraft-auth-keys.json` key set. This avoids a runtime dependency on
+Minecraft Services, whose edge may block managed-container egress IPs. The
+verifier accepts an emergency `MINECRAFT_AUTH_KEYS_JSON` environment override
+using the same document shape. Check for official key rotation before releases:
+
+```console
+npm run minecraft-keys:check
+npm run minecraft-keys:update
+```
+
+Review and deploy any generated key change. Tokens are never logged or sent to
+another verification proxy.
+
 ## Schematic community
 
 The schematic service uses a separate private R2 bucket and `SCHEMATICS_*` credentials. Production startup fails if schematics are enabled without object storage. Upload finalization validates and canonicalizes v2 content, strips community block-entity NBT, and creates immutable 128px and 512px PNG/WebP thumbnails.

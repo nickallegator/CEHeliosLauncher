@@ -17,7 +17,9 @@
     "testers:list": "node scripts/testers.js list",
     "entitlements:grant": "node scripts/entitlements.js grant",
     "entitlements:revoke": "node scripts/entitlements.js revoke",
-    "entitlements:list": "node scripts/entitlements.js list"
+    "entitlements:list": "node scripts/entitlements.js list",
+    "minecraft-keys:update": "node scripts/update-minecraft-auth-keys.js",
+    "minecraft-keys:check": "node scripts/update-minecraft-auth-keys.js --check"
   },
   "engines": {
     "node": "22.x"

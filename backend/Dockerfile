@@ -11,6 +11,7 @@ WORKDIR /app
 COPY --from=dependencies /app/backend/node_modules ./backend/node_modules
 COPY libraries/schematics-core ./libraries/schematics-core
 COPY backend/package.json ./backend/
+COPY backend/config ./backend/config
 COPY backend/migrations ./backend/migrations
 COPY backend/scripts ./backend/scripts
 COPY backend/src ./backend/src

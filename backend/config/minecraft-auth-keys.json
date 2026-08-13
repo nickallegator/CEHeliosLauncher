@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "source": "https://api.minecraftservices.com/publickeys",
+  "fetchedAt": "2026-08-13T02:30:00.000Z",
+  "authenticationKeys": [
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4S4G8fJJw4hLRME8zM2aBqaQRqYs0TlU8N+sZl0MUgtyFw0KAXnzbOPH7yu6qbqsGYVKF/D+fUg+49PhFmxEsylvmj/yeRwdp3yFGME/BVfL06zFmAw+rGaxqubcswzIO8ByUtjQOmlnrzj4zvhNSYJmwNbTIKrKNlSHYvYZbUDRquH9yMDOKnvGAMMDGttFrM300mVznRgaTEzU9aPqMvj0YxtxUcGIQTar0TBQa7NzEAr59u5VVx5s6naS6QVBrMc6e32f38enVkNFZQT87KlCb2B6ziPmbaRzWWs4qcHsHz8BUCKplo5iu/ePtwaa5AaVT27Lnv+KzS46eyf1CwIDAQAB",
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAys5/Z+MBAOBcdnk3wKDDvsw6UUdTjSRQ+e5Ug2HJnshWunZMQDPGZvctUWpHxDZHAjaFfhpjw1pWtN/ejTpv37jZCp0yF533LfAfxiiQBWfJdKk5Wzyw7kmU8xmO984csukYFH4aTTLwZuhmMLFk3l00mMNPixgnRMuyr7aKIu/+l3wH1kCf1k74MTH4wX5fgNqFvTS3127DNVnTH9sOw+dhEViiQpTz3BFEpIUvl9T7B2rjF0CDmW9xtyNINw2EfENa7PwE0uIyNoZl/+m7yzMKef4lrE6Ch/IMzfT03Q2QvbwFlm+kzQKhSlB18Ohotrkega62fMxdn/s6Rv6oQQIDAQAB"
+  ]
+}

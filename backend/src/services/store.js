@@ -98,12 +98,18 @@ function normalizeMinecraftUuid(value) {
 }
 
 async function isMinecraftTester(uuid) {
+    const tester = await getMinecraftTester(uuid)
+    return tester?.enabled === true
+}
+
+async function getMinecraftTester(uuid) {
     const normalized = normalizeMinecraftUuid(uuid)
     const { rows } = await db.query(
-        'select enabled from minecraft_testers where minecraft_uuid = $1',
+        `select minecraft_uuid, label, enabled, created_at, updated_at
+         from minecraft_testers where minecraft_uuid = $1`,
         [normalized]
     )
-    return rows.length > 0 && rows[0].enabled === true
+    return rows[0] || null
 }
 
 async function isUserActiveMinecraftTester(userId) {
@@ -239,6 +245,7 @@ module.exports = {
     getEntitlements,
     getUser,
     getMinecraftIdentity,
+    getMinecraftTester,
     normalizeMinecraftUuid,
     isMinecraftTester,
     isUserActiveMinecraftTester,
