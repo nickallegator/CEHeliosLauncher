@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const test = require('node:test')
+const vm = require('node:vm')
 const ejs = require('ejs')
 
 const {
@@ -177,6 +178,14 @@ test('Home optional-module summary includes nested optional modules', () => {
     const optional = { getRequired: () => ({ value: false }), subModules: [required] }
     const nested = { getRequired: () => ({ value: true }), subModules: [optional] }
     assert.equal(countOptionalModules([optional, nested]), 2)
+})
+
+test('legacy renderer entry scripts share a collision-free lexical scope', () => {
+    const scriptsDirectory = path.resolve(__dirname, '..', '..', 'app', 'assets', 'js', 'scripts')
+    const landing = fs.readFileSync(path.join(scriptsDirectory, 'landing.js'), 'utf8')
+    const uiBinder = fs.readFileSync(path.join(scriptsDirectory, 'uibinder.js'), 'utf8')
+
+    assert.doesNotThrow(() => new vm.Script(`${landing}\n${uiBinder}`))
 })
 
 test('renderer template contains the brand sequence and persistent navigation', async () => {

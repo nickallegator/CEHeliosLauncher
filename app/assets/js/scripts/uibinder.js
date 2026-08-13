@@ -8,6 +8,7 @@ const { Type }      = require('helios-distribution-types')
 const { LoggerUtil: LoggerUtilUI } = require('helios-core')
 
 const AuthManager   = require('./assets/js/authmanager')
+const UIBinderChannelManager = require('./assets/js/channelmanager')
 const ConfigManager = require('./assets/js/configmanager')
 const { DistroAPI } = require('./assets/js/distromanager')
 const bundledTesterBuild = require('./assets/js/testerchannel').isTesterBuild()
@@ -154,9 +155,11 @@ async function showMainUI(data){
 
     const isLoggedIn = Object.keys(ConfigManager.getAuthAccounts()).length > 0
 
-    // If this is enabled in a development environment we'll get ratelimited.
-    // The relaunch frequency is usually far too high.
-    if(!isDev && isLoggedIn){
+    // Ordinary development launches avoid repeated account validation to
+    // prevent rate limiting. Remote tester channels are the exception: their
+    // backend authorization depends on a current Minecraft access token, and
+    // retaining an expired token leaves the launcher on its bootstrap distro.
+    if((!isDev || UIBinderChannelManager.isRemoteChannel()) && isLoggedIn){
         validateSelectedAccount()
     }
 
@@ -480,9 +483,8 @@ async function validateSelectedAccount(){
             toggleOverlay(true, accLen > 0)
         } else {
             try {
-                const ChannelManager = require('./assets/js/channelmanager')
-                if(ChannelManager.isRemoteChannel()) {
-                    const refreshed = await ChannelManager.refreshAuthorizedDistribution({ allowOffline: true })
+                if(UIBinderChannelManager.isRemoteChannel()) {
+                    const refreshed = await UIBinderChannelManager.refreshAuthorizedDistribution({ allowOffline: true })
                     if(refreshed?.distribution) onDistroRefresh(refreshed.distribution)
                 }
             } catch(err) {
