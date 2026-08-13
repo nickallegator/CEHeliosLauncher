@@ -5,41 +5,20 @@ const store = require('../services/store')
 const config = require('../config')
 const { createRateLimit } = require('../middleware/rateLimit')
 const { asyncRoute } = require('../middleware/asyncRoute')
+const {
+    MinecraftTokenVerificationError,
+    verifyMinecraftAccessToken
+} = require('../services/minecraftTokenVerifier')
 
 const router = express.Router()
 
-const MC_PROFILE_URL = 'https://api.minecraftservices.com/minecraft/profile'
-
-async function fetchMinecraftProfile(accessToken) {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 7000)
+function verifyMinecraftProfile(accessToken) {
     try {
-        const res = await fetch(MC_PROFILE_URL, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Accept': 'application/json'
-            },
-            signal: controller.signal
-        })
-        if(!res.ok){
-            return null
-        }
-        const data = await res.json()
-        if(!data?.id){
-            return null
-        }
-        return data
-    } catch (_err) {
-        return null
-    } finally {
-        clearTimeout(timeout)
+        return verifyMinecraftAccessToken(accessToken)
+    } catch(err) {
+        if(err instanceof MinecraftTokenVerificationError) return null
+        throw err
     }
-}
-
-function extractAvatar(profile){
-    const skin = Array.isArray(profile?.skins) ? profile.skins.find(s => s?.state === 'ACTIVE') : null
-    return skin?.url || null
 }
 
 function buildMinecraftEntitlements(activeTester, requiredEntitlement = config.releases.requiredEntitlement, grants = []) {
@@ -64,15 +43,16 @@ router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }),
         return
     }
 
-    const profile = await fetchMinecraftProfile(accessToken)
+    const profile = verifyMinecraftProfile(accessToken)
     if(!profile){
         res.status(401).json({ error: 'invalid_access_token' })
         return
     }
 
     const providerUserId = profile.id
-    const displayName = profile.name || null
-    const avatarUrl = extractAvatar(profile)
+    const tester = await store.getMinecraftTester(providerUserId)
+    const displayName = tester?.label || null
+    const avatarUrl = null
     const userId = await store.upsertUser('minecraft', providerUserId, displayName, avatarUrl)
     // Authentication is shared by the independently deployed release and
     // schematic services. Always resolve tester membership from the shared
@@ -99,3 +79,4 @@ router.post('/auth/minecraft', createRateLimit({ windowMs: 60_000, limit: 10 }),
 module.exports = router
 module.exports.buildMinecraftEntitlements = buildMinecraftEntitlements
 module.exports.resolveMinecraftEntitlements = resolveMinecraftEntitlements
+module.exports.verifyMinecraftProfile = verifyMinecraftProfile
