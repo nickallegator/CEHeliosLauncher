@@ -102,5 +102,12 @@ test('authorized distribution service discovery is injected without rebuilding t
         features: { core: true, collections: false, creators: false },
         allowedVisibilities: ['public']
     })
+    assert.deepEqual(distribution.community, {
+        schemaVersion: 1,
+        enabled: true,
+        apiBaseUrl: 'https://schematics.example.test',
+        features: { catalog: true, publishing: true },
+        supportedTypes: ['schematics']
+    })
     assert.deepEqual(injectSchematicsService({ servers: [] }, { publicApiUrl: '' }), { servers: [] })
 })
