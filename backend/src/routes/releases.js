@@ -12,12 +12,20 @@ const distributionLimit = createRateLimit({ windowMs: 60_000, limit: 30 })
 
 function injectSchematicsService(distribution, schematicsConfig = config.schematics) {
     if(!schematicsConfig.publicApiUrl) return distribution
+    const apiBaseUrl = schematicsConfig.publicApiUrl.replace(/\/+$/, '')
     distribution.schematics = {
         schemaVersion: 2,
         enabled: true,
-        apiBaseUrl: schematicsConfig.publicApiUrl.replace(/\/+$/, ''),
+        apiBaseUrl,
         features: schematicsConfig.features,
         allowedVisibilities: ['public']
+    }
+    distribution.community = {
+        schemaVersion: 1,
+        enabled: true,
+        apiBaseUrl,
+        features: { catalog: true, publishing: schematicsConfig.writeMode !== 'disabled' },
+        supportedTypes: ['schematics']
     }
     return distribution
 }
