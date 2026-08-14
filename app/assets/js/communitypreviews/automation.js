@@ -20,6 +20,7 @@ class AutomationCommunityPreview {
         this.camera = { panX: 0, panY: 0, zoom: 1 }
         this.drag = null
         this.destroyed = false
+        this.hasMeasuredSize = false
         this.handlers = []
     }
 
@@ -190,6 +191,14 @@ class AutomationCommunityPreview {
         const width = Math.max(1, Math.round(rect.width * scale))
         const height = Math.max(1, Math.round(rect.height * scale))
         if(width === this.canvas.width && height === this.canvas.height) return
+        if(!this.hasMeasuredSize) {
+            this.canvas.width = width
+            this.canvas.height = height
+            this.hasMeasuredSize = true
+            this.camera = fitGraph(this.asset?.bounds, width, height, 48)
+            this.render()
+            return
+        }
         const centre = screenToWorld(this.camera, this.canvas.width / 2, this.canvas.height / 2)
         this.canvas.width = width
         this.canvas.height = height

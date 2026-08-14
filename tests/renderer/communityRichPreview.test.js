@@ -14,6 +14,8 @@ const {
     normalizeAutomationBundle,
     normalizeGradientType,
     parseBedrockGeometry,
+    renderAutomationSvg,
+    renderGraphCanvas,
     renderTexturedGradientSvg,
     sampleGradient,
     screenToWorld,
@@ -148,15 +150,15 @@ test('interactive gradient tiles draw only the resolved top-texture frame', () =
     assert.deepEqual(calls, [[image, 0, 16, 16, 16, 20, 30, 40, 50]])
 })
 
-test('Builder Preset publishing always uses the generated textured preview', () => {
+test('Builder Preset and Automation publishing always use generated artifact previews', () => {
     const source = fs.readFileSync(path.resolve(
         __dirname, '..', '..', 'app', 'assets', 'js', 'scripts', 'landing', 'schematics', 'community-content.js'
     ), 'utf8')
     const template = fs.readFileSync(path.resolve(
         __dirname, '..', '..', 'app', 'partials', 'landing', 'community', 'modals', 'content-publish.ejs'
     ), 'utf8')
-    assert.match(source, /type === 'builder-presets' \? null : genericCommunitySelectedPreview/)
-    assert.match(source, /previewFile\.disabled = type === 'builder-presets'/)
+    assert.match(source, /const automaticPreview = type === 'builder-presets' \|\| type === 'automation'/)
+    assert.match(source, /previewFile\.disabled = automaticPreview/)
     assert.match(template, /id="communityContentPreviewFileRow"/)
 })
 
@@ -180,6 +182,43 @@ test('Automation normalization preserves root order, authored positions, routes,
     const zoomed = zoomAt(camera, 1.5, 400, 240)
     const after = screenToWorld(zoomed, 400, 240)
     assert.ok(Math.abs(cursorWorld.x - after.x) < 1e-8 && Math.abs(cursorWorld.y - after.y) < 1e-8)
+})
+
+test('Automation nodes clip category headers to one professional rounded silhouette', () => {
+    const calls = []
+    const context = { canvas: { width: 640, height: 360 } }
+    for(const method of ['arc', 'beginPath', 'clearRect', 'clip', 'fill', 'fillRect', 'fillText', 'lineTo', 'moveTo', 'restore', 'roundRect', 'save', 'scale', 'stroke', 'translate']) {
+        context[method] = (...args) => calls.push([method, ...args])
+    }
+    const node = {
+        id: 'node', title: 'Manual Trigger', category: 'events', x: 40, y: 50,
+        width: 180, height: 86, inputs: [], outputs: []
+    }
+    const asset = { nodes: [node], nodesById: new Map([[node.id, node]]), edges: [] }
+    renderGraphCanvas(context, asset, { panX: 0, panY: 0, zoom: 1 })
+    const headerIndex = calls.findIndex(call => call[0] === 'fillRect' && call[1] === node.x && call[2] === node.y && call[3] === node.width && call[4] === 32)
+    const clipIndex = calls.findIndex(call => call[0] === 'clip')
+    assert.ok(clipIndex >= 0 && clipIndex < headerIndex)
+    assert.equal(calls.some(call => call[0] === 'fillRect' && call[3] === 5 && call[4] === node.height), false)
+})
+
+test('Automation catalog previews fit the full graph into solid category-colored tiles', () => {
+    const svg = renderAutomationSvg({
+        format: 'cobblepower_automation_bundle', version: 1, rootAsset: 'root',
+        assets: [{ id: 'root', kind: 'operation', graph: {
+            nodes: [
+                { id: 'event', type: 'cobblepower:event_manual_trigger', x: 0, y: 0 },
+                { id: 'data', type: 'cobblepower:data_variable', x: 1200, y: 0 },
+                { id: 'control', type: 'cobblepower:control_if', x: 0, y: 800 },
+                { id: 'action', type: 'cobblepower:action_send_message', x: 1200, y: 800 }
+            ],
+            edges: [{ id: 'edge', fromNode: 'event', toNode: 'action', route: [] }]
+        } }]
+    })
+    for(const color of ['#e0b35f', '#63c4c7', '#a39af6', '#77d68e']) assert.match(svg, new RegExp(`fill="${color}"`))
+    assert.match(svg, /<title>Automation graph preview: 4 nodes, 1 connections/)
+    assert.doesNotMatch(svg, /<text\s/)
+    assert.doesNotMatch(svg, /width="4" height=/)
 })
 
 test('static Bedrock parser produces bounded textured triangle meshes', () => {

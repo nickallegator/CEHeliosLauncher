@@ -17,7 +17,7 @@ const {
 } = require('../../libraries/community-core')
 const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
 const { renderSchematicPreviewSvg } = require('../../libraries/schematics-preview')
-const { renderTexturedGradientSvg, sampleGradient } = require('../../libraries/community-rendering')
+const { renderAutomationSvg, renderTexturedGradientSvg, sampleGradient } = require('../../libraries/community-rendering')
 const {
     JarResourceProvider,
     createResourceStack,
@@ -167,16 +167,51 @@ function createAutomationArtifact() {
                             {
                                 nodeId: '31111111-1111-4111-8111-111111111111',
                                 blockTypeId: 'cobblepower:event_manual_trigger',
-                                x: 80,
-                                y: 120,
+                                x: 40,
+                                y: 170,
                                 parameters: {}
                             },
                             {
                                 nodeId: '32222222-2222-4222-8222-222222222222',
+                                blockTypeId: 'cobblepower:data_get_player',
+                                x: 320,
+                                y: 50,
+                                parameters: {}
+                            },
+                            {
+                                nodeId: '35555555-5555-4555-8555-555555555555',
+                                blockTypeId: 'cobblepower:data_variable',
+                                x: 320,
+                                y: 290,
+                                parameters: { name: 'available_apricorns' }
+                            },
+                            {
+                                nodeId: '36666666-6666-4666-8666-666666666666',
+                                blockTypeId: 'cobblepower:control_if',
+                                x: 600,
+                                y: 170,
+                                parameters: {}
+                            },
+                            {
+                                nodeId: '37777777-7777-4777-8777-777777777777',
                                 blockTypeId: 'cobblepower:action_send_message',
-                                x: 420,
-                                y: 120,
+                                x: 880,
+                                y: 50,
                                 parameters: { message: 'Apricorn sorting cycle complete' }
+                            },
+                            {
+                                nodeId: '38888888-8888-4888-8888-888888888888',
+                                blockTypeId: 'cobblepower:action_issue_request',
+                                x: 880,
+                                y: 290,
+                                parameters: {}
+                            },
+                            {
+                                nodeId: '39999999-9999-4999-8999-999999999999',
+                                blockTypeId: 'cobblepower:control_wait',
+                                x: 1160,
+                                y: 170,
+                                parameters: { ticks: '20' }
                             }
                         ],
                         edges: [
@@ -184,7 +219,42 @@ function createAutomationArtifact() {
                                 edgeId: '33333333-3333-4333-8333-333333333333',
                                 fromNodeId: '31111111-1111-4111-8111-111111111111',
                                 fromPin: 'next',
-                                toNodeId: '32222222-2222-4222-8222-222222222222',
+                                toNodeId: '36666666-6666-4666-8666-666666666666',
+                                toPin: 'input'
+                            },
+                            {
+                                edgeId: '34444444-3333-4333-8333-333333333333',
+                                fromNodeId: '32222222-2222-4222-8222-222222222222',
+                                fromPin: 'player',
+                                toNodeId: '36666666-6666-4666-8666-666666666666',
+                                toPin: 'left'
+                            },
+                            {
+                                edgeId: '35555555-3333-4333-8333-333333333333',
+                                fromNodeId: '35555555-5555-4555-8555-555555555555',
+                                fromPin: 'value',
+                                toNodeId: '36666666-6666-4666-8666-666666666666',
+                                toPin: 'right'
+                            },
+                            {
+                                edgeId: '36666666-3333-4333-8333-333333333333',
+                                fromNodeId: '36666666-6666-4666-8666-666666666666',
+                                fromPin: 'true',
+                                toNodeId: '37777777-7777-4777-8777-777777777777',
+                                toPin: 'input'
+                            },
+                            {
+                                edgeId: '37777777-3333-4333-8333-333333333333',
+                                fromNodeId: '36666666-6666-4666-8666-666666666666',
+                                fromPin: 'false',
+                                toNodeId: '38888888-8888-4888-8888-888888888888',
+                                toPin: 'input'
+                            },
+                            {
+                                edgeId: '38888888-3333-4333-8333-333333333333',
+                                fromNodeId: '37777777-7777-4777-8777-777777777777',
+                                fromPin: 'next',
+                                toNodeId: '39999999-9999-4999-8999-999999999999',
                                 toPin: 'input'
                             }
                         ]
@@ -416,7 +486,9 @@ function createEntry(type, definition, artifact) {
         thumbnailUrl: `/v1/community/items/${type}/${itemId}/preview`,
         capabilities: { canEdit: false, canDelete: false, canReport: true, liked: false },
         artifact: bytes,
-        preview: previewSvg(type, definition.title),
+        preview: type === TYPES.AUTOMATION
+            ? Buffer.from(renderAutomationSvg(bytes), 'utf8')
+            : previewSvg(type, definition.title),
         renderAssets: result.renderAssets || []
     }
 }

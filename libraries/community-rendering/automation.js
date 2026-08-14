@@ -2,6 +2,8 @@
 
 const NODE_WIDTH = 180
 const NODE_MIN_HEIGHT = 68
+const NODE_HEADER_HEIGHT = 32
+const NODE_RADIUS = 10
 const SPATIAL_CELL_SIZE = 256
 const CATEGORY_COLORS = Object.freeze({
     events: '#e0b35f', control: '#a39af6', data: '#63c4c7', actions: '#77d68e', functions: '#ff8aa0', unknown: '#9ec8e6'
@@ -108,10 +110,12 @@ function graphBounds(nodes) {
     return { minX, minY, maxX, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) }
 }
 
-function fitGraph(bounds, viewportWidth, viewportHeight, padding = 48) {
+function fitGraph(bounds, viewportWidth, viewportHeight, padding = 48, limits = {}) {
     const availableWidth = Math.max(1, viewportWidth - padding * 2)
     const availableHeight = Math.max(1, viewportHeight - padding * 2)
-    const zoom = Math.max(0.2, Math.min(2, Math.min(availableWidth / bounds.width, availableHeight / bounds.height)))
+    const minimumZoom = Number.isFinite(limits.minimumZoom) ? limits.minimumZoom : 0.2
+    const maximumZoom = Number.isFinite(limits.maximumZoom) ? limits.maximumZoom : 2
+    const zoom = Math.max(minimumZoom, Math.min(maximumZoom, Math.min(availableWidth / bounds.width, availableHeight / bounds.height)))
     return {
         zoom,
         panX: bounds.minX - (viewportWidth / zoom - bounds.width) / 2,
@@ -207,15 +211,22 @@ function renderGraphCanvas(context, asset, camera, options = {}) {
         if(!visibleIds.has(edge.fromNode) && !visibleIds.has(edge.toNode)) continue
         const route = edgeRoute(edge, asset)
         if(route.length < 2) continue
-        context.beginPath()
-        context.moveTo(route[0].x, route[0].y)
-        for(const point of route.slice(1)) context.lineTo(point.x, point.y)
-        context.strokeStyle = options.selectedNodeId && [edge.fromNode, edge.toNode].includes(options.selectedNodeId) ? '#f2b36d' : '#61c8b0'
-        context.lineWidth = 3 / camera.zoom
-        context.stroke()
+        drawEdge(context, route, options.selectedNodeId && [edge.fromNode, edge.toNode].includes(options.selectedNodeId), camera.zoom)
     }
     for(const node of visible) drawNode(context, node, options.selectedNodeId === node.id, camera.zoom)
     context.restore()
+}
+
+function drawEdge(context, route, selected, zoom) {
+    context.beginPath()
+    context.moveTo(route[0].x, route[0].y)
+    for(const point of route.slice(1)) context.lineTo(point.x, point.y)
+    context.strokeStyle = 'rgba(4, 10, 9, .88)'
+    context.lineWidth = (selected ? 7 : 6) / zoom
+    context.stroke()
+    context.strokeStyle = selected ? '#f2b36d' : '#61c8b0'
+    context.lineWidth = (selected ? 3.5 : 2.5) / zoom
+    context.stroke()
 }
 
 function drawGrid(context, camera, width, height) {
@@ -233,34 +244,72 @@ function drawGrid(context, camera, width, height) {
 
 function drawNode(context, node, selected, zoom) {
     const category = CATEGORY_COLORS[node.category] || CATEGORY_COLORS.unknown
-    context.fillStyle = '#263b37'
-    context.strokeStyle = selected ? '#db8044' : category
-    context.lineWidth = (selected ? 4 : 2) / zoom
-    roundedRect(context, node.x, node.y, node.width, node.height, 8)
+    const outline = selected ? '#f2b36d' : 'rgba(210, 235, 227, .48)'
+
+    // At overview zoom the category itself is the useful information. Solid
+    // tiles avoid illegible labels and make graph complexity easy to scan.
+    if(zoom < 0.42) {
+        context.fillStyle = category
+        roundedRect(context, node.x, node.y, node.width, node.height, NODE_RADIUS)
+        context.fill()
+        context.strokeStyle = selected ? '#fff0cf' : 'rgba(5, 12, 11, .82)'
+        context.lineWidth = (selected ? 5 : 2) / zoom
+        context.stroke()
+        return
+    }
+
+    if(selected) {
+        context.strokeStyle = 'rgba(242, 179, 109, .34)'
+        context.lineWidth = 8 / zoom
+        roundedRect(context, node.x, node.y, node.width, node.height, NODE_RADIUS + 1)
+        context.stroke()
+    }
+
+    roundedRect(context, node.x, node.y, node.width, node.height, NODE_RADIUS)
+    context.fillStyle = '#223531'
     context.fill()
-    context.stroke()
+    context.save()
+    context.clip()
     context.fillStyle = category
-    context.fillRect(node.x, node.y, 5, node.height)
+    context.fillRect(node.x, node.y, node.width, NODE_HEADER_HEIGHT)
+    context.fillStyle = 'rgba(5, 12, 11, .16)'
+    context.fillRect(node.x, node.y + NODE_HEADER_HEIGHT - 2, node.width, 2)
+    context.restore()
+    roundedRect(context, node.x, node.y, node.width, node.height, NODE_RADIUS)
+    context.strokeStyle = outline
+    context.lineWidth = (selected ? 3 : 1.5) / zoom
+    context.stroke()
+
     context.fillStyle = '#eef8f3'
-    context.font = '700 14px sans-serif'
-    context.fillText(node.title.slice(0, 25), node.x + 14, node.y + 24, node.width - 24)
+    context.font = '700 13px sans-serif'
+    context.fillText(node.title.slice(0, 25), node.x + 12, node.y + 21, node.width - 24)
     context.font = '11px sans-serif'
     const inputs = node.inputs.slice(0, 5)
     const outputs = node.outputs.slice(0, 5)
+    if(zoom < 0.62) return
     for(let index = 0; index < Math.max(inputs.length, outputs.length); index += 1) {
-        const y = node.y + 44 + index * 17
+        const y = node.y + 45 + index * 17
         if(inputs[index]) {
             context.fillStyle = PIN_COLORS[inputs[index].type] || PIN_COLORS.any
-            context.beginPath(); context.arc(node.x, y, 4, 0, Math.PI * 2); context.fill()
+            drawPin(context, node.x, y)
             context.fillStyle = '#b9cdc7'; context.textAlign = 'left'; context.fillText(inputs[index].id, node.x + 9, y + 4, 72)
         }
         if(outputs[index]) {
             context.fillStyle = PIN_COLORS[outputs[index].type] || PIN_COLORS.any
-            context.beginPath(); context.arc(node.x + node.width, y, 4, 0, Math.PI * 2); context.fill()
+            drawPin(context, node.x + node.width, y)
             context.fillStyle = '#b9cdc7'; context.textAlign = 'right'; context.fillText(outputs[index].id, node.x + node.width - 9, y + 4, 72)
         }
     }
     context.textAlign = 'left'
+}
+
+function drawPin(context, x, y) {
+    context.beginPath()
+    context.arc(x, y, 4.5, 0, Math.PI * 2)
+    context.fill()
+    context.strokeStyle = '#10201d'
+    context.lineWidth = 1.25
+    context.stroke()
 }
 
 function roundedRect(context, x, y, width, height, radius) {
@@ -278,27 +327,34 @@ function renderAutomationSvg(input, options = {}) {
     const width = Number(options.width || 768)
     const height = Number(options.height || 432)
     if(!asset) return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#14201e"/></svg>`
-    const camera = fitGraph(asset.bounds, width, height, 52)
+    const camera = fitGraph(asset.bounds, width, height, 30, { minimumZoom: 0.025, maximumZoom: 1.2 })
     const point = (x, y) => worldToScreen(camera, x, y)
     const edges = asset.edges.map(edge => {
         const route = edgeRoute(edge, asset).map(value => point(value.x, value.y))
         if(route.length < 2) return ''
-        return `<polyline points="${route.map(value => `${value.x.toFixed(2)},${value.y.toFixed(2)}`).join(' ')}" fill="none" stroke="#61c8b0" stroke-width="3"/>`
+        const points = route.map(value => `${value.x.toFixed(2)},${value.y.toFixed(2)}`).join(' ')
+        return `<polyline points="${points}" fill="none" stroke="#06100e" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${points}" fill="none" stroke="#61c8b0" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>`
     }).join('')
     const nodes = asset.nodes.map(node => {
         const p = point(node.x, node.y)
         const color = CATEGORY_COLORS[node.category] || CATEGORY_COLORS.unknown
-        const nodeWidth = node.width * camera.zoom
-        const nodeHeight = node.height * camera.zoom
-        return `<g transform="translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})"><rect width="${nodeWidth.toFixed(2)}" height="${nodeHeight.toFixed(2)}" rx="7" fill="#263b37" stroke="${color}" stroke-width="2"/><rect width="4" height="${nodeHeight.toFixed(2)}" fill="${color}"/><text x="12" y="23" fill="#eef8f3" font-family="sans-serif" font-size="13" font-weight="700">${escapeXml(node.title.slice(0, 28))}</text></g>`
+        const nodeWidth = Math.max(5, node.width * camera.zoom)
+        const nodeHeight = Math.max(4, node.height * camera.zoom)
+        const radius = Math.max(1.5, Math.min(7, nodeHeight * .18))
+        return `<rect x="${p.x.toFixed(2)}" y="${p.y.toFixed(2)}" width="${nodeWidth.toFixed(2)}" height="${nodeHeight.toFixed(2)}" rx="${radius.toFixed(2)}" fill="${color}" stroke="#07110f" stroke-width="1.5"/>`
     }).join('')
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#14201e"/><path d="M0 48H${width}M0 96H${width}M0 144H${width}M0 192H${width}M0 240H${width}M0 288H${width}M0 336H${width}M0 384H${width}" stroke="#345049" opacity=".4"/>${edges}${nodes}<text x="20" y="${height - 18}" fill="#a7c9bf" font-family="sans-serif" font-size="13">${asset.nodes.length} nodes · ${bundle.assets.length} bundled assets</text></svg>`
+    const horizontalGrid = Array.from({ length: Math.ceil(height / 48) }, (_, index) => `M0 ${(index + 1) * 48}H${width}`).join('')
+    const verticalGrid = Array.from({ length: Math.ceil(width / 48) }, (_, index) => `M${(index + 1) * 48} 0V${height}`).join('')
+    const description = `${asset.nodes.length} nodes, ${asset.edges.length} connections, ${bundle.assets.length} bundled assets`
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Automation graph preview: ${escapeXml(description)}"><title>Automation graph preview: ${escapeXml(description)}</title><rect width="100%" height="100%" fill="#101c1a"/><path d="${horizontalGrid}${verticalGrid}" stroke="#345049" stroke-width="1" opacity=".32"/>${edges}${nodes}<rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#52766c" stroke-width="2" opacity=".6"/></svg>`
 }
 
 module.exports = {
     CATEGORY_COLORS,
     GraphSpatialIndex,
+    NODE_HEADER_HEIGHT,
     NODE_MIN_HEIGHT,
+    NODE_RADIUS,
     NODE_WIDTH,
     PIN_COLORS,
     edgeRoute,

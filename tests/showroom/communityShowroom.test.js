@@ -76,6 +76,12 @@ test('local showroom serves representative read-only artifacts without productio
     assert.equal(builderEntry.typeData.previewMode, 'fallback')
     const builderFallback = await fetch(`${runtime.apiBaseUrl}${builderEntry.thumbnailUrl}`).then(response => response.text())
     assert.match(builderFallback, /TEXTURES UNAVAILABLE/)
+    const automationEntry = catalog.items.find(entry => entry.type === 'automation')
+    const automationPreview = await fetch(`${runtime.apiBaseUrl}${automationEntry.thumbnailUrl}`).then(response => response.text())
+    assert.match(automationPreview, /Automation graph preview:/)
+    assert.match(automationPreview, /fill="#e0b35f"/)
+    assert.match(automationPreview, /fill="#a39af6"/)
+    assert.doesNotMatch(automationPreview, /LOCAL COMMUNITY SHOWROOM/)
 
     const schematicEntry = catalog.items.find(entry => entry.type === 'schematics')
     const schematicDetail = await fetch(`${runtime.apiBaseUrl}/v1/schematics/${schematicEntry.id}`).then(response => response.json())

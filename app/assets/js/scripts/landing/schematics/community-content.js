@@ -115,8 +115,9 @@ async function prepareGenericCommunityPublication(type, artifactPath, previewPat
         playerUuid: publishContext.account?.uuid
     })
     const artifact = prepareCommunityArtifact(type, localSource)
-    let preview = type === 'builder-presets' ? null : genericCommunitySelectedPreview(previewPath)
-    if(type === 'builder-presets' || (type === 'automation' && !preview)) preview = await generateCommunityPreview(type, artifact)
+    const automaticPreview = type === 'builder-presets' || type === 'automation'
+    let preview = automaticPreview ? null : genericCommunitySelectedPreview(previewPath)
+    if(automaticPreview) preview = await generateCommunityPreview(type, artifact)
     const showcase = type === 'resource-packs'
         ? (genericCommunityShowcase || defaultShowcase(discoverResourcePackShowcase(artifactPath)))
         : null
@@ -517,8 +518,9 @@ function openGenericCommunityPublisher(type, target = null){
     artifact.value = ''
     const previewFile = genericCommunityElement('communityContentPreviewFile')
     previewFile.value = ''
-    previewFile.disabled = type === 'builder-presets'
-    genericCommunityElement('communityContentPreviewFileRow').hidden = type === 'builder-presets'
+    const automaticPreview = type === 'builder-presets' || type === 'automation'
+    previewFile.disabled = automaticPreview
+    genericCommunityElement('communityContentPreviewFileRow').hidden = automaticPreview
     genericCommunityElement('communityContentArtifactHint').textContent = type === 'automation'
         ? communityCopy('automationBundleHint')
         : type === 'builder-presets'

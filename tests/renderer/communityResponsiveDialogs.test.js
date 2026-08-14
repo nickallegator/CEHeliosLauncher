@@ -57,6 +57,7 @@ test('resize observations coalesce frames, suppress duplicates, and stop after d
 test('Automation pointer coordinates and camera centre remain stable across canvas resizing', () => {
     const preview = Object.create(AutomationCommunityPreview.prototype)
     preview.destroyed = false
+    preview.hasMeasuredSize = true
     preview.camera = { panX: 20, panY: 30, zoom: 1.5 }
     preview.canvas = {
         width: 800,
