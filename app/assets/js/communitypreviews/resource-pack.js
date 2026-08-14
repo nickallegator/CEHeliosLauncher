@@ -98,6 +98,7 @@ class ResourcePackCommunityPreview {
                 const viewer = new CommunityModelViewer(canvas); await viewer.setModel(parseBedrockGeometry(resources.geometry), resources.texture); this.activeRenderer = viewer
             }
             this.status.textContent = `${this.mode === 'pack' ? 'Pack overlay' : 'Locked base resources'} · drag to rotate and use the wheel to zoom.`
+            this.activeRenderer?.resize?.(this.lastSize)
         } catch(error) {
             this.status.textContent = `Interactive preview unavailable: ${error.message}`
             this.status.dataset.state = 'fallback'
@@ -105,6 +106,7 @@ class ResourcePackCommunityPreview {
     }
 
     update(options = {}) { if(options.showcase) this.showcase = options.showcase; this.renderRail(); return this.renderSubject() }
+    resize(size) { this.lastSize = size; this.activeRenderer?.resize?.(size); this.activeRenderer?.render?.() }
     cancel() { this.activeRenderer?.destroy?.(); this.activeRenderer = null }
     destroy() { this.destroyed = true; this.cancel(); this.host.replaceChildren() }
 }

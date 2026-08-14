@@ -90,6 +90,7 @@ class TrainerCommunityPreview {
     }
 
     update(artifact) { this.viewer?.destroy(); this.artifact = JSON.parse(Buffer.from(artifact).toString('utf8')); this.renderParty(); return this.loadModel() }
+    resize(size) { this.viewer?.resize?.(size) }
     cancel() { /* Resource provider reads are bounded and become inert after destroy. */ }
     destroy() { this.destroyed = true; this.viewer?.destroy(); this.viewer = null; this.host.replaceChildren() }
 }

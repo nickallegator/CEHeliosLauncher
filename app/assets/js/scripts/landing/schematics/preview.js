@@ -1,3 +1,5 @@
+let { observeCommunityPreviewSize: observeSchematicPreviewSize } = require('./assets/js/communitypreviews/resize-observer')
+
 function ensureSchematicsMeshWorker(){
     if(schematicsMeshWorker){
         return schematicsMeshWorker
@@ -537,6 +539,7 @@ class SchematicPreviewRenderer {
         this.needsRender = true
         this.isActive = true
         this.frameRequested = false
+        this.resizeObserver = null
         this.view = createMat4()
         this.proj = createMat4()
         this.viewProj = createMat4()
@@ -545,17 +548,15 @@ class SchematicPreviewRenderer {
         this._onPointerUp = this.onPointerUp.bind(this)
         this._onWheel = this.onWheel.bind(this)
         this._onContextMenu = (event) => event.preventDefault()
-        this._onResize = () => this.requestRender()
 
         this.container.addEventListener('pointerdown', this._onPointerDown)
         window.addEventListener('pointermove', this._onPointerMove)
         window.addEventListener('pointerup', this._onPointerUp)
         this.container.addEventListener('wheel', this._onWheel, { passive: false })
         this.container.addEventListener('contextmenu', this._onContextMenu)
-        window.addEventListener('resize', this._onResize)
-
         if(this.isWebGL){
             this.initGL()
+            this.observeSize()
             this.requestRender()
         }
     }
@@ -563,6 +564,13 @@ class SchematicPreviewRenderer {
     resizeCanvas(){
         return resizeCanvasToContainer(this.canvas, this.container)
     }
+
+    observeSize(){
+        if(this.resizeObserver || !this.container) return
+        this.resizeObserver = observeSchematicPreviewSize(this.container, () => this.resize())
+    }
+
+    resize(){ this.requestRender() }
 
     initGL(){
         const gl = this.gl
@@ -896,7 +904,11 @@ class SchematicPreviewRenderer {
     setActive(active){
         this.isActive = Boolean(active)
         if(this.isActive){
+            this.observeSize()
             this.requestRender()
+        } else {
+            this.resizeObserver?.disconnect()
+            this.resizeObserver = null
         }
     }
 
@@ -908,7 +920,8 @@ class SchematicPreviewRenderer {
         window.removeEventListener('pointerup', this._onPointerUp)
         this.container?.removeEventListener('wheel', this._onWheel)
         this.container?.removeEventListener('contextmenu', this._onContextMenu)
-        window.removeEventListener('resize', this._onResize)
+        this.resizeObserver?.disconnect()
+        this.resizeObserver = null
         this.gl?.getExtension('WEBGL_lose_context')?.loseContext()
         this.canvas = null
         this.container = null

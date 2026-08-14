@@ -69,11 +69,68 @@ async function closeOpenDetail(page, closeSelector, detailSelector) {
 }
 
 async function resetShowroomCatalog(page) {
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-    await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 20_000 })
-    await page.locator('#shellNavCommunity').click()
+    for(const selector of ['#communityContentDetail', '#schematicsDetail']) {
+        const root = page.locator(selector)
+        if(await root.getAttribute('data-open') === 'true') {
+            await page.keyboard.press('Escape')
+            await root.waitFor({ state: 'hidden', timeout: 10_000 })
+        }
+    }
+    const nav = page.locator('#shellNavCommunity')
+    if(await nav.getAttribute('aria-current') !== 'page') await nav.click()
     await page.locator('.schematicCard').first().waitFor({ state: 'visible', timeout: 10_000 })
+}
+
+async function setShowroomWindowSize(application, width, height) {
+    await application.evaluate(({ BrowserWindow }, size) => {
+        const window = BrowserWindow.getAllWindows()[0]
+        if(!window) throw new Error('The showroom window is unavailable.')
+        window.setContentSize(size.width, size.height)
+        window.center()
+    }, { width, height })
+    await new Promise(resolve => setTimeout(resolve, 180))
+}
+
+async function verifyResponsiveDetailLayout(application, page, width, height) {
+    await setShowroomWindowSize(application, width, height)
+    await resetShowroomCatalog(page)
+    const cardPreview = page.locator('.schematicCard[data-community-key^="builder-presets:"] .schematicPreview').first()
+    await cardPreview.click()
+    const root = page.locator('#communityContentDetail')
+    const panel = page.locator('#communityContentDetailPanel')
+    const header = panel.locator('.communityDialogHeader')
+    const footer = panel.locator('.communityDialogFooter')
+    const media = panel.locator('.communityContentDetailMedia')
+    const copy = panel.locator('.communityContentDetailCopy')
+    await root.waitFor({ state: 'visible', timeout: 10_000 })
+    await waitForAttribute(page.locator('#communityContentRichView'), 'data-state', 'ready')
+    const [viewportBox, panelBox, headerBox, footerBox, mediaBox, copyBox] = await Promise.all([
+        page.locator('html').boundingBox(), panel.boundingBox(), header.boundingBox(), footer.boundingBox(), media.boundingBox(), copy.boundingBox()
+    ])
+    if(!viewportBox || !panelBox || !headerBox || !footerBox || !mediaBox || !copyBox) throw new Error(`Unable to measure the ${width}x${height} Community dialog.`)
+    const epsilon = 2
+    if(panelBox.x < -epsilon || panelBox.y < -epsilon || panelBox.x + panelBox.width > viewportBox.width + epsilon || panelBox.y + panelBox.height > viewportBox.height + epsilon) {
+        throw new Error(`Community dialog exceeds the ${width}x${height} viewport (viewport ${JSON.stringify(viewportBox)}, panel ${JSON.stringify(panelBox)}).`)
+    }
+    if(headerBox.y < panelBox.y - epsilon || footerBox.y + footerBox.height > panelBox.y + panelBox.height + epsilon) {
+        throw new Error(`Community dialog navigation is clipped at ${width}x${height}.`)
+    }
+    const compact = width < 1100 || height < 640
+    if(compact && mediaBox.y + mediaBox.height > copyBox.y + epsilon) throw new Error(`Compact Community detail does not stack at ${width}x${height}.`)
+    if(!compact && mediaBox.x + mediaBox.width > copyBox.x + epsilon) throw new Error(`Wide Community detail does not split at ${width}x${height}.`)
+    const canvas = page.locator('.communityGradientCanvas')
+    const canvasBox = await canvas.boundingBox()
+    const deadline = Date.now() + 10_000
+    let backingWidth = 0
+    while(Date.now() < deadline) {
+        backingWidth = Number(await canvas.getAttribute('width')) || 0
+        if(canvasBox && backingWidth >= Math.floor(canvasBox.width)) break
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    if(!canvasBox || backingWidth < Math.floor(canvasBox.width)) throw new Error(`Builder canvas backing store did not resize at ${width}x${height}.`)
+    await page.keyboard.press('Escape')
+    await root.waitFor({ state: 'hidden', timeout: 10_000 })
+    if(await page.locator('.schematicCard:focus').count() === 0) throw new Error(`Community detail did not restore focus at ${width}x${height}.`)
 }
 
 async function run(argv = process.argv.slice(2)) {
@@ -166,6 +223,10 @@ async function run(argv = process.argv.slice(2)) {
                 }
                 console.log('Verified Trainer and Resource Pack interactive stages against local game resources.')
             }
+            for(const [width, height] of [[1600, 900], [1180, 680], [980, 600]]) {
+                await verifyResponsiveDetailLayout(application, page, width, height)
+            }
+            console.log('Verified responsive Community dialogs at large, default, and minimum launcher sizes.')
             if(rendererErrors.length > 0) throw new Error(`Renderer error during showroom verification: ${rendererErrors[0]}`)
             await application.close()
             application = null

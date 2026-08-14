@@ -378,7 +378,7 @@ async function openGenericCommunityDetail(entry){
     const root = genericCommunityElement('communityContentDetail')
     const panel = genericCommunityElement('communityContentDetailPanel')
     genericCommunityDetailEntry = entry
-    openModal(root, panel)
+    openModal(root, panel, { onRequestClose: closeGenericCommunityDetail, initialFocus: '#communityContentDetailClose' })
     try {
         const detail = await client.detail(entry.type, entry.id, { headers: getSchematicsAuthHeaders() })
         if(detail) genericCommunityDetailEntry = detail
@@ -534,7 +534,7 @@ function openGenericCommunityPublisher(type, target = null){
     genericCommunityElement('communityContentPublishDescription').value = target?.description || ''
     genericCommunityElement('communityContentPublishTags').value = (target?.tags || []).join(', ')
     if(target?.license) genericCommunityElement('communityContentPublishLicense').value = target.license
-    openModal(root, panel)
+    openModal(root, panel, { onRequestClose: closeGenericCommunityPublisher, initialFocus: '#communityContentPublishClose' })
 }
 
 function closeGenericCommunityPublisher(){

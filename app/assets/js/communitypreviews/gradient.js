@@ -6,6 +6,7 @@ const { Worker } = require('worker_threads')
 const path = require('path')
 const { normalizeGradientDocument, sampleGradient } = require('../../../../libraries/community-rendering')
 const { resolveBlockTopTexture } = require('../../../../libraries/minecraft-resources')
+const { calculatePreviewSize } = require('./resize-observer')
 
 function loadImage(texture) {
     return new Promise((resolve, reject) => {
@@ -256,6 +257,16 @@ class GradientCommunityPreview {
             }
         }
         this.canvas.setAttribute('aria-label', `${sample.model.type.type} gradient at ${sample.cells} by ${sample.cells} blocks in ${this.mode} mode`)
+    }
+
+    resize(size) {
+        if(this.destroyed || !this.canvas) return
+        const rect = this.canvas.getBoundingClientRect()
+        const canvasSize = calculatePreviewSize(rect.width, rect.height, size?.devicePixelRatio)
+        if(this.canvas.width === canvasSize.pixelWidth && this.canvas.height === canvasSize.pixelHeight) return
+        this.canvas.width = canvasSize.pixelWidth
+        this.canvas.height = canvasSize.pixelHeight
+        if(this.lastSample) this.renderSample(this.lastSample)
     }
 
     renderError(message) {

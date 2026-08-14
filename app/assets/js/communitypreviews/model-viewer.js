@@ -115,6 +115,8 @@ class CommunityModelViewer {
         gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount)
     }
 
+    resize() { this.render() }
+
     destroy() {
         if(this.destroyed) return
         this.destroyed = true; this.listeners.splice(0).forEach(remove => remove())

@@ -276,7 +276,7 @@ async function openSchematicDetail(entry){
     }
     updateInstallButtonState(entry)
 
-    openModal(schematicsDetail, schematicsDetailPanel)
+    openModal(schematicsDetail, schematicsDetailPanel, { onRequestClose: closeSchematicDetail, initialFocus: schematicsDetailClose })
     setSchematicPreviewRendererActive(true)
     if(schematicsContent){
         schematicsContent.setAttribute('detail-open', '')

@@ -9,14 +9,22 @@ function getModalFocusable(panelEl){
         .filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true')
 }
 
-function openModal(rootEl, panelEl){
+function openModal(rootEl, panelEl, options = {}){
     if(!rootEl){
         return false
     }
     modalFocusOrigins.set(rootEl, document.activeElement)
     rootEl.setAttribute('data-open', 'true')
     rootEl.setAttribute('aria-hidden', 'false')
+    const previousKeyHandler = modalKeyHandlers.get(rootEl)
+    if(previousKeyHandler) document.removeEventListener('keydown', previousKeyHandler, true)
     const keyHandler = (event) => {
+        if(event.key === 'Escape' && typeof options.onRequestClose === 'function'){
+            event.preventDefault()
+            event.stopPropagation()
+            options.onRequestClose()
+            return
+        }
         if(event.key !== 'Tab') return
         const focusable = getModalFocusable(panelEl)
         if(focusable.length === 0){
@@ -34,9 +42,15 @@ function openModal(rootEl, panelEl){
             first.focus()
         }
     }
-    rootEl.addEventListener('keydown', keyHandler)
+    // Listen at the document boundary so Escape and focus trapping remain
+    // reliable when an async renderer temporarily moves focus outside the
+    // panel (for example while replacing a canvas fallback).
+    document.addEventListener('keydown', keyHandler, true)
     modalKeyHandlers.set(rootEl, keyHandler)
-    panelEl?.focus?.()
+    const initialFocus = typeof options.initialFocus === 'string'
+        ? panelEl?.querySelector?.(options.initialFocus)
+        : options.initialFocus
+    ;(initialFocus || panelEl)?.focus?.()
     return true
 }
 
@@ -47,7 +61,7 @@ function closeModal(rootEl){
     rootEl.removeAttribute('data-open')
     rootEl.setAttribute('aria-hidden', 'true')
     const keyHandler = modalKeyHandlers.get(rootEl)
-    if(keyHandler) rootEl.removeEventListener('keydown', keyHandler)
+    if(keyHandler) document.removeEventListener('keydown', keyHandler, true)
     modalKeyHandlers.delete(rootEl)
     const origin = modalFocusOrigins.get(rootEl)
     modalFocusOrigins.delete(rootEl)

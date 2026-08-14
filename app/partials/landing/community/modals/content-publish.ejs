@@ -1,69 +1,75 @@
-<div id="communityContentPublish" class="schematicsModalRoot" aria-hidden="true">
+<div id="communityContentPublish" class="schematicsModalRoot communityDialogRoot" aria-hidden="true">
     <div id="communityContentPublishScrim" class="schematicsModalScrim"></div>
-    <div id="communityContentPublishPanel" class="schematicsModalPanel communityContentPublishPanel" role="dialog" aria-modal="true" aria-labelledby="communityContentPublishTitle" tabindex="-1">
-        <header class="communityContentDetailHeader">
-            <div>
+    <div id="communityContentPublishPanel" class="schematicsModalPanel communityDialogPanel communityContentPublishPanel" role="dialog" aria-modal="true" aria-labelledby="communityContentPublishTitle" tabindex="-1">
+        <header class="communityDialogHeader communityContentDetailHeader">
+            <div class="communityDialogHeading">
                 <div id="communityContentPublishType" class="schematicsCollectionsEyebrow"><%- lang('community.publish') %></div>
                 <h2 id="communityContentPublishTitle"><%- lang('community.publishCreation') %></h2>
             </div>
             <button id="communityContentPublishClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
         </header>
-        <div class="communityContentPublishForm">
-            <label id="communityContentPreviewFileRow" class="schematicsDetailEditRow">
-                <span><%- lang('community.file') %></span>
-                <input id="communityContentArtifactFile" type="file" />
-                <small id="communityContentArtifactHint"></small>
-            </label>
-            <label class="schematicsDetailEditRow">
-                <span><%- lang('community.preview') %></span>
-                <input id="communityContentPreviewFile" type="file" accept="image/png,image/webp,image/jpeg" />
-            </label>
-            <figure id="communityContentPreviewConfirmation" class="communityContentPreviewConfirmation" hidden>
-                <img id="communityContentPreviewImage" alt="<%- lang('community.preview') %>" />
-                <label>
-                    <input id="communityContentPreviewConfirmed" type="checkbox" />
-                    <span><%- lang('community.previewConfirmation') %></span>
+        <main class="communityDialogMain communityContentPublishForm">
+            <section class="communityContentPublishColumn communityContentPublishSource" aria-label="<%- lang('community.preview') %>">
+                <label class="schematicsDetailEditRow">
+                    <span><%- lang('community.file') %></span>
+                    <input id="communityContentArtifactFile" type="file" />
+                    <small id="communityContentArtifactHint"></small>
                 </label>
-            </figure>
-            <section id="communityResourcePackShowcase" class="communityResourcePackShowcase" hidden aria-labelledby="communityResourcePackShowcaseTitle">
-                <div>
-                    <h3 id="communityResourcePackShowcaseTitle"><%- lang('community.resourcePackShowcase') %></h3>
-                    <p><%- lang('community.resourcePackShowcaseHint') %></p>
-                </div>
-                <ol id="communityResourcePackShowcaseSubjects"></ol>
+                <label id="communityContentPreviewFileRow" class="schematicsDetailEditRow">
+                    <span><%- lang('community.preview') %></span>
+                    <input id="communityContentPreviewFile" type="file" accept="image/png,image/webp,image/jpeg" />
+                </label>
+                <figure id="communityContentPreviewConfirmation" class="communityContentPreviewConfirmation" hidden>
+                    <img id="communityContentPreviewImage" alt="<%- lang('community.preview') %>" />
+                    <label>
+                        <input id="communityContentPreviewConfirmed" type="checkbox" />
+                        <span><%- lang('community.previewConfirmation') %></span>
+                    </label>
+                </figure>
+                <section id="communityResourcePackShowcase" class="communityResourcePackShowcase" hidden aria-labelledby="communityResourcePackShowcaseTitle">
+                    <div>
+                        <h3 id="communityResourcePackShowcaseTitle"><%- lang('community.resourcePackShowcase') %></h3>
+                        <p><%- lang('community.resourcePackShowcaseHint') %></p>
+                    </div>
+                    <ol id="communityResourcePackShowcaseSubjects"></ol>
+                </section>
             </section>
-            <label class="schematicsDetailEditRow">
-                <span><%- lang('community.fieldTitle') %></span>
-                <input id="communityContentPublishName" type="text" maxlength="80" />
-            </label>
-            <label class="schematicsDetailEditRow">
-                <span><%- lang('community.description') %></span>
-                <textarea id="communityContentPublishDescription" maxlength="2000" rows="4"></textarea>
-            </label>
-            <label class="schematicsDetailEditRow">
-                <span><%- lang('community.tags') %></span>
-                <input id="communityContentPublishTags" type="text" placeholder="automation, utility" />
-            </label>
-            <label class="schematicsDetailEditRow">
-                <span><%- lang('community.license') %></span>
-                <select id="communityContentPublishLicense">
-                    <option value="Community-Use-1.0">Community-Use-1.0</option>
-                    <option value="CC0-1.0">CC0-1.0</option>
-                    <option value="CC-BY-4.0">CC-BY-4.0</option>
-                    <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
-                    <option value="MIT">MIT</option>
-                    <option value="MPL-2.0">MPL-2.0</option>
-                </select>
-            </label>
-            <label class="communityRightsAttestation">
-                <input id="communityContentPublishRights" type="checkbox" />
-                <span><%- lang('community.rightsAttestation') %></span>
-            </label>
+            <section class="communityContentPublishColumn communityContentPublishMetadata" aria-label="<%- lang('community.details') %>">
+                <label class="schematicsDetailEditRow">
+                    <span><%- lang('community.fieldTitle') %></span>
+                    <input id="communityContentPublishName" type="text" maxlength="80" />
+                </label>
+                <label class="schematicsDetailEditRow">
+                    <span><%- lang('community.description') %></span>
+                    <textarea id="communityContentPublishDescription" maxlength="2000" rows="4"></textarea>
+                </label>
+                <label class="schematicsDetailEditRow">
+                    <span><%- lang('community.tags') %></span>
+                    <input id="communityContentPublishTags" type="text" placeholder="automation, utility" />
+                </label>
+                <label class="schematicsDetailEditRow">
+                    <span><%- lang('community.license') %></span>
+                    <select id="communityContentPublishLicense">
+                        <option value="Community-Use-1.0">Community-Use-1.0</option>
+                        <option value="CC0-1.0">CC0-1.0</option>
+                        <option value="CC-BY-4.0">CC-BY-4.0</option>
+                        <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
+                        <option value="MIT">MIT</option>
+                        <option value="MPL-2.0">MPL-2.0</option>
+                    </select>
+                </label>
+                <label class="communityRightsAttestation">
+                    <input id="communityContentPublishRights" type="checkbox" />
+                    <span><%- lang('community.rightsAttestation') %></span>
+                </label>
+            </section>
+        </main>
+        <footer class="communityDialogFooter communityContentPublishFooter">
             <div id="communityContentPublishStatus" class="communityContentStatus" role="status"></div>
             <div class="schematicsDetailEditActions">
                 <button id="communityContentPublishSubmit" type="button" class="schematicsDetailButton primary"><%- lang('community.publish') %></button>
                 <button id="communityContentPublishCancel" type="button" class="schematicsDetailButton"><%- lang('community.cancel') %></button>
             </div>
-        </div>
+        </footer>
     </div>
 </div>

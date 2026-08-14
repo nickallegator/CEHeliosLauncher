@@ -82,17 +82,20 @@ class AutomationCommunityPreview {
 
     bindCanvas() {
         this.listen(this.canvas, 'pointerdown', event => {
-            this.drag = { x: event.clientX, y: event.clientY, cameraX: this.camera.panX, cameraY: this.camera.panY }
+            const point = this.eventPoint(event)
+            this.drag = { x: point.x, y: point.y, cameraX: this.camera.panX, cameraY: this.camera.panY }
             this.canvas.setPointerCapture?.(event.pointerId)
         })
         this.listen(this.canvas, 'pointermove', event => {
             if(!this.drag) return
-            this.camera.panX = this.drag.cameraX - (event.clientX - this.drag.x) / this.camera.zoom
-            this.camera.panY = this.drag.cameraY - (event.clientY - this.drag.y) / this.camera.zoom
+            const point = this.eventPoint(event)
+            this.camera.panX = this.drag.cameraX - (point.x - this.drag.x) / this.camera.zoom
+            this.camera.panY = this.drag.cameraY - (point.y - this.drag.y) / this.camera.zoom
             this.render()
         })
         this.listen(this.canvas, 'pointerup', event => {
-            if(this.drag && Math.hypot(event.clientX - this.drag.x, event.clientY - this.drag.y) < 5) this.selectAt(event.offsetX, event.offsetY)
+            const point = this.eventPoint(event)
+            if(this.drag && Math.hypot(point.x - this.drag.x, point.y - this.drag.y) < 5 * point.scale) this.selectAt(point.x, point.y)
             this.drag = null
         })
         this.listen(this.canvas, 'pointercancel', () => { this.drag = null })
@@ -116,6 +119,17 @@ class AutomationCommunityPreview {
             else return
             event.preventDefault(); this.render()
         })
+    }
+
+    eventPoint(event) {
+        const rect = this.canvas.getBoundingClientRect()
+        const scaleX = this.canvas.width / Math.max(1, rect.width)
+        const scaleY = this.canvas.height / Math.max(1, rect.height)
+        return {
+            x: (event.clientX - rect.left) * scaleX,
+            y: (event.clientY - rect.top) * scaleY,
+            scale: Math.max(scaleX, scaleY)
+        }
     }
 
     activate(index) {
@@ -167,6 +181,21 @@ class AutomationCommunityPreview {
             width: this.canvas.width,
             height: this.canvas.height
         })
+    }
+
+    resize(size) {
+        if(this.destroyed || !this.canvas) return
+        const rect = this.canvas.getBoundingClientRect()
+        const scale = Math.max(1, Math.min(2, Number(size?.devicePixelRatio) || 1))
+        const width = Math.max(1, Math.round(rect.width * scale))
+        const height = Math.max(1, Math.round(rect.height * scale))
+        if(width === this.canvas.width && height === this.canvas.height) return
+        const centre = screenToWorld(this.camera, this.canvas.width / 2, this.canvas.height / 2)
+        this.canvas.width = width
+        this.canvas.height = height
+        this.camera.panX = centre.x - width / (2 * this.camera.zoom)
+        this.camera.panY = centre.y - height / (2 * this.camera.zoom)
+        this.render()
     }
 
     update(artifact, options = {}) { this.bundle = normalizeAutomationBundle(artifact, options.registry || {}); this.assetIndex = 0; this.renderTabs(); this.activate(0) }

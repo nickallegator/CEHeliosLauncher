@@ -8,6 +8,7 @@ const { CommunityArtifactCache } = require('../communityartifactcache')
 const { AutomationCommunityPreview } = require('./automation')
 const { GradientCommunityPreview } = require('./gradient')
 const { ResourcePackCommunityPreview } = require('./resource-pack')
+const { observeCommunityPreviewSize } = require('./resize-observer')
 const { TrainerCommunityPreview } = require('./trainer')
 
 class CommunityRichPreviewHost {
@@ -26,6 +27,7 @@ class CommunityRichPreviewHost {
         this.generation = 0
         this.renderer = null
         this.abortController = null
+        this.resizeObserver = null
     }
 
     async artifact(entry, signal) {
@@ -80,6 +82,9 @@ class CommunityRichPreviewHost {
             this.container.dataset.state = 'ready'
             if(this.fallbackImage) this.fallbackImage.hidden = true
             await this.renderer.mount()
+            if(this.renderer?.resize){
+                this.resizeObserver = observeCommunityPreviewSize(this.container, size => this.renderer?.resize?.(size))
+            }
             return this.renderer
         } catch(error) {
             if(generation !== this.generation || this.abortController?.signal.aborted) return null
@@ -91,7 +96,7 @@ class CommunityRichPreviewHost {
         }
     }
 
-    cancel() { this.generation += 1; this.abortController?.abort(); this.abortController = null; this.renderer?.cancel?.() }
+    cancel() { this.generation += 1; this.abortController?.abort(); this.abortController = null; this.resizeObserver?.disconnect(); this.resizeObserver = null; this.renderer?.cancel?.() }
     destroyRenderer() { this.cancel(); this.renderer?.destroy?.(); this.renderer = null; if(this.fallbackImage) this.fallbackImage.hidden = false }
     destroy() { this.destroyRenderer(); this.container?.replaceChildren(); if(this.container) this.container.hidden = true }
 }
@@ -101,5 +106,6 @@ module.exports = {
     CommunityRichPreviewHost,
     GradientCommunityPreview,
     ResourcePackCommunityPreview,
+    observeCommunityPreviewSize,
     TrainerCommunityPreview
 }

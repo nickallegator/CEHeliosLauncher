@@ -1,41 +1,43 @@
-<div id="communityContentDetail" class="schematicsModalRoot" aria-hidden="true">
+<div id="communityContentDetail" class="schematicsModalRoot communityDialogRoot" aria-hidden="true">
     <div id="communityContentDetailScrim" class="schematicsModalScrim"></div>
-    <div id="communityContentDetailPanel" class="schematicsModalPanel communityContentDetailPanel" role="dialog" aria-modal="true" aria-labelledby="communityContentDetailTitle" tabindex="-1">
-        <header class="communityContentDetailHeader">
-            <div>
+    <div id="communityContentDetailPanel" class="schematicsModalPanel communityDialogPanel communityContentDetailPanel" role="dialog" aria-modal="true" aria-labelledby="communityContentDetailTitle" tabindex="-1">
+        <header class="communityDialogHeader communityContentDetailHeader">
+            <div class="communityDialogHeading">
                 <div id="communityContentDetailType" class="schematicsCollectionsEyebrow"><%- lang('community.communityCreation') %></div>
                 <h2 id="communityContentDetailTitle"><%- lang('community.communityCreation') %></h2>
                 <div id="communityContentDetailCreator" class="schematicsDetailCreator"></div>
             </div>
             <button id="communityContentDetailClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
         </header>
-        <div class="communityContentDetailBody">
-            <div class="communityContentDetailMedia">
+        <main class="communityDialogMain communityContentDetailBody">
+            <section class="communityContentDetailMedia" aria-label="<%- lang('community.preview') %>">
                 <img id="communityContentDetailImage" alt="" />
                 <div id="communityContentRichView" class="communityContentRichView" hidden aria-live="polite"></div>
-            </div>
-            <div class="communityContentDetailCopy">
+            </section>
+            <aside class="communityContentDetailCopy" aria-label="<%- lang('community.details') %>">
                 <p id="communityContentDetailDescription"></p>
                 <dl class="communityContentMetadataGrid">
-                    <div><dt><%- lang('community.license') %></dt><dd id="communityContentDetailLicense">â€”</dd></div>
-                    <div><dt><%- lang('community.rightsStatusLabel') %></dt><dd id="communityContentDetailRights">â€”</dd></div>
-                    <div><dt><%- lang('community.revision') %></dt><dd id="communityContentDetailRevision">â€”</dd></div>
-                    <div><dt><%- lang('community.compatibility') %></dt><dd id="communityContentDetailCompatibility">â€”</dd></div>
+                    <div><dt><%- lang('community.license') %></dt><dd id="communityContentDetailLicense">—</dd></div>
+                    <div><dt><%- lang('community.rightsStatusLabel') %></dt><dd id="communityContentDetailRights">—</dd></div>
+                    <div><dt><%- lang('community.revision') %></dt><dd id="communityContentDetailRevision">—</dd></div>
+                    <div><dt><%- lang('community.compatibility') %></dt><dd id="communityContentDetailCompatibility">—</dd></div>
                     <div><dt><%- lang('community.dependencies') %></dt><dd id="communityContentDetailDependencies">0</dd></div>
                 </dl>
-                <div id="communityContentDetailStatus" class="communityContentStatus" role="status"></div>
-                <div class="communityContentDetailActions">
-                    <button id="communityContentInstall" type="button" class="schematicsDetailButton primary"><%- lang('community.install') %></button>
-                    <button id="communityContentRemove" type="button" class="schematicsDetailButton"><%- lang('community.remove') %></button>
-                    <button id="communityContentEnable" type="button" class="schematicsDetailButton" hidden><%- lang('community.enable') %></button>
-                    <button id="communityContentDisable" type="button" class="schematicsDetailButton" hidden><%- lang('community.disable') %></button>
-                    <button id="communityContentPriorityHigher" type="button" class="schematicsDetailButton" hidden><%- lang('community.priorityHigher') %></button>
-                    <button id="communityContentPriorityLower" type="button" class="schematicsDetailButton" hidden><%- lang('community.priorityLower') %></button>
-                    <button id="communityContentLike" type="button" class="schematicsDetailButton"><%- lang('community.like') %></button>
-                    <button id="communityContentPublishRevision" type="button" class="schematicsDetailButton" hidden><%- lang('community.publishRevision') %></button>
-                    <button id="communityContentReport" type="button" class="schematicsDetailButton"><%- lang('community.report') %></button>
-                </div>
+            </aside>
+        </main>
+        <footer class="communityDialogFooter communityContentDetailFooter">
+            <div id="communityContentDetailStatus" class="communityContentStatus" role="status"></div>
+            <div class="communityContentDetailActions">
+                <button id="communityContentInstall" type="button" class="schematicsDetailButton primary"><%- lang('community.install') %></button>
+                <button id="communityContentRemove" type="button" class="schematicsDetailButton"><%- lang('community.remove') %></button>
+                <button id="communityContentEnable" type="button" class="schematicsDetailButton" hidden><%- lang('community.enable') %></button>
+                <button id="communityContentDisable" type="button" class="schematicsDetailButton" hidden><%- lang('community.disable') %></button>
+                <button id="communityContentPriorityHigher" type="button" class="schematicsDetailButton" hidden><%- lang('community.priorityHigher') %></button>
+                <button id="communityContentPriorityLower" type="button" class="schematicsDetailButton" hidden><%- lang('community.priorityLower') %></button>
+                <button id="communityContentLike" type="button" class="schematicsDetailButton"><%- lang('community.like') %></button>
+                <button id="communityContentPublishRevision" type="button" class="schematicsDetailButton" hidden><%- lang('community.publishRevision') %></button>
+                <button id="communityContentReport" type="button" class="schematicsDetailButton"><%- lang('community.report') %></button>
             </div>
-        </div>
+        </footer>
     </div>
 </div>
