@@ -28,6 +28,10 @@ function translation(x, y, z) {
     return value
 }
 
+function scaling(x, y, z) {
+    return [x, 0, 0, 0, y, 0, 0, 0, z, 0, 0, 0]
+}
+
 function rotation(x, y, z) {
     const cx = Math.cos(radians(x)); const sx = Math.sin(radians(x))
     const cy = Math.cos(radians(y)); const sy = Math.sin(radians(y))
@@ -41,7 +45,18 @@ function rotation(x, y, z) {
 function pivotRotation(pivot, angles) {
     const [px, py, pz] = vector(pivot)
     const [rx, ry, rz] = vector(angles)
-    return multiply(multiply(translation(px, py, pz), rotation(-rx, -ry, rz)), translation(-px, -py, -pz))
+    return multiply(multiply(translation(px, py, pz), rotation(-rx, ry, -rz)), translation(-px, -py, -pz))
+}
+
+function pivotModelPartRotation(pivot, angles) {
+    const [px, py, pz] = vector(pivot)
+    return multiply(multiply(translation(px, py, pz), rotation(...vector(angles))), translation(-px, -py, -pz))
+}
+
+function pivotScale(pivot, scale) {
+    const [px, py, pz] = vector(pivot)
+    const [sx, sy, sz] = scaleVector(scale)
+    return multiply(multiply(translation(px, py, pz), scaling(sx, sy, sz)), translation(-px, -py, -pz))
 }
 
 function transformPoint(matrix, point) {
@@ -66,6 +81,28 @@ function vector(value, fallback = [0, 0, 0]) {
     return Array.isArray(value) ? [Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0] : fallback.slice()
 }
 
+function fixedVector(value) {
+    return Array.isArray(value) && value.length >= 3 && value.slice(0, 3).every(Number.isFinite)
+        ? value.slice(0, 3).map(Number)
+        : [0, 0, 0]
+}
+
+function scaleVector(value) {
+    if(Number.isFinite(Number(value))) return [Number(value), Number(value), Number(value)]
+    if(!Array.isArray(value)) return [1, 1, 1]
+    return [0, 1, 2].map(index => Number.isFinite(Number(value[index])) ? Number(value[index]) : 1)
+}
+
+function composeBedrockBoneRotation(sourceRotation, animationRotation) {
+    const source = vector(sourceRotation)
+    const animation = fixedVector(animationRotation)
+    // Cobblemon's TexturedModel loader mirrors Bedrock's Y coordinate into
+    // Minecraft ModelPart space while preserving X/Z. Conjugating ModelPart's
+    // ZYX rotation by that reflection maps (x,y,z) to (-x,+y,-z) in this
+    // renderer's Y-up space. Animation angles are added before that mapping.
+    return [-(source[0] + animation[0]), source[1] + animation[1], -(source[2] + animation[2])]
+}
+
 function parseBedrockGeometry(document, options = {}) {
     const geometries = Array.isArray(document?.['minecraft:geometry']) ? document['minecraft:geometry'] : []
     if(!geometries.length) throw formatError('missing_geometry', 'Bedrock model contains no minecraft:geometry definitions.')
@@ -75,6 +112,8 @@ function parseBedrockGeometry(document, options = {}) {
     const textureWidth = positive(description.texture_width, 64)
     const textureHeight = positive(description.texture_height, 64)
     const bones = Array.isArray(geometry?.bones) ? geometry.bones : []
+    const poseBones = options.pose?.bones && typeof options.pose.bones === 'object' ? options.pose.bones : {}
+    const hiddenBones = new Set((options.hiddenBones || []).map(String))
     if(bones.length > 1024) throw formatError('bedrock_bone_limit', 'Bedrock model exceeds 1,024 bones.')
     const byName = new Map()
     for(const source of bones) {
@@ -89,7 +128,16 @@ function parseBedrockGeometry(document, options = {}) {
         if(entry.resolving) throw formatError('bedrock_bone_cycle', 'Bedrock model contains a parent cycle.')
         entry.resolving = true
         const parent = entry.source.parent ? matrixFor(String(entry.source.parent)) : identity()
-        entry.matrix = multiply(parent, pivotRotation(entry.source.pivot, entry.source.rotation))
+        const pose = poseBones[name] || {}
+        const sourceRotation = vector(entry.source.rotation)
+        const poseRotation = fixedVector(pose.rotation)
+        const position = fixedVector(pose.position)
+        const scale = scaleVector(pose.scale)
+        const rotationValue = composeBedrockBoneRotation(sourceRotation, poseRotation)
+        entry.matrix = multiply(parent, multiply(translation(...position), multiply(
+            pivotModelPartRotation(entry.source.pivot, rotationValue),
+            pivotScale(entry.source.pivot, scale)
+        )))
         entry.resolving = false
         return entry.matrix
     }
@@ -100,18 +148,23 @@ function parseBedrockGeometry(document, options = {}) {
     let cubeCount = 0
     for(const [name, entry] of byName) {
         const boneMatrix = matrixFor(name)
+        if(hiddenBones.has(name)) continue
         const cubes = Array.isArray(entry.source.cubes) ? entry.source.cubes : []
         cubeCount += cubes.length
         if(cubeCount > 16384) throw formatError('bedrock_cube_limit', 'Bedrock model exceeds 16,384 cubes.')
-        for(const cube of cubes) appendCube({ positions, normals, uvs }, cube, boneMatrix, textureWidth, textureHeight)
+        for(const [cubeIndex, cube] of cubes.entries()) appendCube({ positions, normals, uvs }, cube, boneMatrix, textureWidth, textureHeight, cubeIndex)
     }
     if(positions.length === 0) throw formatError('empty_bedrock_geometry', 'Bedrock model has no renderable cubes.')
     const bounds = boundsFor(positions)
-    const center = [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[1] + bounds.max[1]) / 2, (bounds.min[2] + bounds.max[2]) / 2]
+    const suppliedCenter = options.normalization?.center
+    const center = Array.isArray(suppliedCenter) && suppliedCenter.length >= 3
+        ? suppliedCenter.slice(0, 3).map(Number)
+        : [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[1] + bounds.max[1]) / 2, (bounds.min[2] + bounds.max[2]) / 2]
+    const divisor = positive(options.normalization?.divisor, 16)
     for(let index = 0; index < positions.length; index += 3) {
-        positions[index] = (positions[index] - center[0]) / 16
-        positions[index + 1] = (positions[index + 1] - center[1]) / 16
-        positions[index + 2] = (positions[index + 2] - center[2]) / 16
+        positions[index] = (positions[index] - center[0]) / divisor
+        positions[index + 1] = (positions[index + 1] - center[1]) / divisor
+        positions[index + 2] = (positions[index + 2] - center[2]) / divisor
     }
     const normalizedBounds = boundsFor(positions)
     return {
@@ -123,7 +176,8 @@ function parseBedrockGeometry(document, options = {}) {
         positions: new Float32Array(positions),
         normals: new Float32Array(normals),
         uvs: new Float32Array(uvs),
-        bounds: normalizedBounds
+        bounds: normalizedBounds,
+        normalization: { center, divisor }
     }
 }
 
@@ -136,7 +190,21 @@ const FACES = Object.freeze([
     { name: 'down', normal: [0, -1, 0], points: [[0, 0, 1], [0, 0, 0], [1, 0, 0], [1, 0, 1]] }
 ])
 
-function appendCube(target, cube, boneMatrix, textureWidth, textureHeight) {
+const PLANAR_FACE_EPSILON = 0.002
+
+function faceArea(face, size) {
+    if(['north', 'south'].includes(face)) return size[0] * size[1]
+    if(['west', 'east'].includes(face)) return size[2] * size[1]
+    return size[0] * size[2]
+}
+
+function collapsedFaceAxis(face) {
+    if(['north', 'south'].includes(face)) return 2
+    if(['west', 'east'].includes(face)) return 0
+    return 1
+}
+
+function appendCube(target, cube, boneMatrix, textureWidth, textureHeight, planarLayer = 0) {
     const origin = vector(cube.origin)
     const size = vector(cube.size)
     const inflate = Number(cube.inflate) || 0
@@ -146,11 +214,15 @@ function appendCube(target, cube, boneMatrix, textureWidth, textureHeight) {
     const faceUvs = resolveCubeUvs(cube, size, textureWidth, textureHeight)
     for(const face of FACES) {
         const definition = faceUvs[face.name]
-        if(definition === null) continue
+        if(definition === null || faceArea(face.name, size) <= 0) continue
+        const collapsedAxis = collapsedFaceAxis(face.name)
+        const planarOffset = size[collapsedAxis] === 0
+            ? PLANAR_FACE_EPSILON * (1 + Math.min(16, planarLayer))
+            : 0
+        const normal = transformNormal(cubeMatrix, face.normal)
         const points = face.points.map(point => transformPoint(cubeMatrix, [
             point[0] ? to[0] : from[0], point[1] ? to[1] : from[1], point[2] ? to[2] : from[2]
-        ]))
-        const normal = transformNormal(cubeMatrix, face.normal)
+        ]).map((value, axis) => value + normal[axis] * planarOffset))
         const quadUvs = definition || [[0, 1], [0, 0], [1, 0], [1, 1]]
         const order = cube.mirror ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3]
         for(const index of order) {
@@ -225,13 +297,14 @@ function selectResolverVariation(resolvers, aspects = []) {
         .flatMap(document => (Array.isArray(document.variations) ? document.variations : []).map(variation => ({
             ...variation,
             order: Number(document.order || 0),
+            sourcePath: document.__sourcePath || null,
             aspects: (Array.isArray(variation.aspects) ? variation.aspects : []).map(value => String(value).toLowerCase())
         })))
         .filter(variation => variation.aspects.every(aspect => required.has(aspect)))
         .sort((left, right) => left.order - right.order || left.aspects.length - right.aspects.length)
     const resolved = {}
     for(const variation of candidates) {
-        for(const key of ['model', 'texture', 'poser', 'layers']) {
+        for(const key of ['model', 'texture', 'poser', 'layers', 'sourcePath']) {
             if(variation[key] != null) resolved[key] = variation[key]
         }
     }
@@ -240,6 +313,7 @@ function selectResolverVariation(resolvers, aspects = []) {
 
 module.exports = {
     boundsFor,
+    composeBedrockBoneRotation,
     parseBedrockGeometry,
     selectResolverVariation,
     transformNormal,

@@ -5,6 +5,7 @@ const fs = require('node:fs')
 const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
+const zlib = require('node:zlib')
 
 const AdmZip = require('adm-zip')
 
@@ -22,6 +23,7 @@ const {
     JarResourceProvider,
     createResourceStack,
     discoverProfileResources,
+    readPngDimensions,
     resolveBlockTopTexture
 } = require('../../libraries/minecraft-resources')
 const { validateResourcePack } = require('../../backend/src/services/communityResourcePack')
@@ -57,10 +59,60 @@ const REVISION_IDS = Object.freeze({
     [TYPES.RESOURCE_PACKS]: '50000000-0000-4000-8000-000000000004'
 })
 
-const ONE_PIXEL_PNG = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl5ZKYAAAAASUVORK5CYII=',
-    'base64'
-)
+function crc32(value) {
+    let crc = 0xffffffff
+    for(const byte of value) {
+        crc ^= byte
+        for(let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0)
+    }
+    return (crc ^ 0xffffffff) >>> 0
+}
+
+function pngChunk(type, data = Buffer.alloc(0)) {
+    const name = Buffer.from(type, 'ascii')
+    const output = Buffer.alloc(12 + data.length)
+    output.writeUInt32BE(data.length, 0)
+    name.copy(output, 4)
+    data.copy(output, 8)
+    output.writeUInt32BE(crc32(Buffer.concat([name, data])), 8 + data.length)
+    return output
+}
+
+function createRgbaPng(width, height, pixel) {
+    const scanlines = Buffer.alloc((width * 4 + 1) * height)
+    for(let y = 0; y < height; y += 1) {
+        const row = y * (width * 4 + 1)
+        scanlines[row] = 0
+        for(let x = 0; x < width; x += 1) {
+            const color = pixel(x, y)
+            const offset = row + 1 + x * 4
+            for(let channel = 0; channel < 4; channel += 1) scanlines[offset + channel] = color[channel] ?? 255
+        }
+    }
+    const header = Buffer.alloc(13)
+    header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4)
+    header[8] = 8; header[9] = 6
+    return Buffer.concat([
+        Buffer.from('89504e470d0a1a0a', 'hex'),
+        pngChunk('IHDR', header),
+        pngChunk('IDAT', zlib.deflateSync(scanlines, { level: 9 })),
+        pngChunk('IEND')
+    ])
+}
+
+const SHOWROOM_COPPER_PNG = createRgbaPng(16, 16, (x, y) => {
+    const noise = ((x * 17 + y * 29 + x * y * 3) % 23) - 11
+    const seam = x % 8 === 0 || y % 8 === 0 ? -18 : 0
+    return [190 + noise + seam, 105 + Math.floor(noise / 2) + seam, 66 + Math.floor(noise / 3) + seam, 255]
+})
+
+const SHOWROOM_PIKACHU_FALLBACK_PNG = createRgbaPng(64, 64, (x, y) => {
+    const accent = ((x >> 3) + (y >> 3)) % 2 ? 7 : -5
+    if((x < 10 && y < 18) || (x > 53 && y < 18)) return [43, 34, 25, 255]
+    if((x > 18 && x < 28 && y > 18 && y < 28) || (x > 36 && x < 46 && y > 18 && y < 28)) return [45, 37, 28, 255]
+    if((x < 16 || x > 47) && y > 30 && y < 47) return [205, 58, 45, 255]
+    return [241 + accent, 197 + accent, 43, 255]
+})
 
 function sha256(value) {
     return crypto.createHash('sha256').update(value).digest('hex')
@@ -354,8 +406,49 @@ function createGradientArtifact() {
     return { bytes: Buffer.from(result.serialized, 'utf8'), result }
 }
 
-async function createResourcePackArtifact(workspaceRoot) {
+async function resolveShowroomPikachuTexture(resourceDataDirectory) {
+    if(!resourceDataDirectory) return { bytes: SHOWROOM_PIKACHU_FALLBACK_PNG, source: 'fallback' }
+    const resources = await discoverProfileResources({
+        dataDirectory: resourceDataDirectory,
+        profileId: SHOWROOM_PROFILE_ID,
+        minecraftVersion: '1.21.1'
+    })
+    const stack = createResourceStack(resources.activeModJars.map(jarPath => new JarResourceProvider(jarPath)))
+    const resourcePath = 'assets/cobblemon/textures/pokemon/0025_pikachu/pikachu.png'
+    const bytes = await stack.getBuffer(resourcePath)
+    const dimensions = readPngDimensions(bytes)
+    if(!bytes || dimensions?.width !== 64 || dimensions?.height !== 64) {
+        throw new Error(`The selected profile does not provide the expected 64×64 Cobblemon Pikachu texture at ${resourcePath}. Repair the profile before opening the Resource Pack showroom.`)
+    }
+    return { bytes: Buffer.from(bytes), source: 'locked-profile' }
+}
+
+async function createExternalResourcePackArtifact(showcasePackPath) {
+    const initial = await validateResourcePack(showcasePackPath)
+    const candidates = initial.typeData.showcaseCandidates.filter(candidate => candidate.kind === 'pokemon')
+    const preferred = ['cobblemon:cosmog', 'cobblemon:barbaracle', 'cobblemon:zygarde', 'cobblemon:baxcalibur']
+    const selected = [
+        ...preferred.map(species => candidates.find(candidate => candidate.species === species)).filter(Boolean),
+        ...candidates
+    ].filter((candidate, index, values) => values.findIndex(value => value.species === candidate.species) === index).slice(0, 4)
+    if(selected.length === 0) throw new Error('The external showroom pack does not contain discoverable Cobblemon Pokémon resolvers.')
+    const result = await validateResourcePack(showcasePackPath, {
+        showcase: {
+            schemaVersion: 1,
+            subjects: selected.map(candidate => ({
+                kind: 'pokemon', species: candidate.species, form: candidate.form || '', gender: candidate.gender || 'MALE'
+            }))
+        }
+    })
+    result.typeData.showroomExternalPack = path.basename(showcasePackPath)
+    return { bytes: fs.readFileSync(showcasePackPath), result }
+}
+
+async function createResourcePackArtifact(workspaceRoot, resourceDataDirectory = null, showcasePackPath = null) {
+    if(showcasePackPath) return createExternalResourcePackArtifact(showcasePackPath)
     const zip = new AdmZip()
+    const packIcon = fs.readFileSync(path.resolve(__dirname, '..', '..', 'app', 'assets', 'brand', 'allegator-games-app-icon.png'))
+    const pikachuTexture = await resolveShowroomPikachuTexture(resourceDataDirectory)
     zip.addFile('pack.mcmeta', jsonBuffer({
         pack: {
             pack_format: 34,
@@ -363,8 +456,8 @@ async function createResourcePackArtifact(workspaceRoot) {
             description: 'AG Community showroom textures for Cobble Power and Cobblemon'
         }
     }))
-    zip.addFile('pack.png', ONE_PIXEL_PNG)
-    zip.addFile('assets/cobblepower/textures/gui/community_showroom_badge.png', ONE_PIXEL_PNG)
+    zip.addFile('pack.png', packIcon)
+    zip.addFile('assets/cobblepower/textures/gui/community_showroom_badge.png', packIcon)
     zip.addFile('assets/cobblepower/models/item/community_showroom_badge.json', jsonBuffer({
         parent: 'minecraft:item/generated',
         textures: { layer0: 'cobblepower:gui/community_showroom_badge' }
@@ -374,7 +467,7 @@ async function createResourcePackArtifact(workspaceRoot) {
     }))
     zip.addFile('assets/minecraft/blockstates/copper_block.json', jsonBuffer({ variants: { '': { model: 'minecraft:block/copper_block' } } }))
     zip.addFile('assets/minecraft/models/block/copper_block.json', jsonBuffer({ parent: 'minecraft:block/cube_all', textures: { all: 'cobblepower:block/community_copper' } }))
-    zip.addFile('assets/cobblepower/textures/block/community_copper.png', ONE_PIXEL_PNG)
+    zip.addFile('assets/cobblepower/textures/block/community_copper.png', SHOWROOM_COPPER_PNG)
     zip.addFile('assets/cobblemon/bedrock/pokemon/resolvers/0025_pikachu/0_pikachu_base.json', jsonBuffer({
         species: 'cobblemon:pikachu',
         order: 0,
@@ -386,7 +479,7 @@ async function createResourcePackArtifact(workspaceRoot) {
             layers: []
         }]
     }))
-    zip.addFile('assets/cobblepower/textures/pokemon/community_pikachu.png', ONE_PIXEL_PNG)
+    zip.addFile('assets/cobblepower/textures/pokemon/community_pikachu.png', pikachuTexture.bytes)
     zip.addFile('LICENSE.txt', Buffer.from('Local AG Launcher showroom fixture. Not for redistribution.\n', 'utf8'))
     const bytes = zip.toBuffer()
     const filePath = path.join(workspaceRoot, 'ag-workshop-accents.zip')
@@ -400,6 +493,7 @@ async function createResourcePackArtifact(workspaceRoot) {
             ]
         }
     })
+    result.typeData.showroomTextureSource = pikachuTexture.source
     return { bytes, result }
 }
 
@@ -564,14 +658,14 @@ function schematicDetail(entry) {
     }
 }
 
-async function createShowroomFixtures(workspaceRoot, resourceDataDirectory = null) {
+async function createShowroomFixtures(workspaceRoot, resourceDataDirectory = null, showcasePackPath = null) {
     fs.mkdirSync(workspaceRoot, { recursive: true })
     const artifacts = {
         [SCHEMATIC_TYPE]: createSchematicArtifact(),
         [TYPES.AUTOMATION]: createAutomationArtifact(),
         [TYPES.BATTLE_TRAINERS]: createTrainerArtifact(),
         [TYPES.BUILDER_PRESETS]: createGradientArtifact(),
-        [TYPES.RESOURCE_PACKS]: await createResourcePackArtifact(workspaceRoot)
+        [TYPES.RESOURCE_PACKS]: await createResourcePackArtifact(workspaceRoot, resourceDataDirectory, showcasePackPath)
     }
     const definitions = {
         [SCHEMATIC_TYPE]: {
@@ -608,6 +702,15 @@ async function createShowroomFixtures(workspaceRoot, resourceDataDirectory = nul
             tags: ['resource-pack', 'ui', 'cobblepower'],
             likes: 72, views: 405, downloads: 121,
             publishedAt: '2026-08-04T12:00:00.000Z', updatedAt: '2026-08-08T09:00:00.000Z'
+        }
+    }
+    if(showcasePackPath){
+        definitions[TYPES.RESOURCE_PACKS] = {
+            title: path.basename(showcasePackPath, path.extname(showcasePackPath)),
+            description: 'A local, read-only external pack loaded for testing namespaced Cobblemon models in the AG Community viewer.',
+            tags: ['resource-pack', 'external-models', 'local-test'],
+            likes: 0, views: 1, downloads: 0,
+            publishedAt: '2026-08-13T12:00:00.000Z', updatedAt: '2026-08-13T12:00:00.000Z'
         }
     }
     const entries = SHOWROOM_TYPES.map(type => type === SCHEMATIC_TYPE
@@ -989,6 +1092,9 @@ async function createShowroomEnvironment(options = {}) {
     const resourceDataDirectory = options.resourceDataDirectory
         ? validateResourceDataDirectory(options.resourceDataDirectory)
         : null
+    const showcasePackPath = options.showcasePackPath
+        ? validateShowcasePackPath(options.showcasePackPath)
+        : null
     const rootDirectory = options.rootDirectory
         ? path.resolve(options.rootDirectory)
         : fs.mkdtempSync(path.join(os.tmpdir(), 'ag-community-showroom-'))
@@ -998,7 +1104,7 @@ async function createShowroomEnvironment(options = {}) {
     const fixtureDirectory = path.join(rootDirectory, 'fixtures')
     fs.mkdirSync(launcherDirectory, { recursive: true })
     fs.mkdirSync(gameDataDirectory, { recursive: true })
-    const entries = await createShowroomFixtures(fixtureDirectory, resourceDataDirectory)
+    const entries = await createShowroomFixtures(fixtureDirectory, resourceDataDirectory, showcasePackPath)
     const api = await startShowroomServer(entries)
     try {
         const sourceDistribution = JSON.parse(fs.readFileSync(path.join(appDirectory, 'distribution_dev.json'), 'utf8'))
@@ -1020,6 +1126,7 @@ async function createShowroomEnvironment(options = {}) {
             distributionPath,
             apiBaseUrl: api.baseUrl,
             resourceDataDirectory,
+            showcasePackPath,
             entries: entries.map(entry => ({ type: entry.type, id: entry.id, title: entry.title, sha256: entry.revision.sha256 }))
         }
         fs.writeFileSync(path.join(rootDirectory, SHOWROOM_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
@@ -1062,6 +1169,16 @@ function validateResourceDataDirectory(value) {
     return directory
 }
 
+function validateShowcasePackPath(value) {
+    const filePath = path.resolve(String(value || ''))
+    if(!value || path.extname(filePath).toLowerCase() !== '.zip' || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        throw new Error(`Community showroom pack must be an existing ZIP file: ${filePath}`)
+    }
+    const size = fs.statSync(filePath).size
+    if(size < 1 || size > 100 * 1024 * 1024) throw new Error(`Community showroom pack exceeds the 100 MiB limit: ${filePath}`)
+    return filePath
+}
+
 function assertSafeShowroomRoot(rootDirectory) {
     if(!fs.existsSync(rootDirectory)) {
         fs.mkdirSync(rootDirectory, { recursive: true })
@@ -1089,8 +1206,10 @@ module.exports = {
     SHOWROOM_SCHEMA_VERSION,
     SHOWROOM_TYPES,
     assertSafeShowroomRoot,
+    createRgbaPng,
     createShowroomEnvironment,
     validateResourceDataDirectory,
+    validateShowcasePackPath,
     createShowroomFixtures,
     decodeCursor,
     filterCatalog,

@@ -10,6 +10,9 @@ const {
     GradientEvaluator,
     GraphSpatialIndex,
     computeTexturedGradientLayout,
+    compileBedrockAnimations,
+    compileExpression,
+    composeBedrockBoneRotation,
     fitGraph,
     normalizeAutomationBundle,
     normalizeGradientType,
@@ -19,11 +22,15 @@ const {
     renderTexturedGradientSvg,
     sampleGradient,
     screenToWorld,
+    selectableBedrockAnimations,
+    selectDefaultBedrockAnimation,
     zoomAt
 } = require('../../libraries/community-rendering')
 const { resolveBlockTopTexture } = require('../../libraries/minecraft-resources')
 const { CommunityArtifactCache, hashBuffer } = require('../../app/assets/js/communityartifactcache')
 const { drawTexture } = require('../../app/assets/js/communitypreviews/gradient')
+const { configureTextureUpload, orbitEye, orbitFromDrag } = require('../../app/assets/js/communitypreviews/model-viewer')
+const { normalizeSubjects, rendererGroup, subjectKey } = require('../../app/assets/js/communitypreviews/resource-pack')
 
 const gradientSource = {
     format: 'cobblepower_gradient', version: 1,
@@ -39,6 +46,63 @@ const gradientSource = {
     ],
     blend: { enabled: true, sharpness: .55, radius: .3, seed: 421 }, preview: { grid_cells: 16 }
 }
+
+test('Bedrock animation expressions use degree-based Molang timing without evaluating code', () => {
+    const sample = compileExpression('math.clamp(math.sin(q.anim_time*90)*8, -4, 4)')
+    assert.equal(sample({ animTime: 0 }), 0)
+    assert.ok(Math.abs(sample({ animTime: 1 }) - 4) < 0.000001)
+    assert.equal(compileExpression('global.process.exit()')({ animTime: 1 }), 0)
+})
+
+test('poser standing metadata selects idle while keyframed animations interpolate', () => {
+    const animations = compileBedrockAnimations([{ animations: {
+        'animation.example.walk': { loop: true, animation_length: 2, bones: { body: { position: { 0: [0, 0, 0], 2: [2, 0, 0] } } } },
+        'animation.example.ground_idle': { loop: true, bones: { body: { rotation: [0, 0, 'math.sin(q.anim_time*90)*5'] } } }
+    } }])
+    const poser = { poses: { standing: { poseTypes: ['STAND'], isBattle: false, animations: ["q.bedrock('example', 'ground_idle')"] } } }
+    assert.equal(selectDefaultBedrockAnimation(animations, poser).id, 'ground_idle')
+    assert.deepEqual(selectableBedrockAnimations([
+        ...animations,
+        ...compileBedrockAnimations([{ animations: {
+            'animation.example.pose': { loop: true, bones: { body: { rotation: [0, 0, 0] } } },
+            'animation.example.ground_idle_size': { loop: true, bones: { body: { scale: .5 } } }
+        } }])
+    ], poser).map(animation => animation.id), ['ground_idle', 'walk'])
+    const walk = animations.find(animation => animation.id === 'walk')
+    assert.deepEqual(walk.sample(1).bones.body.position, [1, 0, 0])
+})
+
+test('Bedrock animation composition matches Cobblemon ModelPart axes for Dialga-like legs', () => {
+    const dialgaLeg = composeBedrockBoneRotation([38.04466, 16.64183, 41.72981], [-10.15932, 3.42732, -9.1825])
+    assert.deepEqual(dialgaLeg.map(value => Number(value.toFixed(5))), [-27.88534, 20.06915, -32.54731])
+    assert.deepEqual(composeBedrockBoneRotation([0, 0, 0], [20, -15, 8]), [-20, -15, -8])
+})
+
+test('Bedrock jump keyframes interpolate from lower post to upper pre and apply post at the key', () => {
+    const [animation] = compileBedrockAnimations([{ animations: {
+        'animation.example.jump': { animation_length: 2, bones: { body: { position: {
+            0: { pre: [0, 0, 0], post: [4, 0, 0] },
+            2: { pre: [8, 0, 0], post: [12, 0, 0] }
+        } } } }
+    } }])
+    assert.deepEqual(animation.sample(1).bones.body.position, [6, 0, 0])
+    assert.deepEqual(animation.sample(2).bones.body.position, [12, 0, 0])
+})
+
+test('Bedrock animated meshes preserve normalization while applying bone scale', () => {
+    const geometry = { 'minecraft:geometry': [{
+        description: { identifier: 'geometry.test', texture_width: 16, texture_height: 16 },
+        bones: [{ name: 'body', pivot: [0, 0, 0], cubes: [{ origin: [0, 0, 0], size: [2, 2, 2], uv: [0, 0] }] }]
+    }] }
+    const base = parseBedrockGeometry(geometry, { pose: { bones: { body: { scale: [1, 1, 1] } } } })
+    const animated = parseBedrockGeometry(geometry, {
+        pose: { bones: { body: { position: [2, 0, 0], scale: [2, 1, 1] } } },
+        normalization: base.normalization
+    })
+    assert.deepEqual(animated.normalization, base.normalization)
+    assert.ok(animated.bounds.size[0] > base.bounds.size[0])
+    assert.ok(animated.bounds.min[0] > base.bounds.min[0])
+})
 
 test('JavaScript gradient evaluator matches the Java golden contract', () => {
     const expected = [0.000203,0,0,0.003582,0,0,0.001687,0.504474,0,0.00456,0,0.502992,0.497916,0.499986,0.003477,0,0.494242,0.500259,0.493191,1,0,0,0,0.998132,1]
@@ -233,6 +297,100 @@ test('static Bedrock parser produces bounded textured triangle meshes', () => {
     assert.equal(mesh.normals.length, 108)
     assert.equal(mesh.uvs.length, 72)
     assert.ok(mesh.bounds.size.every(value => value > 0))
+})
+
+test('Bedrock static poses transform bones and hidden alternatives do not emit geometry', () => {
+    const geometry = {
+        format_version: '1.12.0',
+        'minecraft:geometry': [{
+            description: { identifier: 'geometry.pose', texture_width: 16, texture_height: 16 },
+            bones: [
+                { name: 'body', pivot: [0, 0, 0], cubes: [{ origin: [0, 0, 0], size: [2, 2, 2], uv: [0, 0] }] },
+                { name: 'mouth_closed', parent: 'body', cubes: [{ origin: [0, 0, -1], size: [1, 1, 1], uv: [0, 0] }] },
+                { name: 'mouth_open', parent: 'body', cubes: [{ origin: [0, 0, -1], size: [1, 1, 1], uv: [0, 0] }] }
+            ]
+        }]
+    }
+    const unposed = parseBedrockGeometry(geometry)
+    const posed = parseBedrockGeometry(geometry, {
+        pose: { bones: { body: { position: [3, 0, 0], rotation: [0, 25, 0] } } },
+        hiddenBones: ['mouth_open']
+    })
+    assert.equal(posed.positions.length, unposed.positions.length - 108)
+    assert.notDeepEqual(Array.from(posed.positions.slice(0, 6)), Array.from(unposed.positions.slice(0, 6)))
+})
+
+test('Bedrock texture upload preserves the format top-origin UV convention', () => {
+    const calls = []
+    const gl = { UNPACK_FLIP_Y_WEBGL: 0x9240, pixelStorei: (...args) => calls.push(args) }
+    configureTextureUpload(gl)
+    assert.deepEqual(calls, [[gl.UNPACK_FLIP_Y_WEBGL, false]])
+})
+
+test('Community model controls use the same orbit direction, sensitivity, and pitch bounds as block previews', () => {
+    const rotation = orbitFromDrag(0.4, 0.2, 20, -10)
+    assert.equal(rotation.yaw, 0.5)
+    assert.ok(Math.abs(rotation.pitch - 0.15) < 1e-12)
+    assert.equal(orbitFromDrag(0, 1.3, 0, 100).pitch, 1.35)
+    assert.equal(orbitFromDrag(0, -1.3, 0, -100).pitch, -1.35)
+    const eye = orbitEye(-Math.PI / 2, 0, 4)
+    assert.ok(Math.abs(eye[0]) < 1e-12)
+    assert.ok(Math.abs(eye[1]) < 1e-12)
+    assert.ok(Math.abs(eye[2] + 4) < 1e-12)
+})
+
+test('Resource Pack preview resources combine the complete candidate list with selected showcases deterministically', () => {
+    const subjects = normalizeSubjects([
+        { kind: 'pokemon', species: 'cobblemon:pikachu', form: '', gender: 'MALE' },
+        { kind: 'block', id: 'minecraft:cut_copper', state: {} },
+        { kind: 'block', id: 'minecraft:copper_block', state: {} }
+    ], {
+        subjects: [
+            { kind: 'block', id: 'minecraft:copper_block', state: {} },
+            { kind: 'pokemon', species: 'cobblemon:pikachu', form: '', gender: 'MALE' }
+        ]
+    })
+    assert.deepEqual(subjects.map(subjectKey), [
+        'block:minecraft:copper_block',
+        'block:minecraft:cut_copper',
+        'pokemon:cobblemon:pikachu::MALE'
+    ])
+})
+
+test('Resource Pack comparison groups forward camera lifecycle calls to both renderers', () => {
+    const calls = []
+    const fake = name => ({
+        fit(){ calls.push(`${name}:fit`) }, render(){ calls.push(`${name}:render`) },
+        resize(size){ calls.push(`${name}:resize:${size.cssWidth}`) },
+        getAnimationOptions(){ return [{ id: 'idle', label: 'Idle' }] }, getAnimationId(){ return 'idle' }, isPlaying(){ return true },
+        setAnimation(id){ calls.push(`${name}:animation:${id}`) }, setPlaying(value){ calls.push(`${name}:playing:${value}`) },
+        destroy(){ calls.push(`${name}:destroy`) }
+    })
+    const group = rendererGroup([fake('base'), fake('pack')])
+    assert.deepEqual(group.getAnimationOptions(), [{ id: 'idle', label: 'Idle' }])
+    assert.equal(group.getAnimationId(), 'idle'); assert.equal(group.isPlaying(), true)
+    group.fit(); group.render(); group.resize({ cssWidth: 720 }); group.setAnimation('idle'); group.setPlaying(false); group.destroy(); group.destroy()
+    assert.deepEqual(calls, [
+        'base:fit', 'pack:fit', 'base:render', 'pack:render',
+        'base:resize:720', 'pack:resize:720',
+        'base:animation:idle', 'pack:animation:idle', 'base:playing:false', 'pack:playing:false',
+        'base:destroy', 'pack:destroy'
+    ])
+})
+
+test('Bedrock planar cubes omit degenerate sides and separate opposing textured faces', () => {
+    const mesh = parseBedrockGeometry({
+        format_version: '1.12.0',
+        'minecraft:geometry': [{
+            description: { identifier: 'geometry.plane', texture_width: 16, texture_height: 16 },
+            bones: [{ name: 'plane', cubes: [{ origin: [-2, 0, 0], size: [4, 4, 0], uv: [0, 0] }] }]
+        }]
+    })
+    assert.equal(mesh.positions.length, 36)
+    assert.equal(mesh.normals.length, 36)
+    assert.equal(mesh.uvs.length, 24)
+    assert.ok(mesh.bounds.size[2] > 0, 'opposing plane faces need a stable depth separation')
+    assert.ok(mesh.bounds.size[2] < 0.001, 'plane depth separation must remain visually negligible')
 })
 
 test('Community artifact cache verifies checksums, repairs corruption, and evicts LRU entries', t => {

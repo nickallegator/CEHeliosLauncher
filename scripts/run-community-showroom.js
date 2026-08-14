@@ -9,18 +9,19 @@ const { createShowroomEnvironment } = require('./lib/community-showroom')
 
 function usage() {
     return [
-        'Usage: run-community-showroom.cmd [--keep-data] [--data-dir <path>] [--resources-from <path>]',
+        'Usage: run-community-showroom.cmd [--keep-data] [--data-dir <path>] [--resources-from <path>] [--showcase-pack <zip>]',
         '',
         '  --keep-data       Keep the disposable showroom directory after exit.',
         '  --data-dir <path> Use an explicit directory and never remove it automatically.',
         '  --resources-from  Read block models and textures from an existing AG Launcher game-data directory.',
+        '  --showcase-pack   Preview an external Resource Pack ZIP as the showroom Resource Pack entry.',
         '  --verify          Open, verify the catalog, then close automatically.',
         '  --help            Show this help.'
     ].join('\n')
 }
 
 function parseArguments(argv) {
-    const options = { keepData: false, dataDirectory: null, resourceDataDirectory: null, verify: false, help: false }
+    const options = { keepData: false, dataDirectory: null, resourceDataDirectory: null, showcasePackPath: null, verify: false, help: false }
     for(let index = 0; index < argv.length; index += 1) {
         const argument = argv[index]
         if(argument === '--keep-data') options.keepData = true
@@ -36,6 +37,11 @@ function parseArguments(argv) {
             const value = argv[index + 1]
             if(!value || value.startsWith('--')) throw new Error('--resources-from requires a path.')
             options.resourceDataDirectory = path.resolve(value)
+            index += 1
+        } else if(argument === '--showcase-pack') {
+            const value = argv[index + 1]
+            if(!value || value.startsWith('--')) throw new Error('--showcase-pack requires a ZIP path.')
+            options.showcasePackPath = path.resolve(value)
             index += 1
         } else throw new Error(`Unknown argument: ${argument}`)
     }
@@ -56,6 +62,17 @@ async function waitForAttribute(locator, name, expected, timeoutMs = 20_000) {
     }
     const text = await locator.textContent().catch(() => '')
     throw new Error(`Timed out waiting for ${name}=${expected}; received ${value || 'unset'}. ${String(text || '').trim()}`)
+}
+
+async function waitForText(locator, pattern, timeoutMs = 20_000) {
+    const deadline = Date.now() + timeoutMs
+    let value = ''
+    while(Date.now() < deadline) {
+        value = String(await locator.textContent().catch(() => '') || '').trim()
+        if(pattern.test(value)) return value
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    throw new Error(`Timed out waiting for ${pattern}; received ${value || 'empty text'}.`)
 }
 
 async function closeOpenDetail(page, closeSelector, detailSelector) {
@@ -147,7 +164,8 @@ async function run(argv = process.argv.slice(2)) {
     const runtime = await createShowroomEnvironment({
         appDirectory,
         ...(options.dataDirectory ? { rootDirectory: options.dataDirectory } : {}),
-        ...(options.resourceDataDirectory ? { resourceDataDirectory: options.resourceDataDirectory } : {})
+        ...(options.resourceDataDirectory ? { resourceDataDirectory: options.resourceDataDirectory } : {}),
+        ...(options.showcasePackPath ? { showcasePackPath: options.showcasePackPath } : {})
     })
     let application = null
     let shuttingDown = false
@@ -172,6 +190,7 @@ async function run(argv = process.argv.slice(2)) {
         console.log(`  Data:     ${runtime.rootDirectory}`)
         console.log(`  Instance: ${runtime.instanceRoot}`)
         console.log(`  Resources:${runtime.resourceDataDirectory ? ` ${runtime.resourceDataDirectory}` : ' palette fallback'}`)
+        if(runtime.showcasePackPath) console.log(`  Pack:      ${runtime.showcasePackPath}`)
         console.log(`  Cleanup:  ${options.keepData ? 'preserved after exit' : 'automatic after exit'}`)
         console.log('  Safety:   publishing and game launch are disabled')
         console.log('')
@@ -231,6 +250,54 @@ async function run(argv = process.argv.slice(2)) {
                     await card.locator('.schematicPreview').click()
                     await page.locator('#communityContentDetail').waitFor({ state: 'visible', timeout: 10_000 })
                     await waitForAttribute(page.locator('#communityContentRichView'), 'data-state', 'ready')
+                    if(type === 'resource-packs') {
+                        const externalPack = Boolean(runtime.showcasePackPath)
+                        const resources = page.locator('.communityPackResourceItem')
+                        const resourceCount = await resources.count()
+                        if((externalPack && resourceCount < 3) || (!externalPack && resourceCount !== 2)) throw new Error('Resource Pack showroom is missing its expected renderable resources.')
+                        if(!await page.locator('[data-community-metadata="dependencies"]').isVisible()) throw new Error('Resource Pack dependencies are not visible.')
+                        for(const metadata of ['license', 'rights', 'revision', 'compatibility']) {
+                            if(await page.locator(`[data-community-metadata="${metadata}"]`).isVisible()) throw new Error(`Resource Pack ${metadata} metadata should be hidden.`)
+                        }
+                        const search = page.locator('.communityPackResourceSearch')
+                        if(!externalPack){
+                            await resources.nth(0).click()
+                            await waitForText(page.locator('.communityResourcePackView .communityRichNote'), /^Drag to rotate · wheel to zoom$/)
+                            await waitForAttribute(page.locator('.communityPackStage canvas'), 'data-texture-source', 'resources')
+                            await waitForAttribute(page.locator('.communityPackStage canvas'), 'data-camera-target', '0.5000,0.5000,0.5000')
+                        }
+                        await search.fill(externalPack ? 'cosmog' : 'pikachu')
+                        if(await page.locator('.communityPackResourceItem').count() !== 1) throw new Error('Resource Pack resource search did not filter the list.')
+                        await page.locator('.communityPackResourceItem').click()
+                        await waitForText(page.locator('.communityResourcePackView .communityRichNote'), /^Drag to rotate · wheel to zoom$/)
+                        const pokemonCanvas = page.locator('.communityPackStage canvas')
+                        await pokemonCanvas.waitFor({ state: 'visible', timeout: 10_000 })
+                        if(externalPack) {
+                            const controls = page.locator('.communityPackAnimationTools')
+                            await controls.waitFor({ state: 'visible', timeout: 10_000 })
+                            await waitForAttribute(pokemonCanvas, 'data-animation-id', 'ground_idle')
+                            const firstFrame = Number(await pokemonCanvas.getAttribute('data-animation-frame'))
+                            await new Promise(resolve => setTimeout(resolve, 250))
+                            const laterFrame = Number(await pokemonCanvas.getAttribute('data-animation-frame'))
+                            if(laterFrame <= firstFrame) throw new Error('The default Pokémon idle animation did not advance.')
+                            await page.locator('.communityPackAnimationTools select').selectOption('ground_walk')
+                            await waitForAttribute(pokemonCanvas, 'data-animation-id', 'ground_walk')
+                            await page.locator('.communityPackAnimationTools [data-action="animation-playback"]').click()
+                            await waitForAttribute(pokemonCanvas, 'data-animation-playing', 'false')
+                        }
+                        await page.locator('.communityPackModeControl button[data-mode="compare"]').click()
+                        const comparisonCanvases = page.locator('.communityPackComparisonPane canvas')
+                        await page.locator('.communityPackComparisonPane[data-mode="pack"] canvas').waitFor({ state: 'visible', timeout: 20_000 })
+                        if(externalPack){
+                            if(await page.locator('.communityPackComparisonPane[data-mode="base"] canvas').count() !== 0) throw new Error('The external-only Cosmog model unexpectedly resolved from base Cobblemon resources.')
+                            if(!await page.locator('.communityPackComparisonPane[data-mode="base"] .communityPackPaneStatus').isVisible()) throw new Error('The Base comparison did not explain its missing external model.')
+                        } else {
+                            if(await comparisonCanvases.count() !== 2) throw new Error('Resource Pack comparison did not create independent Base and Pack views.')
+                            if(await page.locator('.communityPackPaneStatus:visible').count() !== 0) throw new Error('Resource Pack comparison duplicated its interaction guidance.')
+                            await page.locator('.communityPackModeControl button[data-mode="base"]').click()
+                            await waitForText(page.locator('.communityResourcePackView .communityRichNote'), /^Drag to rotate · wheel to zoom$/)
+                        }
+                    }
                     await resetShowroomCatalog(page)
                 }
                 console.log('Verified Trainer and Resource Pack interactive stages against local game resources.')
@@ -263,4 +330,4 @@ if(require.main === module) {
     })
 }
 
-module.exports = { closeOpenDetail, parseArguments, resetShowroomCatalog, run, usage, waitForApplicationClose, waitForAttribute }
+module.exports = { closeOpenDetail, parseArguments, resetShowroomCatalog, run, usage, waitForApplicationClose, waitForAttribute, waitForText }

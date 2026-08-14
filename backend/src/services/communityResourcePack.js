@@ -17,6 +17,7 @@ const MAX_SHOWCASE_POKEMON = 4
 const MAX_RENDER_OVERLAY_BYTES = 16 * 1024 * 1024
 const MAX_RENDER_OVERLAY_EXPANDED_BYTES = 64 * 1024 * 1024
 const RESOURCE_LOCATION = /^[a-z0-9_.-]+:[a-z0-9/._-]+$/
+const COBBLEMON_EXTENSION_RESOURCE = /^(?:bedrock\/pokemon\/(?:animations|models|posers|resolvers)\/|textures\/pokemon\/)/i
 const FORBIDDEN_EXTENSIONS = new Set([
     '.7z', '.apk', '.app', '.bat', '.bin', '.cmd', '.com', '.dll', '.dmg', '.exe', '.gz',
     '.jar', '.js', '.lnk', '.msi', '.ps1', '.rar', '.reg', '.scr', '.sh', '.so', '.tar',
@@ -175,7 +176,8 @@ function validateEntryMetadata(entry, state) {
     const namespaceMatch = name.match(/^assets\/([^/]+)\//i)
     if(namespaceMatch) {
         const namespace = namespaceMatch[1].toLowerCase()
-        if(!['minecraft', 'cobblepower', 'cobblemon'].includes(namespace)) {
+        const relativePath = name.slice(namespaceMatch[0].length)
+        if(!['minecraft', 'cobblepower', 'cobblemon'].includes(namespace) && !COBBLEMON_EXTENSION_RESOURCE.test(relativePath)) {
             throw validationError('unapproved_resource_pack_namespace', `Resource Pack namespace ${namespace} is not approved for Cobble Power Community packs.`)
         }
         if(namespace !== 'minecraft') state.namespaces.add(namespace)
@@ -215,14 +217,16 @@ function discoverShowcaseCandidate(info, payload) {
     if(blockstate) {
         return { kind: 'block', id: `${blockstate[1].toLowerCase()}:${blockstate[2].toLowerCase()}`, state: {}, sourcePath: info.name }
     }
-    const resolver = info.name.match(/^assets\/cobblemon\/bedrock\/pokemon\/resolvers\/(.+)\.json$/i)
+    const resolver = info.name.match(/^assets\/([^/]+)\/bedrock\/pokemon\/resolvers\/(.+)\.json$/i)
     if(!resolver || !payload) return null
     try {
         const document = JSON.parse(payload.toString('utf8'))
-        const rawSpecies = String(document.species || resolver[1].split('/').at(-1) || '').toLowerCase()
+        const variations = Array.isArray(document.variations) ? document.variations : []
+        if(!variations.some(variation => variation?.model) || !variations.some(variation => variation?.texture)) return null
+        const rawSpecies = String(document.species || resolver[2].split('/').at(-1) || '').toLowerCase()
         const species = rawSpecies.includes(':') ? rawSpecies : `cobblemon:${rawSpecies}`
         if(!RESOURCE_LOCATION.test(species)) return null
-        return { kind: 'pokemon', species, form: '', gender: 'MALE', sourcePath: info.name }
+        return { kind: 'pokemon', species, form: '', gender: 'MALE', resourceNamespace: resolver[1].toLowerCase(), sourcePath: info.name }
     } catch(_error) {
         return null
     }
@@ -266,7 +270,10 @@ function normalizeShowcase(raw, candidates) {
             seen.add(key)
             const gender = String(subject.gender || 'MALE').toUpperCase()
             if(!['MALE', 'FEMALE', 'GENDERLESS'].includes(gender)) throw validationError('invalid_showcase_subject', 'Showcase Pokémon gender is invalid.')
-            return { kind, species, form: String(subject.form || '').slice(0, 80).toLowerCase(), gender, sourcePath: candidate.sourcePath }
+            return {
+                kind, species, form: String(subject.form || '').slice(0, 80).toLowerCase(), gender,
+                resourceNamespace: candidate.resourceNamespace || 'cobblemon', sourcePath: candidate.sourcePath
+            }
         }
         throw validationError('invalid_showcase_subject', `Showcase subject ${index + 1} has an unsupported kind.`)
     })
@@ -288,15 +295,27 @@ function resourceReferences(document) {
 
 function resolveReferencePaths(reference, entryNames) {
     const [namespace, resourcePath] = reference.split(':', 2)
-    const candidates = [
-        `assets/${namespace}/models/${resourcePath}.json`,
-        `assets/${namespace}/textures/${resourcePath}.png`,
-        `assets/${namespace}/${resourcePath}.json`,
-        `assets/${namespace}/${resourcePath}.png`,
-        `assets/${namespace}/bedrock/${resourcePath}.json`,
-        `assets/${namespace}/bedrock/${resourcePath}.geo.json`
-    ]
-    return candidates.filter(value => entryNames.has(value.toLowerCase()))
+    const withoutJson = resourcePath.replace(/\.json$/i, '')
+    const withoutPng = resourcePath.replace(/\.png$/i, '')
+    const withoutGeometryExtension = withoutJson.replace(/\.geo$/i, '')
+    const candidates = new Set([
+        `assets/${namespace}/${resourcePath}`,
+        `assets/${namespace}/${withoutJson}.json`,
+        `assets/${namespace}/${withoutPng}.png`,
+        `assets/${namespace}/models/${withoutJson}.json`,
+        `assets/${namespace}/textures/${withoutPng}.png`,
+        `assets/${namespace}/bedrock/${withoutJson}.json`,
+        `assets/${namespace}/bedrock/${withoutGeometryExtension}.geo.json`
+    ])
+    const resolved = [...candidates].filter(value => entryNames.has(value.toLowerCase()))
+    const basename = withoutGeometryExtension.split('/').at(-1)
+    const bedrockPrefix = `assets/${namespace}/bedrock/pokemon/`
+    const suffixes = [`/${basename}.geo.json`, `/${basename}.json`]
+    const names = typeof entryNames.keys === 'function' ? entryNames.keys() : entryNames
+    for(const entryName of names) {
+        if(entryName.startsWith(bedrockPrefix) && suffixes.some(suffix => entryName.endsWith(suffix))) resolved.push(entryName)
+    }
+    return [...new Set(resolved)].sort()
 }
 
 function buildRenderOverlay(filePath, showcase) {

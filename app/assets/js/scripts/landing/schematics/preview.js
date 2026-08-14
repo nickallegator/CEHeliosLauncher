@@ -465,19 +465,47 @@ function mat4Multiply(out, a, b){
     return out
 }
 
-function computePreviewCameraRadius(boundsSize, aspect, fov = Math.PI / 4){
+function computePreviewCameraRadius(boundsSize, aspect, fov = Math.PI / 4, minimumRadius = 6){
     const dimensions = Array.isArray(boundsSize) ? boundsSize.map(value => Math.max(1, Number(value) || 1)) : [1, 1, 1]
     const boundingRadius = Math.hypot(dimensions[0], dimensions[1], dimensions[2]) / 2
     const safeAspect = Math.max(0.2, Number(aspect) || 1)
     const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * safeAspect)
     const limitingFov = Math.max(0.2, Math.min(fov, horizontalFov))
-    return Math.max(6, boundingRadius / Math.sin(limitingFov / 2) * 1.12)
+    return Math.max(Math.max(0.5, Number(minimumRadius) || 0.5), boundingRadius / Math.sin(limitingFov / 2) * 1.12)
+}
+
+function computePreviewMeshFrame(mesh){
+    const positions = [mesh?.opaque?.positions, mesh?.cutout?.positions, mesh?.translucent?.positions]
+    const min = [Infinity, Infinity, Infinity]
+    const max = [-Infinity, -Infinity, -Infinity]
+    let vertices = 0
+    for(const values of positions){
+        if(!values) continue
+        for(let index = 0; index + 2 < values.length; index += 3){
+            const point = [Number(values[index]), Number(values[index + 1]), Number(values[index + 2])]
+            if(!point.every(Number.isFinite)) continue
+            vertices++
+            for(let axis = 0; axis < 3; axis++){
+                min[axis] = Math.min(min[axis], point[axis])
+                max[axis] = Math.max(max[axis], point[axis])
+            }
+        }
+    }
+    if(vertices === 0) return null
+    return {
+        center: min.map((value, axis) => (value + max[axis]) / 2),
+        size: min.map((value, axis) => Math.max(0.01, max[axis] - value))
+    }
 }
 
 class SchematicPreviewRenderer {
-    constructor(canvas, container){
+    constructor(canvas, container, options = {}){
         this.canvas = canvas
         this.container = container
+        this.autoFrameMesh = options.autoFrameMesh === true
+        this.defaultYaw = Number.isFinite(options.defaultYaw) ? options.defaultYaw : -0.8
+        this.defaultPitch = Number.isFinite(options.defaultPitch) ? options.defaultPitch : 0.5
+        this.minimumRadius = Number.isFinite(options.minimumRadius) ? Math.max(0.5, options.minimumRadius) : 6
         this.gl = canvas.getContext('webgl2', { antialias: true, alpha: true })
         this.isWebGL = Boolean(this.gl)
         this.ctx2d = this.gl ? null : canvas.getContext('2d')
@@ -528,10 +556,11 @@ class SchematicPreviewRenderer {
         this.lastTransSortEye = null
         this.meshTaskId = 0
         this.boundsSize = [1, 1, 1]
-        this.center = [0, 0, 0]
+        this.defaultCenter = [0, 0, 0]
+        this.center = [...this.defaultCenter]
         this.radius = 10
-        this.yaw = -0.8
-        this.pitch = 0.5
+        this.yaw = this.defaultYaw
+        this.pitch = this.defaultPitch
         this.dragging = false
         this.panning = false
         this.lastX = 0
@@ -563,6 +592,16 @@ class SchematicPreviewRenderer {
 
     resizeCanvas(){
         return resizeCanvasToContainer(this.canvas, this.container)
+    }
+
+    fit(){
+        this.center = [...this.defaultCenter]
+        this.yaw = this.defaultYaw
+        this.pitch = this.defaultPitch
+        const previewRect = this.container?.getBoundingClientRect()
+        const aspect = previewRect?.height > 0 ? previewRect.width / previewRect.height : 1
+        this.radius = computePreviewCameraRadius(this.boundsSize, aspect, Math.PI / 4, this.minimumRadius)
+        this.requestRender()
     }
 
     observeSize(){
@@ -1057,6 +1096,14 @@ class SchematicPreviewRenderer {
         const gl = this.gl
         this.container?.removeAttribute('data-mesh')
         this.meshHasCoplanar = Boolean(mesh?.hasCoplanar)
+        if(this.autoFrameMesh){
+            const frame = computePreviewMeshFrame(mesh)
+            if(frame){
+                this.defaultCenter = frame.center
+                this.boundsSize = frame.size
+                this.fit()
+            }
+        }
         if(mesh && mesh.opaque?.positions?.length > 0){
             const opaque = mesh.opaque
             gl.bindBuffer(gl.ARRAY_BUFFER, this.meshPositionBuffer)
@@ -1194,11 +1241,12 @@ class SchematicPreviewRenderer {
         ]
         // Mesh vertices are normalized around the schematic bounds before upload.
         // Keep the camera target in that same local coordinate system.
-        this.center = [0, 0, 0]
+        this.defaultCenter = [0, 0, 0]
+        this.center = [...this.defaultCenter]
         this.boundsSize = bounds.size || [1, 1, 1]
         const previewRect = this.container?.getBoundingClientRect()
         const aspect = previewRect?.height > 0 ? previewRect.width / previewRect.height : 1
-        this.radius = computePreviewCameraRadius(this.boundsSize, aspect)
+        this.radius = computePreviewCameraRadius(this.boundsSize, aspect, Math.PI / 4, this.minimumRadius)
 
         const paletteColors = buildPaletteColors(schematic)
         this.container?.setAttribute('data-mesh', 'building')
@@ -1332,6 +1380,8 @@ class SchematicPreviewRenderer {
             this.center[1] + this.radius * sp,
             this.center[2] + this.radius * cp * sy
         ]
+        this.canvas.dataset.cameraTarget = this.center.map(value => Number(value).toFixed(4)).join(',')
+        this.canvas.dataset.cameraRadius = Number(this.radius).toFixed(4)
         mat4LookAt(this.view, eye, this.center, [0, 1, 0])
         mat4Multiply(this.viewProj, this.proj, this.view)
 

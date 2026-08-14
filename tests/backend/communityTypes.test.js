@@ -178,15 +178,26 @@ test('Resource Pack validator discovers selected subjects and builds a bounded r
     zip.addFile('pack.mcmeta', Buffer.from(JSON.stringify({ pack: { pack_format: 34, description: 'Showcase' } })))
     zip.addFile('assets/cobblepower/blockstates/copper_machine.json', Buffer.from(JSON.stringify({ variants: { '': { model: 'cobblepower:block/copper_machine' } } })))
     zip.addFile('assets/cobblepower/models/block/copper_machine.json', Buffer.from(JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: 'cobblepower:block/copper_machine' } })))
-    zip.addFile('assets/cobblepower/textures/block/copper_machine.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'))
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    zip.addFile('assets/cobblepower/textures/block/copper_machine.png', png)
+    zip.addFile('assets/cobblemon/bedrock/pokemon/resolvers/0025_pikachu/base.json', Buffer.from(JSON.stringify({
+        species: 'cobblemon:pikachu',
+        variations: [{ aspects: [], model: 'cobblemon:pikachu_male.geo', texture: 'cobblepower:textures/pokemon/showcase.png' }]
+    })))
+    zip.addFile('assets/cobblepower/textures/pokemon/showcase.png', png)
     zip.writeZip(filePath)
     const result = await validateResourcePack(filePath, {
-        showcase: { schemaVersion: 1, subjects: [{ kind: 'block', id: 'cobblepower:copper_machine', state: {} }] }
+        showcase: { schemaVersion: 1, subjects: [
+            { kind: 'block', id: 'cobblepower:copper_machine', state: {} },
+            { kind: 'pokemon', species: 'cobblemon:pikachu', form: '', gender: 'MALE' }
+        ] }
     })
     assert.equal(result.typeData.showcase.subjects[0].id, 'cobblepower:copper_machine')
     assert.equal(result.renderAssets.length, 1)
     assert.equal(result.renderAssets[0].role, 'render-overlay')
     assert.ok(result.renderAssets[0].bytes.length > 0)
+    const overlayPaths = new Set(new AdmZip(result.renderAssets[0].bytes).getEntries().map(entry => entry.entryName.toLowerCase()))
+    assert.equal(overlayPaths.has('assets/cobblepower/textures/pokemon/showcase.png'), true)
 })
 
 test('Resource Pack validator rejects malformed content files', async t => {
@@ -211,6 +222,26 @@ test('Resource Pack path normalization rejects traversal and Windows paths', () 
     assert.throws(() => normalizeEntryPath('../outside.json'), error => error.code === 'unsafe_resource_pack_path')
     assert.throws(() => normalizeEntryPath('C:/outside.json'), error => error.code === 'unsafe_resource_pack_path')
     assert.throws(() => normalizeEntryPath('assets\\cobblepower\\bad.json'), error => error.code === 'unsafe_resource_pack_path')
+})
+
+test('Resource Pack validator accepts dedicated Cobblemon model namespaces without allowing unrelated assets', async t => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ag-resource-pack-extension-test-'))
+    t.after(() => fs.promises.rm(directory, { recursive: true, force: true }))
+    const filePath = path.join(directory, 'reanimodel.zip')
+    const zip = new AdmZip()
+    zip.addFile('pack.mcmeta', Buffer.from(JSON.stringify({ pack: { pack_format: 34, description: 'Namespaced models' } })))
+    zip.addFile('assets/example_models/bedrock/pokemon/resolvers/1_cosmog_base.json', Buffer.from(JSON.stringify({
+        species: 'cobblemon:cosmog', order: 1,
+        variations: [{ aspects: [], model: 'example_models:cosmog.geo', texture: 'example_models:textures/pokemon/cosmog.png' }]
+    })))
+    zip.addFile('assets/example_models/bedrock/pokemon/models/cosmog/cosmog.geo.json', Buffer.from(JSON.stringify({ 'minecraft:geometry': [] })))
+    zip.addFile('assets/example_models/textures/pokemon/cosmog.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'))
+    zip.writeZip(filePath)
+    const result = await validateResourcePack(filePath, {
+        showcase: { schemaVersion: 1, subjects: [{ kind: 'pokemon', species: 'cobblemon:cosmog', form: '', gender: 'GENDERLESS' }] }
+    })
+    assert.equal(result.typeData.showcaseCandidates[0].resourceNamespace, 'example_models')
+    assert.equal(result.typeData.showcase.subjects[0].resourceNamespace, 'example_models')
 })
 
 test('Resource Pack validator rejects unrelated mod namespaces', async t => {

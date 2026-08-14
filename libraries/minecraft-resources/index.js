@@ -20,6 +20,7 @@ class JarResourceProvider {
         }
         this.jarPath = jarPath
         this._zip = null
+        this._entries = null
     }
 
     _ensureZip(){
@@ -29,13 +30,27 @@ class JarResourceProvider {
         return this._zip
     }
 
+    _ensureEntries(){
+        if(!this._entries){
+            this._entries = new Map()
+            for(const entry of this._ensureZip().getEntries()){
+                if(entry.isDirectory) continue
+                const name = String(entry.entryName || '').replaceAll('\\', '/')
+                if(name) this._entries.set(name.toLowerCase(), { name, entry })
+            }
+        }
+        return this._entries
+    }
+
     getBuffer(resourcePath){
-        const zip = this._ensureZip()
-        const entry = zip.getEntry(resourcePath)
-        if(!entry){
+        const normalized = String(resourcePath || '').replaceAll('\\', '/')
+        const direct = this._ensureZip().getEntry(normalized)
+        if(direct) return direct.getData()
+        const record = this._ensureEntries().get(normalized.toLowerCase())
+        if(!record){
             return null
         }
-        return entry.getData()
+        return record.entry.getData()
     }
 
     getText(resourcePath){
@@ -49,6 +64,14 @@ class JarResourceProvider {
             return null
         }
         return JSON.parse(text)
+    }
+
+    list(prefix = ''){
+        const normalized = String(prefix || '').replaceAll('\\', '/').toLowerCase()
+        return [...this._ensureEntries().values()]
+            .filter(record => record.name.toLowerCase().startsWith(normalized))
+            .map(record => record.name)
+            .sort((left, right) => left.localeCompare(right))
     }
 }
 
@@ -120,6 +143,30 @@ class DirectoryResourceProvider {
         }
         return JSON.parse(text)
     }
+
+    async list(prefix = ''){
+        const normalized = String(prefix || '').replaceAll('\\', '/').replace(/^\/+/, '')
+        if(normalized.split('/').some(part => part === '..' || part === '.')) throw new Error('Resource prefix contains an unsafe path.')
+        const root = path.resolve(this.rootDir)
+        const start = path.resolve(root, normalized)
+        const relativeStart = path.relative(root, start)
+        if(relativeStart.startsWith('..') || path.isAbsolute(relativeStart)) throw new Error('Resource prefix leaves the provider root.')
+        const results = []
+        const visit = async directory => {
+            let entries
+            try { entries = await fs.readdir(directory, { withFileTypes: true }) } catch(error) {
+                if(error.code === 'ENOENT') return
+                throw error
+            }
+            for(const entry of entries.sort((left, right) => left.name.localeCompare(right.name))){
+                const entryPath = path.join(directory, entry.name)
+                if(entry.isDirectory()) await visit(entryPath)
+                else if(entry.isFile()) results.push(path.relative(root, entryPath).replaceAll('\\', '/'))
+            }
+        }
+        await visit(start)
+        return results
+    }
 }
 
 function createResourceStack(providers){
@@ -151,6 +198,19 @@ function createResourceStack(providers){
                 }
             }
             return null
+        },
+        async list(prefix = ''){
+            const paths = new Map()
+            for(const provider of list){
+                if(typeof provider.list !== 'function') continue
+                const entries = await provider.list(prefix)
+                for(const entry of entries || []){
+                    const normalized = String(entry || '').replaceAll('\\', '/')
+                    const key = normalized.toLowerCase()
+                    if(normalized && !paths.has(key)) paths.set(key, normalized)
+                }
+            }
+            return [...paths.values()].sort((left, right) => left.localeCompare(right))
         }
     }
 }

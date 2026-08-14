@@ -832,6 +832,7 @@ let schematicsRuntimeRegistry = {
 }
 let schematicsLoadedBlockstates = new Set(Object.keys(schematicsRuntimeRegistry.blockstates))
 let schematicsLoadedModels = new Set(Object.keys(schematicsRuntimeRegistry.models))
+let schematicsRegistryResourceKey = null
 let schematicsTextureAtlas = null
 let schematicsTextureAtlasDiagnostics = { requestedTextures: 0, resolvedTextures: 0 }
 const SCHEMATICS_ATLAS_CACHE_LIMIT = 3
@@ -2078,12 +2079,17 @@ function resetSchematicsResourceCaches(){
             schematicsRemoteModProvider.failedNamespaces.clear()
         }
     }
+    resetSchematicsRuntimeRegistry(null)
+}
+
+function resetSchematicsRuntimeRegistry(resourceKey){
     schematicsRuntimeRegistry = {
         blockstates: { ...(schematicRegistryBase.blockstates || {}) },
         models: { ...(schematicRegistryBase.models || {}) }
     }
     schematicsLoadedBlockstates = new Set(Object.keys(schematicsRuntimeRegistry.blockstates))
     schematicsLoadedModels = new Set(Object.keys(schematicsRuntimeRegistry.models))
+    schematicsRegistryResourceKey = resourceKey
 }
 
 async function rebuildSchematicsCacheIfNeeded(){
@@ -2140,7 +2146,7 @@ function extractModelIds(apply, set){
 
 const schematicsModelLoadPromises = new Map()
 
-async function ensureModelLoaded(modelId, stack){
+async function ensureModelLoaded(modelId, stack, registryKey = schematicsRegistryResourceKey){
     if(!modelId){
         return
     }
@@ -2152,13 +2158,14 @@ async function ensureModelLoaded(modelId, stack){
     if(schematicsLoadedModels.has(modelId) || schematicsLoadedModels.has(normalizedId)){
         return
     }
-    if(schematicsModelLoadPromises.has(normalizedId)){
-        await schematicsModelLoadPromises.get(normalizedId)
+    const promiseKey = `${registryKey || 'default'}|${normalizedId}`
+    if(schematicsModelLoadPromises.has(promiseKey)){
+        await schematicsModelLoadPromises.get(promiseKey)
         return
     }
     const loadPromise = (async () => {
         const model = await loadModel(stack, namespace, path)
-        if(!model){
+        if(!model || schematicsRegistryResourceKey !== registryKey){
             return
         }
         schematicsRuntimeRegistry.models[modelId] = model
@@ -2168,12 +2175,12 @@ async function ensureModelLoaded(modelId, stack){
         schematicsLoadedModels.add(modelId)
         schematicsLoadedModels.add(normalizedId)
         if(model.parent){
-            await ensureModelLoaded(model.parent, stack)
+            await ensureModelLoaded(model.parent, stack, registryKey)
         }
     })().finally(() => {
-        schematicsModelLoadPromises.delete(normalizedId)
+        schematicsModelLoadPromises.delete(promiseKey)
     })
-    schematicsModelLoadPromises.set(normalizedId, loadPromise)
+    schematicsModelLoadPromises.set(promiseKey, loadPromise)
     await loadPromise
 }
 
@@ -2185,6 +2192,8 @@ async function ensureRegistryForSchematic(schematic, resourceStack = null){
     if(!stack){
         return
     }
+    const registryKey = String(stack.cacheKey || stack.signature || 'default')
+    if(schematicsRegistryResourceKey !== registryKey) resetSchematicsRuntimeRegistry(registryKey)
     const paletteBlockIds = Array.from(new Set(
         schematic.palette
             .map(entry => entry?.block)
@@ -2213,6 +2222,7 @@ async function ensureRegistryForSchematic(schematic, resourceStack = null){
                 }
             }
         }
+        if(schematicsRegistryResourceKey !== registryKey) return
         if(blockstate){
             schematicsRuntimeRegistry.blockstates[blockId] = blockstate
             schematicsLoadedBlockstates.add(blockId)
@@ -2223,7 +2233,7 @@ async function ensureRegistryForSchematic(schematic, resourceStack = null){
         collectModelIdsFromBlockstate(activeBlockstate).forEach(modelId => modelIdsToLoad.add(modelId))
     }))
 
-    await Promise.all(Array.from(modelIdsToLoad).map(modelId => ensureModelLoaded(modelId, stack)))
+    await Promise.all(Array.from(modelIdsToLoad).map(modelId => ensureModelLoaded(modelId, stack, registryKey)))
 }
 
 function resolveTextureIdParts(textureId){

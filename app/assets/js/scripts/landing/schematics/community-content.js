@@ -286,8 +286,15 @@ async function genericCommunityRenderBlockSubject({ host, subject, resourceStack
     }
     await ensureRegistryForSchematic(schematic, resourceStack)
     const atlas = await prepareTextureAtlasForSchematic(schematic, { resourceStack })
-    const renderer = new SchematicPreviewRenderer(canvas, host)
+    const renderer = new SchematicPreviewRenderer(canvas, host, {
+        autoFrameMesh: true,
+        defaultYaw: -Math.PI / 4,
+        defaultPitch: 0.34,
+        minimumRadius: 2.65
+    })
     if(atlas?.canvas) renderer.setTextureAtlas(atlas.canvas)
+    canvas.dataset.textureSource = atlas?.canvas ? 'resources' : 'fallback'
+    canvas.dataset.texturesResolved = String(atlas?.resolvedTextureCount || 0)
     renderer.setSchematic(schematic)
     return renderer
 }
@@ -377,10 +384,10 @@ async function refreshGenericCommunityDetailState(){
 function configureGenericCommunityDetailLayout(type){
     const panel = genericCommunityElement('communityContentDetailPanel')
     const typeSidebar = genericCommunityElement('communityContentTypeSidebar')
-    const automation = type === 'automation'
+    const dependenciesOnly = type === 'automation' || type === 'resource-packs'
     if(panel) panel.dataset.communityType = type || ''
     panel?.querySelectorAll?.('[data-community-metadata]').forEach(row => {
-        row.hidden = automation && row.dataset.communityMetadata !== 'dependencies'
+        row.hidden = dependenciesOnly && row.dataset.communityMetadata !== 'dependencies'
     })
     if(typeSidebar){
         typeSidebar.hidden = true

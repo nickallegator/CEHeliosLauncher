@@ -101,13 +101,20 @@ test('Community dialog CSS defines fluid wide, compact, and container-responsive
     assert.match(css, /communityAutomationView\.hasExternalInspector/)
 })
 
-test('Automation detail keeps only dependencies and mounts node inspection in the detail sidebar', () => {
+test('Automation and Resource Pack details keep only dependencies and mount type tools in the detail sidebar', () => {
     const detailSource = fs.readFileSync(path.join(root, 'app', 'assets', 'js', 'scripts', 'landing', 'schematics', 'community-content.js'), 'utf8')
     const previewSource = fs.readFileSync(path.join(root, 'app', 'assets', 'js', 'communitypreviews', 'automation.js'), 'utf8')
-    assert.match(detailSource, /automation && row\.dataset\.communityMetadata !== 'dependencies'/)
+    assert.match(detailSource, /type === 'automation' \|\| type === 'resource-packs'/)
+    assert.match(detailSource, /dependenciesOnly && row\.dataset\.communityMetadata !== 'dependencies'/)
     assert.match(detailSource, /detailSidebar: genericCommunityElement\('communityContentTypeSidebar'\)/)
     assert.match(previewSource, /this\.inspectorHost\.replaceChildren\(this\.inspector\)/)
     assert.match(previewSource, /body\.append\(stage\)/)
+    const resourcePackSource = fs.readFileSync(path.join(root, 'app', 'assets', 'js', 'communitypreviews', 'resource-pack.js'), 'utf8')
+    assert.match(resourcePackSource, /this\.sidebarHost\.replaceChildren\(this\.browser\)/)
+    assert.match(resourcePackSource, /for\(const mode of \['compare', 'base', 'pack'\]\)/)
+    assert.match(resourcePackSource, /const INTERACTION_GUIDANCE = 'Drag to rotate · wheel to zoom'/)
+    assert.match(resourcePackSource, /value\.note\.hidden = false/)
+    assert.doesNotMatch(resourcePackSource, /value\.note\.textContent = 'Drag to rotate/)
 })
 
 test('modal controller supports Escape dismissal and initial focus without changing legacy callers', () => {

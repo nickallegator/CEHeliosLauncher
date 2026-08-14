@@ -78,6 +78,8 @@ class CommunityRichPreviewHost {
                 ...common,
                 overlayBytes,
                 showcase: entry.typeData?.showcase || { schemaVersion: 1, subjects: [] },
+                resources: entry.typeData?.showcaseCandidates || entry.typeData?.showcase?.subjects || [],
+                sidebarHost: this.detailSidebar,
                 renderBlock: this.renderBlock
             })
             this.container.dataset.state = 'ready'

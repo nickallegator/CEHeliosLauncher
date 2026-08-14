@@ -6,13 +6,15 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
+const AdmZip = require('adm-zip')
 
 const {
     SHOWROOM_PROFILE_ID,
     SHOWROOM_TYPES,
     assertSafeShowroomRoot,
     createShowroomEnvironment,
-    validateResourceDataDirectory
+    validateResourceDataDirectory,
+    validateShowcasePackPath
 } = require('../../scripts/lib/community-showroom')
 const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
 const { parseArguments } = require('../../scripts/run-community-showroom')
@@ -28,15 +30,30 @@ test('showroom arguments preserve explicit directories and reject unknown switch
         '--keep-data',
         '--verify',
         '--data-dir', 'fixture-output',
-        '--resources-from', 'installed-game-data'
+        '--resources-from', 'installed-game-data',
+        '--showcase-pack', 'external-pack.zip'
     ])
     assert.equal(value.keepData, true)
     assert.equal(value.verify, true)
     assert.equal(value.dataDirectory, path.resolve('fixture-output'))
     assert.equal(value.resourceDataDirectory, path.resolve('installed-game-data'))
+    assert.equal(value.showcasePackPath, path.resolve('external-pack.zip'))
     assert.throws(() => parseArguments(['--unknown']), /Unknown argument/)
     assert.throws(() => parseArguments(['--data-dir']), /requires a path/)
     assert.throws(() => parseArguments(['--resources-from']), /requires a path/)
+    assert.throws(() => parseArguments(['--showcase-pack']), /requires a ZIP path/)
+})
+
+test('showroom external packs require bounded ZIP files', t => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-showcase-pack-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    const zipPath = path.join(directory, 'models.zip')
+    fs.writeFileSync(zipPath, Buffer.alloc(0))
+    assert.throws(() => validateShowcasePackPath(path.join(directory, 'missing.zip')), /existing ZIP/)
+    assert.throws(() => validateShowcasePackPath(path.join(directory, 'models.txt')), /existing ZIP/)
+    assert.throws(() => validateShowcasePackPath(zipPath), /100 MiB limit/)
+    const zip = new AdmZip(); zip.addFile('pack.mcmeta', Buffer.from('{}')); zip.writeZip(zipPath)
+    assert.equal(validateShowcasePackPath(zipPath), zipPath)
 })
 
 test('showroom resource roots require existing common and instances directories', t => {
@@ -106,6 +123,9 @@ test('local showroom serves representative read-only artifacts without productio
     assert.equal(previewAssets.assets[0].role, 'render-overlay')
     const overlay = Buffer.from(await fetch(previewAssets.assets[0].downloadUrl).then(response => response.arrayBuffer()))
     assert.equal(digest(overlay), previewAssets.assets[0].sha256)
+    const overlayPaths = new Set(new AdmZip(overlay).getEntries().map(entry => entry.entryName.toLowerCase()))
+    assert.equal(overlayPaths.has('assets/cobblepower/textures/block/community_copper.png'), true)
+    assert.equal(overlayPaths.has('assets/cobblepower/textures/pokemon/community_pikachu.png'), true)
 
     const publishResponse = await fetch(`${runtime.apiBaseUrl}/v1/community/uploads`, { method: 'POST' })
     assert.equal(publishResponse.status, 403)
