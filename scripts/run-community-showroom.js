@@ -202,6 +202,18 @@ async function run(argv = process.argv.slice(2)) {
                 if(type === 'builder-presets' && options.resourceDataDirectory) {
                     await waitForAttribute(page.locator('.communityGradientCanvas'), 'data-texture-source', 'resources')
                 }
+                if(type === 'automation') {
+                    if(!await page.locator('#communityContentTypeSidebar .communityGraphInspector').isVisible()) {
+                        throw new Error('Automation node inspection was not moved into the detail sidebar.')
+                    }
+                    if(await page.locator('.communityAutomationBody > .communityGraphInspector').count() > 0) {
+                        throw new Error('Automation preview still reserves canvas space for its node inspector.')
+                    }
+                    if(!await page.locator('[data-community-metadata="license"]').isHidden()
+                        || !await page.locator('[data-community-metadata="dependencies"]').isVisible()) {
+                        throw new Error('Automation detail metadata was not reduced to dependencies.')
+                    }
+                }
                 await resetShowroomCatalog(page)
             }
             console.log('Verified interactive Builder Preset and Automation renderers.')

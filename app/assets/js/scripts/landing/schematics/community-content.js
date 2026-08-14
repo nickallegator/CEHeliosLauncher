@@ -297,6 +297,7 @@ function ensureGenericCommunityRichPreview(client){
         genericCommunityRichPreview = new CommunityRichPreviewHost({
             container: genericCommunityElement('communityContentRichView'),
             fallbackImage: genericCommunityElement('communityContentDetailImage'),
+            detailSidebar: genericCommunityElement('communityContentTypeSidebar'),
             client,
             enabled: communityCapabilities?.features?.richPreviews === true,
             headers: getSchematicsAuthHeaders,
@@ -373,6 +374,20 @@ async function refreshGenericCommunityDetailState(){
     }
 }
 
+function configureGenericCommunityDetailLayout(type){
+    const panel = genericCommunityElement('communityContentDetailPanel')
+    const typeSidebar = genericCommunityElement('communityContentTypeSidebar')
+    const automation = type === 'automation'
+    if(panel) panel.dataset.communityType = type || ''
+    panel?.querySelectorAll?.('[data-community-metadata]').forEach(row => {
+        row.hidden = automation && row.dataset.communityMetadata !== 'dependencies'
+    })
+    if(typeSidebar){
+        typeSidebar.hidden = true
+        typeSidebar.replaceChildren()
+    }
+}
+
 async function openGenericCommunityDetail(entry){
     const client = await getCommunityApiClient()
     if(!client) return
@@ -387,6 +402,7 @@ async function openGenericCommunityDetail(entry){
         loggerLanding.warn('Failed to load Community detail.', { code: error?.code, message: error?.message })
     }
     const value = genericCommunityDetailEntry
+    configureGenericCommunityDetailLayout(value.type)
     genericCommunityElement('communityContentDetailType').textContent = genericCommunityTypeLabel(value.type)
     genericCommunityElement('communityContentDetailTitle').textContent = value.title || value.name
     const creatorName = typeof value.creator === 'string' ? value.creator : value.creator?.name

@@ -85,6 +85,8 @@ test('Community detail and publishing templates use the shared semantic dialog s
         assert.match(template, /<footer[^>]+communityDialogFooter/)
     }
     assert.match(detail, /<aside[^>]+communityContentDetailCopy/)
+    assert.match(detail, /id="communityContentTypeSidebar"/)
+    assert.match(detail, /data-community-metadata="dependencies"/)
     assert.match(schematic, /<aside id="schematicsDetailInfo"/)
     assert.match(publish, /communityContentPublishSource/)
     assert.match(publish, /communityContentPublishMetadata/)
@@ -96,6 +98,16 @@ test('Community dialog CSS defines fluid wide, compact, and container-responsive
     assert.match(css, /@media \(max-width: 1099px\), \(max-height: 639px\)/)
     assert.match(css, /@container community-preview \(max-width: 700px\)/)
     assert.match(css, /backdrop-filter:\s*none/)
+    assert.match(css, /communityAutomationView\.hasExternalInspector/)
+})
+
+test('Automation detail keeps only dependencies and mounts node inspection in the detail sidebar', () => {
+    const detailSource = fs.readFileSync(path.join(root, 'app', 'assets', 'js', 'scripts', 'landing', 'schematics', 'community-content.js'), 'utf8')
+    const previewSource = fs.readFileSync(path.join(root, 'app', 'assets', 'js', 'communitypreviews', 'automation.js'), 'utf8')
+    assert.match(detailSource, /automation && row\.dataset\.communityMetadata !== 'dependencies'/)
+    assert.match(detailSource, /detailSidebar: genericCommunityElement\('communityContentTypeSidebar'\)/)
+    assert.match(previewSource, /this\.inspectorHost\.replaceChildren\(this\.inspector\)/)
+    assert.match(previewSource, /body\.append\(stage\)/)
 })
 
 test('modal controller supports Escape dismissal and initial focus without changing legacy callers', () => {

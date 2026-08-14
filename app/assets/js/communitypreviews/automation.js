@@ -14,6 +14,7 @@ const {
 class AutomationCommunityPreview {
     constructor(options) {
         this.host = options.host
+        this.inspectorHost = options.inspectorHost || null
         this.bundle = normalizeAutomationBundle(options.artifact, options.registry || {})
         this.assetIndex = 0
         this.selectedNode = null
@@ -60,7 +61,14 @@ class AutomationCommunityPreview {
         this.inspector = document.createElement('aside')
         this.inspector.className = 'communityGraphInspector'
         this.inspector.setAttribute('aria-live', 'polite')
-        body.append(stage, this.inspector)
+        if(this.inspectorHost){
+            this.host.classList.add('hasExternalInspector')
+            this.inspectorHost.replaceChildren(this.inspector)
+            this.inspectorHost.hidden = false
+            body.append(stage)
+        } else {
+            body.append(stage, this.inspector)
+        }
         this.summary = document.createElement('p')
         this.summary.className = 'communityAccessibleSummary'
         this.host.append(header, body, this.summary)
@@ -209,7 +217,16 @@ class AutomationCommunityPreview {
 
     update(artifact, options = {}) { this.bundle = normalizeAutomationBundle(artifact, options.registry || {}); this.assetIndex = 0; this.renderTabs(); this.activate(0) }
     cancel() { this.drag = null }
-    destroy() { this.destroyed = true; this.cancel(); this.handlers.splice(0).forEach(remove => remove()); this.host.replaceChildren() }
+    destroy() {
+        this.destroyed = true
+        this.cancel()
+        this.handlers.splice(0).forEach(remove => remove())
+        if(this.inspectorHost){
+            this.inspectorHost.replaceChildren()
+            this.inspectorHost.hidden = true
+        }
+        this.host.replaceChildren()
+    }
 }
 
 module.exports = { AutomationCommunityPreview }

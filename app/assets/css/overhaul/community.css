@@ -293,6 +293,23 @@
 .communityGraphInspector dd { margin: 0; overflow-wrap: anywhere; }
 .communityAccessibleSummary { height: 1px; margin: -1px; overflow: hidden; position: absolute; width: 1px; }
 
+.communityAutomationView.hasExternalInspector .communityAutomationBody {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.communityContentMetadataGrid [hidden] { display: none !important; }
+.communityContentDetailPanel[data-community-type="automation"] .communityContentMetadataGrid {
+    margin-bottom: 12px;
+}
+.communityContentTypeSidebar[hidden] { display: none !important; }
+.communityContentTypeSidebar .communityGraphInspector {
+    background: rgba(10, 22, 20, .72);
+    border: 1px solid var(--workshop-line);
+    min-height: 150px;
+    padding: 14px;
+}
+.communityContentTypeSidebar .communityGraphInspector p:last-child { margin-bottom: 0; }
+
 .communityTrainerStageColumn { display: flex; flex-direction: column; min-width: 0; }
 .communityTrainerParty { background: rgba(16, 31, 29, .97); border-left: 1px solid var(--workshop-line); list-style: none; margin: 0; overflow: auto; padding: 8px; }
 .communityTrainerSlot { border: 1px solid var(--workshop-line); margin-bottom: 6px; padding: 8px; }

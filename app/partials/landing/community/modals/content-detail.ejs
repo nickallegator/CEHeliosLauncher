@@ -17,12 +17,13 @@
             <aside class="communityContentDetailCopy" aria-label="<%- lang('community.details') %>">
                 <p id="communityContentDetailDescription"></p>
                 <dl class="communityContentMetadataGrid">
-                    <div><dt><%- lang('community.license') %></dt><dd id="communityContentDetailLicense">—</dd></div>
-                    <div><dt><%- lang('community.rightsStatusLabel') %></dt><dd id="communityContentDetailRights">—</dd></div>
-                    <div><dt><%- lang('community.revision') %></dt><dd id="communityContentDetailRevision">—</dd></div>
-                    <div><dt><%- lang('community.compatibility') %></dt><dd id="communityContentDetailCompatibility">—</dd></div>
-                    <div><dt><%- lang('community.dependencies') %></dt><dd id="communityContentDetailDependencies">0</dd></div>
+                    <div data-community-metadata="license"><dt><%- lang('community.license') %></dt><dd id="communityContentDetailLicense">—</dd></div>
+                    <div data-community-metadata="rights"><dt><%- lang('community.rightsStatusLabel') %></dt><dd id="communityContentDetailRights">—</dd></div>
+                    <div data-community-metadata="revision"><dt><%- lang('community.revision') %></dt><dd id="communityContentDetailRevision">—</dd></div>
+                    <div data-community-metadata="compatibility"><dt><%- lang('community.compatibility') %></dt><dd id="communityContentDetailCompatibility">—</dd></div>
+                    <div data-community-metadata="dependencies"><dt><%- lang('community.dependencies') %></dt><dd id="communityContentDetailDependencies">0</dd></div>
                 </dl>
+                <section id="communityContentTypeSidebar" class="communityContentTypeSidebar" aria-label="<%- lang('community.details') %>" hidden></section>
             </aside>
         </main>
         <footer class="communityDialogFooter communityContentDetailFooter">

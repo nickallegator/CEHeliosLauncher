@@ -19,6 +19,7 @@ class CommunityRichPreviewHost {
         this.headers = options.headers || (() => ({}))
         this.resourceStack = options.resourceStack || (async () => null)
         this.renderBlock = options.renderBlock || null
+        this.detailSidebar = options.detailSidebar || null
         this.enabled = options.enabled !== false
         this.registry = options.registry || {}
         this.cache = options.cache || new CommunityArtifactCache({
@@ -71,7 +72,7 @@ class CommunityRichPreviewHost {
             if(generation !== this.generation) return null
             const common = { host: this.container, artifact, resourceStack: stack }
             if(entry.type === 'builder-presets') this.renderer = new GradientCommunityPreview({ ...common, workerPath: path.resolve(__dirname, '..', 'communitypreviewworker.js') })
-            else if(entry.type === 'automation') this.renderer = new AutomationCommunityPreview({ ...common, registry })
+            else if(entry.type === 'automation') this.renderer = new AutomationCommunityPreview({ ...common, registry, inspectorHost: this.detailSidebar })
             else if(entry.type === 'battle-trainers') this.renderer = new TrainerCommunityPreview(common)
             else this.renderer = new ResourcePackCommunityPreview({
                 ...common,
@@ -88,6 +89,8 @@ class CommunityRichPreviewHost {
             return this.renderer
         } catch(error) {
             if(generation !== this.generation || this.abortController?.signal.aborted) return null
+            this.renderer?.destroy?.()
+            this.renderer = null
             this.container.dataset.state = 'fallback'
             this.container.replaceChildren()
             const notice = document.createElement('p'); notice.className = 'communityRichNote'; notice.textContent = `Interactive preview unavailable: ${error.message}`; this.container.append(notice)
