@@ -170,6 +170,25 @@ test('Resource Pack validator accepts Cobble ecosystem packs and rejects forbidd
     await assert.rejects(validateResourcePack(badPath), error => error.code === 'forbidden_resource_pack_file')
 })
 
+test('Resource Pack validator discovers selected subjects and builds a bounded render overlay', async t => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ag-resource-pack-showcase-test-'))
+    t.after(() => fs.promises.rm(directory, { recursive: true, force: true }))
+    const filePath = path.join(directory, 'showcase.zip')
+    const zip = new AdmZip()
+    zip.addFile('pack.mcmeta', Buffer.from(JSON.stringify({ pack: { pack_format: 34, description: 'Showcase' } })))
+    zip.addFile('assets/cobblepower/blockstates/copper_machine.json', Buffer.from(JSON.stringify({ variants: { '': { model: 'cobblepower:block/copper_machine' } } })))
+    zip.addFile('assets/cobblepower/models/block/copper_machine.json', Buffer.from(JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: 'cobblepower:block/copper_machine' } })))
+    zip.addFile('assets/cobblepower/textures/block/copper_machine.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'))
+    zip.writeZip(filePath)
+    const result = await validateResourcePack(filePath, {
+        showcase: { schemaVersion: 1, subjects: [{ kind: 'block', id: 'cobblepower:copper_machine', state: {} }] }
+    })
+    assert.equal(result.typeData.showcase.subjects[0].id, 'cobblepower:copper_machine')
+    assert.equal(result.renderAssets.length, 1)
+    assert.equal(result.renderAssets[0].role, 'render-overlay')
+    assert.ok(result.renderAssets[0].bytes.length > 0)
+})
+
 test('Resource Pack validator rejects malformed content files', async t => {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ag-resource-pack-content-test-'))
     t.after(() => fs.promises.rm(directory, { recursive: true, force: true }))

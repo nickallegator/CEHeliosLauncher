@@ -75,6 +75,7 @@ app.get('/ready', async (_req, res) => {
                 if(enabled && !handlers.get(type)) throw new Error(`Missing Community handler: ${type}`)
             }
             await db.query('select 1 from community_revisions limit 1')
+            if(config.community.richPreviewsEnabled) await db.query('select 1 from community_revision_assets limit 1')
             await getCommunityObjectStorage().ready()
             checks.community = 'ok'
         } catch(_err) {

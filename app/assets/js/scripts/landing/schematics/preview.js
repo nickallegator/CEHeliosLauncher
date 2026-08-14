@@ -900,6 +900,20 @@ class SchematicPreviewRenderer {
         }
     }
 
+    destroy(){
+        this.setActive(false)
+        this.meshTaskId += 1
+        this.container?.removeEventListener('pointerdown', this._onPointerDown)
+        window.removeEventListener('pointermove', this._onPointerMove)
+        window.removeEventListener('pointerup', this._onPointerUp)
+        this.container?.removeEventListener('wheel', this._onWheel)
+        this.container?.removeEventListener('contextmenu', this._onContextMenu)
+        window.removeEventListener('resize', this._onResize)
+        this.gl?.getExtension('WEBGL_lose_context')?.loseContext()
+        this.canvas = null
+        this.container = null
+    }
+
     clearMesh(){
         if(!this.isWebGL){
             return

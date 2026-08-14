@@ -7,7 +7,7 @@ artifactName: 'AG-Launcher-Test-setup-${version}.${ext}'
 copyright: 'Copyright (c) 2026 Allegator Games'
 
 extraMetadata:
-  version: '2.4.0-test.1'
+  version: '2.5.0-test.1'
   productName: 'Allegator Games Launcher'
 
 extraResources:

@@ -63,6 +63,29 @@ function createTestCommunityContract(root, version) {
     return contractPath
 }
 
+function createTestRenderRegistry(root, version) {
+    const registryPath = path.join(root, 'community-render-registry.json')
+    fs.writeFileSync(registryPath, JSON.stringify({
+        schemaVersion: 1,
+        modVersion: version,
+        minecraft: '1.21.1',
+        cobblemon: '1.6.0',
+        trainerSkins: [],
+        trainerModels: { default: 'assets/cobblemon/bedrock/npcs/models/steve.geo.json' }
+    }))
+    return registryPath
+}
+
+function createTestCommunityRegistry(root, version) {
+    const registryPath = path.join(root, 'community-registry-manifest.json')
+    fs.writeFileSync(registryPath, JSON.stringify({
+        schemaVersion: 1,
+        modVersion: version,
+        automationNodes: [{ id: 'cobblepower:event_manual_trigger', category: 'events', inputs: [], outputs: [] }]
+    }))
+    return registryPath
+}
+
 test('publisher rejects tag, metadata, and non-prerelease version disagreement', () => {
     assert.throws(() => validateVersionAgreement({
         version: '1.0.0',
@@ -102,6 +125,8 @@ test('prepare produces deterministic templates, descriptors, and publish state',
     const version = '1.0.1-test.1'
     const jarPath = createTestMod(fixture, version)
     const communityContractPath = createTestCommunityContract(fixture, version)
+    const communityRenderRegistryPath = createTestRenderRegistry(fixture, version)
+    const communityRegistryPath = createTestCommunityRegistry(fixture, version)
     const sourceRepo = path.join(fixture, 'source')
     fs.mkdirSync(sourceRepo)
     fs.writeFileSync(path.join(sourceRepo, 'gradle.properties'), `mod_version=${version}\n`)
@@ -127,6 +152,8 @@ test('prepare produces deterministic templates, descriptors, and publish state',
         sourceCommit,
         sourceRepo,
         communityContractPath,
+        communityRegistryPath,
+        communityRenderRegistryPath,
         createdAt: '2026-08-09T00:00:00.000Z'
     }
     await prepareRelease({ ...options, outputDir: outputA })
@@ -144,6 +171,8 @@ test('prepare produces deterministic templates, descriptors, and publish state',
         'automation', 'battle-trainers', 'builder-presets', 'resource-packs'
     ])
     assert.equal(descriptor.communityContracts.sha256.length, 64)
+    assert.equal(descriptor.communityRegistry.automationNodeCount, 1)
+    assert.equal(descriptor.communityRenderRegistry.sha256.length, 64)
 })
 
 test('streaming file hashing reports both launcher and release digests', async (t) => {

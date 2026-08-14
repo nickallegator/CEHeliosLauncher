@@ -16,7 +16,7 @@ class CommunityContentTypeRegistry {
         if(typeof definition.isEnabled !== 'function' || typeof definition.normalize !== 'function' || typeof definition.openDetail !== 'function'){
             throw new TypeError(`Community content type ${definition.id} requires isEnabled, normalize, and openDetail functions.`)
         }
-        for(const hook of ['publish', 'install', 'update', 'remove', 'manageInstalled']){
+        for(const hook of ['publish', 'install', 'update', 'remove', 'manageInstalled', 'createDetailRenderer', 'preparePublicationPreview', 'onDetailClosed']){
             if(definition[hook] != null && typeof definition[hook] !== 'function'){
                 throw new TypeError(`Community content type ${definition.id} hook ${hook} must be a function.`)
             }
@@ -131,6 +131,15 @@ function genericTypeDefinition(id, labelKey, icon){
         },
         manageInstalled(context){
             return context.openGenericInstalledManager?.(id)
+        },
+        createDetailRenderer(entry, context){
+            return context.mountRichCommunityPreview?.(entry)
+        },
+        preparePublicationPreview(source, context){
+            return context.prepareGenericCommunityPublication?.(id, source)
+        },
+        onDetailClosed(_entry, context){
+            return context.destroyRichCommunityPreview?.()
         }
     }
 }

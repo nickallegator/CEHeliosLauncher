@@ -43,7 +43,7 @@ async function responseJson(response, status) {
     return text ? JSON.parse(text) : null
 }
 
-async function publish(token, type, artifact, preview) {
+async function publish(token, type, artifact, preview, extraMetadata = {}) {
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
     const session = await responseJson(await fetch(`${BASE}/v1/community/uploads`, {
         method: 'POST', headers,
@@ -51,7 +51,8 @@ async function publish(token, type, artifact, preview) {
             type, title: `Pilot ${type}`, description: 'Community integration pilot', tags: ['pilot'],
             license: 'Community-Use-1.0', rightsAttested: true, visibility: 'public',
             previewMime: preview ? 'image/png' : null,
-            compatibility: { minecraft: '1.21.1', loader: 'neoforge', cobblePower: '>=1.0.3-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0' }
+            compatibility: { minecraft: '1.21.1', loader: 'neoforge', cobblePower: '>=1.0.4-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0' },
+            ...extraMetadata
         })
     }), 201)
     const artifactPut = await fetch(session.uploads.artifact.uploadUrl, {
@@ -104,6 +105,8 @@ function resourcePack(directory) {
     const zip = new AdmZip()
     zip.addFile('pack.mcmeta', Buffer.from(JSON.stringify({ pack: { pack_format: 34, description: 'Pilot' } })))
     zip.addFile('assets/cobblepower/textures/community/pilot.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'))
+    zip.addFile('assets/cobblepower/blockstates/pilot.json', Buffer.from(JSON.stringify({ variants: { '': { model: 'cobblepower:block/pilot' } } })))
+    zip.addFile('assets/cobblepower/models/block/pilot.json', Buffer.from(JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: 'cobblepower:community/pilot' } })))
     zip.writeZip(filePath)
     return fs.readFileSync(filePath)
 }
@@ -121,6 +124,7 @@ test('generic Community types migrate, publish, browse, engage, and download thr
         env: {
             ...process.env, NODE_ENV: 'test', PORT: String(PORT), DATABASE_URL,
             RELEASES_ENABLED: 'false', SCHEMATICS_ENABLED: 'false', COMMUNITY_ENABLED: 'true', COMMUNITY_WRITE_MODE: 'authenticated',
+            COMMUNITY_RICH_PREVIEWS_ENABLED: 'true',
             COMMUNITY_AUTOMATION_ENABLED: 'true', COMMUNITY_BATTLE_TRAINERS_ENABLED: 'true',
             COMMUNITY_BUILDER_PRESETS_ENABLED: 'true', COMMUNITY_RESOURCE_PACKS_ENABLED: 'true',
             COMMUNITY_STORAGE_PROVIDER: 's3', COMMUNITY_STORAGE_BUCKET: BUCKET, COMMUNITY_STORAGE_REGION: 'us-east-1',
@@ -151,7 +155,9 @@ test('generic Community types migrate, publish, browse, engage, and download thr
     pilots.push(await publish(session.token, 'builder-presets', gradient(), preview))
     pilots.push(await publish(session.token, 'battle-trainers', trainer(), preview))
     pilots.push(await publish(session.token, 'automation', automation(), preview))
-    pilots.push(await publish(session.token, 'resource-packs', resourcePack(temp), null))
+    pilots.push(await publish(session.token, 'resource-packs', resourcePack(temp), null, {
+        showcase: { schemaVersion: 1, subjects: [{ kind: 'block', id: 'cobblepower:pilot', state: {} }] }
+    }))
     assert.deepEqual(pilots.map(item => item.type), ['builder-presets', 'battle-trainers', 'automation', 'resource-packs'])
 
     const capabilities = await responseJson(await fetch(`${BASE}/v1/community/capabilities`), 200)
@@ -170,6 +176,11 @@ test('generic Community types migrate, publish, browse, engage, and download thr
     const artifact = await fetch(download.downloadUrl)
     assert.equal(artifact.ok, true)
     assert.equal(Buffer.from(await artifact.arrayBuffer()).length, first.revision.sizeBytes)
+    const resourcePackPilot = pilots.find(pilot => pilot.type === 'resource-packs')
+    const previewAssets = await responseJson(await fetch(`${BASE}/v1/community/items/resource-packs/${resourcePackPilot.id}/preview-assets`), 200)
+    assert.equal(previewAssets.assets.length, 1)
+    assert.equal(previewAssets.assets[0].role, 'render-overlay')
+    assert.equal((await fetch(previewAssets.assets[0].downloadUrl)).ok, true)
 
     const traversal = await fetch(`${BASE}/v1/community/items/resource-packs/not-a-uuid/download`)
     assert.equal(traversal.status, 400)

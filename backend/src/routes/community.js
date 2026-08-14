@@ -64,6 +64,32 @@ function cleanTags(value) {
     return Array.from(new Set(source.map(tag => cleanText(tag, 24)).filter(Boolean))).slice(0, 12)
 }
 
+function cleanShowcase(value) {
+    if(value == null) return null
+    if(Number(value.schemaVersion) !== 1 || !Array.isArray(value.subjects)) {
+        throw new CommunityValidationError('invalid_resource_pack_showcase', 'Showcase metadata must use schema version 1.')
+    }
+    if(value.subjects.length > 8) throw new CommunityValidationError('resource_pack_showcase_limit', 'Select at most eight showcase subjects.')
+    return {
+        schemaVersion: 1,
+        subjects: value.subjects.map(subject => {
+            const kind = cleanText(subject?.kind, 16).toLowerCase()
+            if(kind === 'block') return {
+                kind,
+                id: cleanText(subject.id, 256).toLowerCase(),
+                state: subject.state && typeof subject.state === 'object' && !Array.isArray(subject.state) ? subject.state : {}
+            }
+            if(kind === 'pokemon') return {
+                kind,
+                species: cleanText(subject.species, 256).toLowerCase(),
+                form: cleanText(subject.form, 80).toLowerCase(),
+                gender: cleanText(subject.gender, 16, 'MALE').toUpperCase()
+            }
+            throw new CommunityValidationError('invalid_showcase_subject', `Unsupported showcase subject type: ${kind || '<empty>'}.`)
+        })
+    }
+}
+
 function parseUuid(value, label = 'id') {
     const normalized = String(value || '').trim().toLowerCase()
     if(!UUID.test(normalized)) throw new CommunityValidationError('invalid_id', `${label} must be a UUID.`)
@@ -106,7 +132,8 @@ function cleanMetadata(body = {}) {
         visibility,
         compatibility: normalizeCompatibility(body.compatibility, {
             allowedRanges: [compatibilityManifest.compatibility]
-        })
+        }),
+        ...(body.showcase == null ? {} : { showcase: cleanShowcase(body.showcase) })
     }
 }
 
@@ -261,6 +288,7 @@ router.get('/community/capabilities', (_req, res) => {
     res.set('Cache-Control', 'public, max-age=300')
     res.json({
         ...catalog.capabilities(),
+        features: { richPreviews: config.community.richPreviewsEnabled === true },
         licenses: config.community.allowedLicenses.map(id => ({ id, url: `/v1/community/licenses/${encodeURIComponent(id)}` }))
     })
 })
@@ -391,6 +419,7 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
     let tempDirectory = null
     let storage = null
     const writtenPreviewKeys = []
+    const writtenRenderAssetKeys = []
     try {
         const metadata = cleanMetadata(upload.metadata)
         storage = getCommunityObjectStorage()
@@ -401,7 +430,7 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
             throw new CommunityValidationError('invalid_artifact_size', `Artifact must be between 1 and ${handler.maxBytes} bytes.`)
         }
         await storage.getToFile(upload.artifact_pending_key, artifactPath, { maxBytes: handler.maxBytes })
-        const validated = await handler.validate({ filePath: artifactPath })
+        const validated = await handler.validate({ filePath: artifactPath, options: { showcase: metadata.showcase } })
         let previewBuffer = validated.previewBuffer || null
         if(upload.preview_pending_key) {
             const previewHead = await storage.head(upload.preview_pending_key)
@@ -434,6 +463,17 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
                 cacheControl: 'private, max-age=31536000, immutable'
             })
             if(!write.existing) writtenPreviewKeys.push(variant.objectKey)
+        }
+        const renderAssets = []
+        for(const asset of validated.renderAssets || []) {
+            const objectKey = `community/render-assets/${revisionId}/${asset.sha256}.zip`
+            const write = await storage.putImmutable(objectKey, asset.bytes, {
+                contentType: asset.mimeType,
+                cacheControl: 'private, max-age=31536000, immutable',
+                metadata: { sha256: asset.sha256, role: asset.role }
+            })
+            if(!write.existing) writtenRenderAssetKeys.push(objectKey)
+            renderAssets.push({ ...asset, objectKey, sizeBytes: asset.bytes.length })
         }
 
         const result = await db.withClient(async client => {
@@ -503,6 +543,14 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
                             [revisionId, variant.label, variant.mime, variant.objectKey, variant.width, variant.height, variant.buffer.length]
                         )
                     }
+                    for(const asset of renderAssets) {
+                        await client.query(
+                            `insert into community_revision_assets
+                             (revision_id, role, object_key, sha256, size_bytes, mime_type, metadata)
+                             values ($1,$2,$3,$4,$5,$6,$7)`,
+                            [revisionId, asset.role, asset.objectKey, asset.sha256, asset.sizeBytes, asset.mimeType, asset.metadata || {}]
+                        )
+                    }
                     await client.query('update community_items set current_revision_id = $2, updated_at = now() where id = $1', [itemId, revisionId])
                 }
                 await client.query(
@@ -519,6 +567,7 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
         })
         if(result.alreadyCurrent) {
             await Promise.all(writtenPreviewKeys.map(key => storage.delete(key).catch(() => {})))
+            await Promise.all(writtenRenderAssetKeys.map(key => storage.delete(key).catch(() => {})))
         }
         const row = await getItem(handler.id, result.itemId, { includeInactive: true })
         audit(req, result.alreadyCurrent ? 'revision_already_current' : 'revision_published', {
@@ -537,6 +586,7 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
             [upload.id]
         ).catch(() => {})
         await Promise.all(writtenPreviewKeys.map(key => storage?.delete(key).catch(() => {})))
+        await Promise.all(writtenRenderAssetKeys.map(key => storage?.delete(key).catch(() => {})))
         throw error
     } finally {
         await safeRemoveTemp(tempDirectory)
@@ -574,6 +624,35 @@ router.get('/community/items/:type/:id/download', asyncRoute(async (req, res) =>
         expiresAt: new Date(Date.now() + 900_000).toISOString(),
         downloadUrl
     })
+}))
+
+router.get('/community/items/:type/:id/preview-assets', asyncRoute(async (req, res) => {
+    if(!config.community.richPreviewsEnabled) {
+        res.status(404).json({ error: 'community_rich_previews_disabled' })
+        return
+    }
+    const handler = getTypeHandler(req.params.type)
+    const row = await getItem(handler.id, parseUuid(req.params.id))
+    if(!row) {
+        res.status(404).json({ error: 'community_item_not_found' })
+        return
+    }
+    const result = await db.query(
+        `select role, object_key, sha256, size_bytes, mime_type, metadata
+         from community_revision_assets where revision_id=$1 order by role, sha256`,
+        [row.revision_id]
+    )
+    const storage = getCommunityObjectStorage()
+    const assets = await Promise.all(result.rows.map(async asset => ({
+        role: asset.role,
+        sha256: asset.sha256,
+        sizeBytes: Number(asset.size_bytes),
+        mimeType: asset.mime_type,
+        downloadUrl: await storage.signGet(asset.object_key, 900),
+        metadata: typeof asset.metadata === 'string' ? JSON.parse(asset.metadata) : asset.metadata
+    })))
+    res.set('Cache-Control', 'private, no-store')
+    res.json({ schemaVersion: 1, revisionId: row.revision_id, assets })
 }))
 
 router.get('/community/items/:type/:id/preview', asyncRoute(async (req, res) => {
@@ -820,6 +899,7 @@ module.exports = router
 module.exports.optionalSession = optionalSession
 module.exports._test = {
     cleanMetadata,
+    cleanShowcase,
     getTypeHandler,
     hashToken,
     itemJson,

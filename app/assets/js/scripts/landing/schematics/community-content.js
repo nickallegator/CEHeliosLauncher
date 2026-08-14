@@ -6,12 +6,22 @@ let { webUtils: genericCommunityWebUtils } = require('electron')
 let genericCommunitySemver = require('semver')
 let { Worker: GenericCommunityWorker } = require('worker_threads')
 let genericCommunityPath = require('path')
+let { CommunityRichPreviewHost } = require('./assets/js/communitypreviews')
+let { defaultShowcase, discoverResourcePackShowcase } = require('./assets/js/communityresourcepackshowcase')
+let {
+    renderTexturedGradientSvg: genericRenderTexturedGradientSvg,
+    sampleGradient: genericSampleGradient
+} = require(genericCommunityPath.resolve(process.cwd(), 'libraries', 'community-rendering'))
+let { resolveBlockTopTexture: genericResolveBlockTopTexture } = require(genericCommunityPath.resolve(process.cwd(), 'libraries', 'minecraft-resources'))
 
 let genericCommunityInstallManager = null
 let genericCommunityDetailEntry = null
 let genericCommunityPublishType = null
 let genericCommunityPublishTarget = null
 let genericCommunityPreparedPublication = null
+let genericCommunityRichPreview = null
+let genericCommunityShowcase = null
+let genericCommunityContractCache = null
 
 function genericCommunityElement(id){ return document.getElementById(id) }
 
@@ -36,15 +46,38 @@ function genericCommunitySvgToPng(svg){
                 canvas.width = image.naturalWidth || 768
                 canvas.height = image.naturalHeight || 432
                 canvas.getContext('2d').drawImage(image, 0, 0)
-                canvas.toBlob(blob => blob ? blob.arrayBuffer().then(value => resolve(Buffer.from(value))).catch(reject) : reject(new Error('Unable to render Automation preview.')), 'image/png')
+                canvas.toBlob(blob => blob ? blob.arrayBuffer().then(value => resolve(Buffer.from(value))).catch(reject) : reject(new Error('Unable to render Community preview.')), 'image/png')
             } catch(error) { reject(error) }
         }
-        image.onerror = () => reject(new Error('Unable to decode Automation graph preview.'))
+        image.onerror = () => reject(new Error('Unable to decode Community preview.'))
         image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
     })
 }
 
 async function generateCommunityPreview(type, artifact){
+    if(type === 'builder-presets'){
+        const stack = await buildCommunityCanonicalResourceStack()
+        const sample = genericSampleGradient(artifact)
+        const blockIds = [...new Set([...sample.blocks, ...sample.model.pins.map(pin => pin.block)].filter(Boolean))].sort()
+        const textures = new Map()
+        const missing = []
+        let cursor = 0
+        const workers = Array.from({ length: Math.min(6, blockIds.length) }, async () => {
+            while(cursor < blockIds.length){
+                const blockId = blockIds[cursor++]
+                try { textures.set(blockId, await genericResolveBlockTopTexture(stack, blockId)) }
+                catch(error) { missing.push({ blockId, error }) }
+            }
+        })
+        await Promise.all(workers)
+        if(missing.length > 0){
+            const ids = missing.map(value => value.blockId).sort()
+            throw new Error(`Unable to resolve Builder Preset textures: ${ids.join(', ')}. Repair the selected profile or install its declared dependencies before publishing.`)
+        }
+        const rendered = genericRenderTexturedGradientSvg(sample, textures, { width: 768, height: 432 })
+        if(rendered.missing.length > 0) throw new Error(`Unable to render Builder Preset textures: ${rendered.missing.join(', ')}.`)
+        return { bytes: await genericCommunitySvgToPng(rendered.svg), mimeType: 'image/png', generated: true }
+    }
     const workerPath = genericCommunityPath.resolve(__dirname, 'assets', 'js', 'communitypreviewworker.js')
     const svg = await new Promise((resolve, reject) => {
         const worker = new GenericCommunityWorker(workerPath)
@@ -73,7 +106,7 @@ async function prepareGenericCommunityPublication(type, artifactPath, previewPat
         type,
         compatibility: {
             minecraft: '1.21.1', loader: 'neoforge',
-            cobblePower: '>=1.0.3-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0'
+            cobblePower: '>=1.0.4-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0'
         }
     })
     const localSource = validatePublishSource(type, artifactPath, {
@@ -82,9 +115,58 @@ async function prepareGenericCommunityPublication(type, artifactPath, previewPat
         playerUuid: publishContext.account?.uuid
     })
     const artifact = prepareCommunityArtifact(type, localSource)
-    let preview = genericCommunitySelectedPreview(previewPath)
-    if(['automation', 'builder-presets'].includes(type) && !preview) preview = await generateCommunityPreview(type, artifact)
-    return { artifact, preview }
+    let preview = type === 'builder-presets' ? null : genericCommunitySelectedPreview(previewPath)
+    if(type === 'builder-presets' || (type === 'automation' && !preview)) preview = await generateCommunityPreview(type, artifact)
+    const showcase = type === 'resource-packs'
+        ? (genericCommunityShowcase || defaultShowcase(discoverResourcePackShowcase(artifactPath)))
+        : null
+    return { artifact, preview, showcase }
+}
+
+function renderGenericCommunityShowcase(){
+    const root = genericCommunityElement('communityResourcePackShowcase')
+    const list = genericCommunityElement('communityResourcePackShowcaseSubjects')
+    if(!root || !list) return
+    root.hidden = genericCommunityPublishType !== 'resource-packs'
+    list.replaceChildren()
+    if(root.hidden || !genericCommunityShowcase) return
+    const selected = genericCommunityShowcase.subjects
+    const candidates = genericCommunityShowcase.candidates || selected
+    const keyFor = subject => subject.kind === 'block' ? `block:${subject.id}` : `pokemon:${subject.species}`
+    const selectedKeys = new Set(selected.map(keyFor))
+    const ordered = [...selected, ...candidates.filter(candidate => !selectedKeys.has(keyFor(candidate)))]
+    for(const subject of ordered){
+        const item = document.createElement('li')
+        item.dataset.key = keyFor(subject)
+        const toggle = document.createElement('input')
+        toggle.type = 'checkbox'; toggle.checked = selectedKeys.has(item.dataset.key)
+        const name = document.createElement('span')
+        name.textContent = `${subject.kind === 'block' ? 'Block' : 'Pokémon'} · ${(subject.id || subject.species).split(':').at(-1).replaceAll('_', ' ')}`
+        const up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.setAttribute('aria-label', `Move ${name.textContent} earlier`)
+        const down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.setAttribute('aria-label', `Move ${name.textContent} later`)
+        const move = amount => {
+            const index = selected.findIndex(value => keyFor(value) === item.dataset.key)
+            const target = index + amount
+            if(index < 0 || target < 0 || target >= selected.length) return
+            ;[selected[index], selected[target]] = [selected[target], selected[index]]
+            renderGenericCommunityShowcase()
+        }
+        up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1))
+        toggle.addEventListener('change', () => {
+            const current = selected.findIndex(value => keyFor(value) === item.dataset.key)
+            if(toggle.checked){
+                if(selected.length >= 8 || (subject.kind === 'pokemon' && selected.filter(value => value.kind === 'pokemon').length >= 4)){
+                    toggle.checked = false
+                    genericCommunityElement('communityContentPublishStatus').textContent = 'The showcase supports eight subjects with at most four Pokémon.'
+                    return
+                }
+                if(current < 0) selected.push({ ...subject })
+            } else if(current >= 0) selected.splice(current, 1)
+            renderGenericCommunityShowcase()
+        })
+        up.disabled = !toggle.checked; down.disabled = !toggle.checked
+        item.append(toggle, name, up, down); list.append(item)
+    }
 }
 
 async function refreshGenericCommunityPublicationPreview(){
@@ -100,6 +182,12 @@ async function refreshGenericCommunityPublicationPreview(){
     const status = genericCommunityElement('communityContentPublishStatus')
     status.textContent = communityCopy('preparingCreationPreview')
     try {
+        if(genericCommunityPublishType === 'resource-packs'){
+            const candidates = discoverResourcePackShowcase(artifactPath)
+            const initial = defaultShowcase(candidates)
+            genericCommunityShowcase = { ...initial, candidates }
+            renderGenericCommunityShowcase()
+        }
         const prepared = await prepareGenericCommunityPublication(genericCommunityPublishType, artifactPath, previewPath)
         genericCommunityPreparedPublication = { ...prepared, artifactPath, previewPath, type: genericCommunityPublishType }
         image.src = prepared.preview
@@ -182,6 +270,67 @@ function genericCommunityStatusLabel(state){
     }[state] || state
 }
 
+async function genericCommunityRenderBlockSubject({ host, subject, resourceStack }){
+    const canvas = document.createElement('canvas')
+    canvas.tabIndex = 0
+    canvas.setAttribute('aria-label', `${subject.id} block model. Drag to rotate and use the wheel to zoom.`)
+    host.replaceChildren(canvas)
+    const palette = [{ block: subject.id, state: subject.state || {} }]
+    const schematic = {
+        name: subject.id,
+        palette,
+        blocks: [{ x: 0, y: 0, z: 0, p: 0 }],
+        bounds: { min: [0, 0, 0], max: [0, 0, 0], size: [1, 1, 1] },
+        meta: { blockCount: 1 }
+    }
+    await ensureRegistryForSchematic(schematic, resourceStack)
+    const atlas = await prepareTextureAtlasForSchematic(schematic, { resourceStack })
+    const renderer = new SchematicPreviewRenderer(canvas, host)
+    if(atlas?.canvas) renderer.setTextureAtlas(atlas.canvas)
+    renderer.setSchematic(schematic)
+    return renderer
+}
+
+function ensureGenericCommunityRichPreview(client){
+    if(!genericCommunityRichPreview){
+        genericCommunityRichPreview = new CommunityRichPreviewHost({
+            container: genericCommunityElement('communityContentRichView'),
+            fallbackImage: genericCommunityElement('communityContentDetailImage'),
+            client,
+            enabled: communityCapabilities?.features?.richPreviews === true,
+            headers: getSchematicsAuthHeaders,
+            cacheDirectory: genericCommunityPath.join(ConfigManager.getLauncherDirectory(), 'community-cache', 'artifacts'),
+            resourceStack: () => buildSchematicsResourceStack(),
+            registry: async (_entry, signal) => {
+                if(genericCommunityContractCache) return genericCommunityContractCache
+                const distro = await DistroAPI.getDistribution()
+                const contracts = distro?.rawDistribution?.communityRenderContracts
+                const descriptor = contracts?.registry
+                const renderDescriptor = contracts?.renderRegistry
+                if(!descriptor?.url || !descriptor?.sha256 || !renderDescriptor?.url || !renderDescriptor?.sha256) return {}
+                const cache = ensureGenericCommunityRichPreview(client).cache
+                const loadDescriptor = async value => {
+                    let bytes = cache.get(value.sha256, value.size)
+                    if(bytes) return bytes
+                    const response = await client.fetch(value.url, { signal })
+                    if(!response.ok) throw new Error(`Community render contract returned HTTP ${response.status}.`)
+                    bytes = Buffer.from(await response.arrayBuffer())
+                    cache.put(value.sha256, bytes, { sizeBytes: value.size, mimeType: 'application/json', role: 'render-contract' })
+                    return bytes
+                }
+                const [registryBytes, renderRegistryBytes] = await Promise.all([loadDescriptor(descriptor), loadDescriptor(renderDescriptor)])
+                genericCommunityContractCache = {
+                    ...JSON.parse(registryBytes.toString('utf8')),
+                    renderRegistry: JSON.parse(renderRegistryBytes.toString('utf8'))
+                }
+                return genericCommunityContractCache
+            },
+            renderBlock: genericCommunityRenderBlockSubject
+        })
+    }
+    return genericCommunityRichPreview
+}
+
 async function genericCommunityInstallState(entry){
     try {
         const context = await genericCommunityContext(entry)
@@ -251,6 +400,10 @@ async function openGenericCommunityDetail(entry){
     const apiBase = (schematicsState.apiBase || '').replace(/\/+$/, '')
     image.src = value.thumbnailUrl?.startsWith('http') ? value.thumbnailUrl : `${apiBase}${value.thumbnailUrl || ''}`
     image.alt = `${value.title || value.name} preview`
+    const detailDefinition = communityContentRegistry?.get(value.type)
+    detailDefinition?.createDetailRenderer?.(value, {
+        mountRichCommunityPreview: richEntry => ensureGenericCommunityRichPreview(client).mount(richEntry)
+    })?.catch?.(error => loggerLanding.debug('Rich Community preview used the static fallback.', { code: error?.code, message: error?.message }))
     const authHeaders = getSchematicsAuthHeaders()
     if(authHeaders.Authorization){
         client.engagement(value.type, value.id, 'view', { headers: authHeaders }).catch(error => {
@@ -261,8 +414,17 @@ async function openGenericCommunityDetail(entry){
 }
 
 function closeGenericCommunityDetail(){
-    closeModal(genericCommunityElement('communityContentDetail'))
-    genericCommunityDetailEntry = null
+    const value = genericCommunityDetailEntry
+    try {
+        communityContentRegistry?.get(value?.type)?.onDetailClosed?.(value, {
+            destroyRichCommunityPreview: () => genericCommunityRichPreview?.destroy()
+        })
+    } catch(error) {
+        loggerLanding.warn('Community preview cleanup failed.', { code: error?.code, message: error?.message })
+    } finally {
+        closeModal(genericCommunityElement('communityContentDetail'))
+        genericCommunityDetailEntry = null
+    }
 }
 
 async function installGenericCommunityItem(entry, chain = new Set()){
@@ -353,12 +515,19 @@ function openGenericCommunityPublisher(type, target = null){
     const artifact = genericCommunityElement('communityContentArtifactFile')
     artifact.accept = type === 'resource-packs' ? '.zip,application/zip' : '.json,application/json'
     artifact.value = ''
-    genericCommunityElement('communityContentPreviewFile').value = ''
+    const previewFile = genericCommunityElement('communityContentPreviewFile')
+    previewFile.value = ''
+    previewFile.disabled = type === 'builder-presets'
+    genericCommunityElement('communityContentPreviewFileRow').hidden = type === 'builder-presets'
     genericCommunityElement('communityContentArtifactHint').textContent = type === 'automation'
         ? communityCopy('automationBundleHint')
-        : communityCopy('selectLocalCreation')
+        : type === 'builder-presets'
+            ? communityCopy('builderPreviewGenerated')
+            : communityCopy('selectLocalCreation')
     genericCommunityElement('communityContentPublishStatus').textContent = ''
     genericCommunityPreparedPublication = null
+    genericCommunityShowcase = null
+    renderGenericCommunityShowcase()
     genericCommunityElement('communityContentPreviewConfirmation').hidden = true
     genericCommunityElement('communityContentPreviewConfirmed').checked = false
     genericCommunityElement('communityContentPublishName').value = target?.title || ''
@@ -373,6 +542,7 @@ function closeGenericCommunityPublisher(){
     genericCommunityPublishType = null
     genericCommunityPublishTarget = null
     genericCommunityPreparedPublication = null
+    genericCommunityShowcase = null
 }
 
 async function submitGenericCommunityPublisher(){
@@ -404,7 +574,7 @@ async function submitGenericCommunityPublisher(){
             && genericCommunityPreparedPublication.previewPath === previewPath
             ? genericCommunityPreparedPublication
             : await prepareGenericCommunityPublication(type, artifactPath, previewPath)
-        const { artifact, preview } = prepared
+        const { artifact, preview, showcase } = prepared
         await client.publish({
             type,
             ...(genericCommunityPublishTarget?.id ? { targetItemId: genericCommunityPublishTarget.id } : {}),
@@ -414,9 +584,10 @@ async function submitGenericCommunityPublisher(){
             license: genericCommunityElement('communityContentPublishLicense').value,
             rightsAttested: genericCommunityElement('communityContentPublishRights').checked,
             visibility: 'public',
+            ...(showcase ? { showcase: { schemaVersion: 1, subjects: showcase.subjects } } : {}),
             compatibility: {
                 minecraft: '1.21.1', loader: 'neoforge',
-                cobblePower: '>=1.0.3-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0'
+                cobblePower: '>=1.0.4-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0'
             }
         }, artifact, preview, { headers: getSchematicsAuthHeaders() })
         status.textContent = communityCopy('publishedCreation')

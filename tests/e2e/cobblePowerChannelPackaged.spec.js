@@ -4,6 +4,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const asar = require('@electron/asar')
+const launcherPackage = require('../../package.json')
 
 test('packaged authenticated channel starts from a JAR-free bootstrap at shortcut cwd', async () => {
     test.setTimeout(60000)
@@ -32,7 +33,7 @@ test('packaged authenticated channel starts from a JAR-free bootstrap at shortcu
         const resources = path.join(path.dirname(executablePath), 'resources', 'tester')
         const channel = JSON.parse(fs.readFileSync(path.join(resources, 'tester-channel.json'), 'utf8'))
         const identity = await app.evaluate(({ app }) => ({ name: app.getName(), version: app.getVersion() }))
-        expect(identity).toEqual({ name: 'Allegator Games Launcher', version: '2.3.1-test.2' })
+        expect(identity).toEqual({ name: 'Allegator Games Launcher', version: launcherPackage.version })
         expect(channel.schemaVersion).toBe(2)
         expect(channel.requiredEntitlement).toBe('cobblepower:test')
         expect(fs.readdirSync(resources).sort()).toEqual(['distribution_bootstrap.json', 'tester-channel.json'])

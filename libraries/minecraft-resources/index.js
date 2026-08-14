@@ -52,6 +52,39 @@ class JarResourceProvider {
     }
 }
 
+class ZipBufferResourceProvider {
+    constructor(buffer, options = {}) {
+        const value = Buffer.from(buffer || [])
+        const maxBytes = Number(options.maxBytes) || 16 * 1024 * 1024
+        if(value.length < 1 || value.length > maxBytes) throw new Error('ZIP resource overlay exceeds its compressed size limit.')
+        this._zip = new AdmZip(value)
+        this._entries = new Map()
+        const maxEntries = Number(options.maxEntries) || 2048
+        const maxExpandedBytes = Number(options.maxExpandedBytes) || 64 * 1024 * 1024
+        let expandedBytes = 0
+        for(const entry of this._zip.getEntries()) {
+            const name = String(entry.entryName || '').replaceAll('\\', '/')
+            if(entry.isDirectory) continue
+            if(!name || name.startsWith('/') || /^[a-z]:/i.test(name) || name.split('/').some(part => part === '..' || part === '.')) throw new Error('ZIP resource overlay contains an unsafe path.')
+            expandedBytes += Number(entry.header?.size || 0)
+            if(expandedBytes > maxExpandedBytes || this._entries.size >= maxEntries) throw new Error('ZIP resource overlay exceeds its expanded limits.')
+            this._entries.set(name.toLowerCase(), entry)
+        }
+    }
+
+    getBuffer(resourcePath) {
+        const entry = this._entries.get(String(resourcePath || '').replaceAll('\\', '/').toLowerCase())
+        return entry ? entry.getData() : null
+    }
+
+    getText(resourcePath) { const buffer = this.getBuffer(resourcePath); return buffer ? buffer.toString('utf8') : null }
+    getJson(resourcePath) { const text = this.getText(resourcePath); return text ? JSON.parse(text) : null }
+    list(prefix = '') {
+        const normalized = String(prefix || '').replaceAll('\\', '/').toLowerCase()
+        return [...this._entries.keys()].filter(name => name.startsWith(normalized)).sort()
+    }
+}
+
 class DirectoryResourceProvider {
     constructor(rootDir) {
         if(!rootDir){
@@ -119,6 +152,142 @@ function createResourceStack(providers){
             }
             return null
         }
+    }
+}
+
+function splitResourceId(value, fallbackNamespace = 'minecraft'){
+    const normalized = String(value || '').trim()
+    const separator = normalized.indexOf(':')
+    return separator >= 0
+        ? { namespace: normalized.slice(0, separator), path: normalized.slice(separator + 1) }
+        : { namespace: fallbackNamespace, path: normalized }
+}
+
+function selectModelReference(blockstate){
+    if(blockstate?.variants && typeof blockstate.variants === 'object'){
+        const keys = Object.keys(blockstate.variants).sort((left, right) => {
+            if(left === '') return -1
+            if(right === '') return 1
+            return left.localeCompare(right)
+        })
+        for(const key of keys){
+            const value = blockstate.variants[key]
+            const selected = Array.isArray(value) ? value[0] : value
+            const model = typeof selected === 'string' ? selected : selected?.model
+            if(model) return model
+        }
+    }
+    if(Array.isArray(blockstate?.multipart)){
+        for(const part of blockstate.multipart){
+            const selected = Array.isArray(part?.apply) ? part.apply[0] : part?.apply
+            const model = typeof selected === 'string' ? selected : selected?.model
+            if(model) return model
+        }
+    }
+    return null
+}
+
+async function resolveInheritedModel(resourceStack, modelId, options = {}){
+    const maxDepth = Number(options.maxDepth) || 16
+    const seen = options.seen || new Set()
+    const id = splitResourceId(modelId)
+    const normalizedId = `${id.namespace}:${id.path}`
+    if(seen.has(normalizedId)) throw new Error(`Model inheritance cycle detected at ${normalizedId}.`)
+    if(seen.size >= maxDepth) throw new Error(`Model inheritance exceeds ${maxDepth} levels at ${normalizedId}.`)
+    seen.add(normalizedId)
+    const model = await resourceStack?.getJson(resolveModelPath(id.namespace, id.path))
+    if(!model) return null
+    const parent = model.parent
+        ? await resolveInheritedModel(resourceStack, model.parent, { maxDepth, seen })
+        : null
+    return {
+        id: normalizedId,
+        textures: { ...(parent?.textures || {}), ...(model.textures || {}) },
+        elements: Array.isArray(model.elements) ? model.elements : (parent?.elements || [])
+    }
+}
+
+function dereferenceTexture(textures, value){
+    let current = value
+    const seen = new Set()
+    while(typeof current === 'string' && current.startsWith('#')){
+        if(seen.has(current)) throw new Error(`Texture reference cycle detected at ${current}.`)
+        seen.add(current)
+        current = textures[current.slice(1)]
+    }
+    return current || null
+}
+
+function selectTopTexture(model){
+    for(const element of model?.elements || []){
+        const reference = element?.faces?.up?.texture
+        if(reference) return dereferenceTexture(model.textures || {}, reference)
+    }
+    for(const key of ['up', 'top', 'all', 'particle']){
+        if(model?.textures?.[key]) return dereferenceTexture(model.textures, model.textures[key])
+    }
+    for(const key of Object.keys(model?.textures || {}).sort()){
+        const value = dereferenceTexture(model.textures, model.textures[key])
+        if(value) return value
+    }
+    return null
+}
+
+function readPngDimensions(bytes){
+    const value = Buffer.from(bytes || [])
+    const signature = '89504e470d0a1a0a'
+    if(value.length < 24 || value.subarray(0, 8).toString('hex') !== signature) return null
+    const width = value.readUInt32BE(16)
+    const height = value.readUInt32BE(20)
+    return width > 0 && height > 0 ? { width, height } : null
+}
+
+function firstAnimationFrame(dimensions, metadata){
+    const animation = metadata?.animation || {}
+    const frameWidth = Number.isInteger(animation.width) && animation.width > 0
+        ? animation.width
+        : dimensions.width
+    const frameHeight = Number.isInteger(animation.height) && animation.height > 0
+        ? animation.height
+        : (dimensions.height >= frameWidth && dimensions.height % frameWidth === 0 ? frameWidth : dimensions.height)
+    const columns = Math.max(1, Math.floor(dimensions.width / frameWidth))
+    const first = Array.isArray(animation.frames) && animation.frames.length > 0 ? animation.frames[0] : 0
+    const index = Math.max(0, Number(typeof first === 'object' ? first.index : first) || 0)
+    return {
+        x: (index % columns) * frameWidth,
+        y: Math.floor(index / columns) * frameHeight,
+        width: frameWidth,
+        height: frameHeight
+    }
+}
+
+async function resolveBlockTopTexture(resourceStack, blockId){
+    if(!resourceStack) throw Object.assign(new Error('Minecraft resources are unavailable.'), { code: 'resources_unavailable', blockId })
+    const block = splitResourceId(blockId)
+    if(!block.namespace || !block.path) throw Object.assign(new Error(`Invalid block identifier: ${blockId}`), { code: 'invalid_block_id', blockId })
+    const blockstate = await resourceStack.getJson(resolveBlockstatePath(block.namespace, block.path))
+    if(!blockstate) throw Object.assign(new Error(`Blockstate not found for ${blockId}.`), { code: 'missing_blockstate', blockId })
+    const modelId = selectModelReference(blockstate)
+    if(!modelId) throw Object.assign(new Error(`No renderable model was found for ${blockId}.`), { code: 'missing_model', blockId })
+    const model = await resolveInheritedModel(resourceStack, modelId)
+    if(!model) throw Object.assign(new Error(`Model ${modelId} was not found for ${blockId}.`), { code: 'missing_model', blockId, modelId })
+    const textureId = selectTopTexture(model)
+    if(!textureId) throw Object.assign(new Error(`No top texture was found for ${blockId}.`), { code: 'missing_texture_reference', blockId, modelId })
+    const texture = splitResourceId(textureId, block.namespace)
+    const texturePath = resolveTexturePath(texture.namespace, texture.path)
+    const bytes = await resourceStack.getBuffer(texturePath)
+    if(!bytes) throw Object.assign(new Error(`Texture ${textureId} was not found for ${blockId}.`), { code: 'missing_texture', blockId, modelId, textureId })
+    const dimensions = readPngDimensions(bytes)
+    if(!dimensions) throw Object.assign(new Error(`Texture ${textureId} is not a valid PNG.`), { code: 'invalid_texture', blockId, modelId, textureId })
+    const metadata = await resourceStack.getJson(`${texturePath}.mcmeta`).catch(() => null)
+    return {
+        blockId: `${block.namespace}:${block.path}`,
+        modelId: model.id,
+        textureId: `${texture.namespace}:${texture.path}`,
+        bytes: Buffer.from(bytes),
+        width: dimensions.width,
+        height: dimensions.height,
+        frame: firstAnimationFrame(dimensions, metadata)
     }
 }
 
@@ -253,15 +422,24 @@ async function loadTexture(resourceStack, namespace, texture){
 
 module.exports = {
     JarResourceProvider,
+    ZipBufferResourceProvider,
     DirectoryResourceProvider,
     createResourceStack,
+    dereferenceTexture,
     discoverProfileResources,
-    parseMavenCoordinate,
-    resolveModstoreArtifactPath,
-    resolveBlockstatePath,
-    resolveModelPath,
-    resolveTexturePath,
+    firstAnimationFrame,
     loadBlockstate,
     loadModel,
-    loadTexture
+    loadTexture,
+    parseMavenCoordinate,
+    readPngDimensions,
+    resolveBlockTopTexture,
+    resolveBlockstatePath,
+    resolveInheritedModel,
+    resolveModelPath,
+    resolveModstoreArtifactPath,
+    resolveTexturePath,
+    selectModelReference,
+    selectTopTexture,
+    splitResourceId
 }

@@ -28,7 +28,8 @@ function injectSchematicsService(distribution, schematicsConfig = config.schemat
             apiBaseUrl: communityApiUrl.replace(/\/+$/, ''),
             features: {
                 catalog: true,
-                publishing: communityConfig.writeMode !== 'disabled'
+                publishing: communityConfig.writeMode !== 'disabled',
+                richPreviews: communityConfig.richPreviewsEnabled === true
             },
             supportedTypes: [
                 ...(schematicsConfig.enabled ? ['schematics'] : []),

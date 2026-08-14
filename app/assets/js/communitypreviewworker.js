@@ -2,6 +2,10 @@
 
 const crypto = require('crypto')
 const { isMainThread, parentPort } = require('worker_threads')
+const {
+    renderAutomationSvg: renderContractAutomationSvg,
+    sampleGradient
+} = require('../../../libraries/community-rendering')
 
 function escapeXml(value) {
     return String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -71,17 +75,40 @@ function renderGradientSvg(input) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="432" viewBox="0 0 768 432"><defs><linearGradient id="preview" x1="0" y1="0" x2="1" y2="0">${stops}</linearGradient></defs><rect width="768" height="432" fill="#14201e"/><rect x="30" y="44" width="708" height="230" rx="12" fill="url(#preview)" stroke="#87decd" stroke-width="4"/><path d="M30 286H738" stroke="#38504b" stroke-width="2"/><text x="34" y="30" fill="#f4f8f7" font-family="sans-serif" font-size="18" font-weight="700">${gradientType} BUILDER PRESET</text><text x="734" y="30" text-anchor="end" fill="#abc0bc" font-family="sans-serif" font-size="14">${escapeXml(state)}</text>${swatches}<text x="34" y="414" fill="#abc0bc" font-family="sans-serif" font-size="13">${pins.length} pinned materials · ${Array.isArray(root?.nodes) ? root.nodes.length : 0} gradient nodes</text></svg>`
 }
 
+function renderEvaluatedGradientSvg(input) {
+    const root = parseArtifact(input)
+    const sample = sampleGradient(root, root?.preview?.grid_cells)
+    const size = 320
+    const cell = size / sample.cells
+    const cells = sample.blocks.map((block, index) => {
+        const x = index % sample.cells
+        const y = Math.floor(index / sample.cells)
+        return `<rect x="${(32 + x * cell).toFixed(3)}" y="${(56 + y * cell).toFixed(3)}" width="${(cell + .1).toFixed(3)}" height="${(cell + .1).toFixed(3)}" fill="${blockColor(block)}"/>`
+    }).join('')
+    const pins = sample.model.pins.slice(0, 8).map((pin, index) => {
+        const y = 70 + index * 38
+        return `<rect x="390" y="${y}" width="26" height="26" fill="${blockColor(pin.block)}"/><text x="426" y="${y + 18}" fill="#d5e5e0" font-family="sans-serif" font-size="12">${escapeXml(pin.block.split(':').at(-1).replaceAll('_', ' '))}</text>`
+    }).join('')
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="432" viewBox="0 0 768 432"><rect width="768" height="432" fill="#14201e"/><text x="32" y="32" fill="#f4f8f7" font-family="sans-serif" font-size="18" font-weight="700">${sample.model.type.type} BUILDER PRESET</text><text x="736" y="32" text-anchor="end" fill="#abc0bc" font-family="sans-serif" font-size="14">${sample.cells}×${sample.cells} BLOCK AREA</text><rect x="28" y="52" width="328" height="328" fill="#08100f" stroke="#87decd" stroke-width="4"/>${cells}${pins}<text x="32" y="414" fill="#abc0bc" font-family="sans-serif" font-size="13">${sample.model.pins.length} pinned materials · ${sample.model.nodes.length} gradient nodes</text></svg>`
+}
+
 function renderPreviewSvg(value) {
-    if(value?.type === 'builder-presets') return renderGradientSvg(value.artifact)
-    if(value?.type === 'automation') return renderAutomationSvg(value.artifact)
+    if(value?.type === 'builder-presets') return renderEvaluatedGradientSvg(value.artifact)
+    if(value?.type === 'automation') return renderContractAutomationSvg(value.artifact, value.options || {})
     return renderAutomationSvg(value)
 }
 
 if(!isMainThread && parentPort) {
     parentPort.on('message', value => {
-        try { parentPort.postMessage({ svg: renderPreviewSvg(value) }) }
+        try {
+            if(value?.action === 'sample-gradient') {
+                parentPort.postMessage({ action: value.action, requestId: value.requestId, sample: sampleGradient(value.artifact, value.cells) })
+                return
+            }
+            parentPort.postMessage({ svg: renderPreviewSvg(value) })
+        }
         catch(error) { parentPort.postMessage({ error: error.message }) }
     })
 }
 
-module.exports = { blockColor, escapeXml, renderAutomationSvg, renderGradientSvg, renderPreviewSvg }
+module.exports = { blockColor, escapeXml, renderAutomationSvg, renderEvaluatedGradientSvg, renderGradientSvg, renderPreviewSvg }

@@ -16,7 +16,7 @@ test('Community upload metadata remains valid when the single-use session is fin
         compatibility: {
             minecraft: '1.21.1',
             loader: 'NeoForge',
-            cobblePower: '>=1.0.3-test.1 <1.1.0',
+            cobblePower: '>=1.0.4-test.1 <1.1.0',
             cobblemon: '>=1.6.0 <1.7.0'
         }
     })
@@ -24,6 +24,23 @@ test('Community upload metadata remains valid when the single-use session is fin
     assert.deepEqual(finalized, initial)
     assert.equal(finalized.rightsAttested, true)
     assert.deepEqual(finalized.tags, ['automation', 'portable'])
+})
+
+test('Community upload metadata preserves a bounded Resource Pack showcase', () => {
+    const metadata = _test.cleanMetadata({
+        title: 'Copper Pack',
+        license: 'Community-Use-1.0',
+        rightsAttested: true,
+        showcase: {
+            schemaVersion: 1,
+            subjects: [
+                { kind: 'block', id: 'cobblepower:copper_machine', state: { facing: 'north' } },
+                { kind: 'pokemon', species: 'cobblemon:pikachu', gender: 'MALE' }
+            ]
+        }
+    })
+    assert.equal(metadata.showcase.subjects.length, 2)
+    assert.equal(metadata.showcase.subjects[1].species, 'cobblemon:pikachu')
 })
 
 test('Community upload metadata requires a distribution-rights attestation', () => {

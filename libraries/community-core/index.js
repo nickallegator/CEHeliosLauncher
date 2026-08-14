@@ -25,7 +25,7 @@ const FORMAT_CONTRACTS = Object.freeze({
 const DEFAULT_COMPATIBILITY = Object.freeze({
     minecraft: '1.21.1',
     loader: 'neoforge',
-    cobblePower: '>=1.0.3-test.1 <1.1.0',
+    cobblePower: '>=1.0.4-test.1 <1.1.0',
     cobblemon: '>=1.6.0 <1.7.0'
 })
 
@@ -450,7 +450,7 @@ function canonicalizeGradient(input) {
         block: resourceLocation(pin.block, 'Pinned block')
     })).sort((a, b) => a.value - b.value || a.block.localeCompare(b.block))
     const type = cleanText(root.settings?.type, 32, 'SMOOTH').toUpperCase()
-    if(!['SMOOTH', 'LINEAR', 'RADIAL', 'ANGULAR'].includes(type)) fail('invalid_gradient_type', `Unsupported gradient type: ${type}`)
+    if(!['SMOOTH', 'BANDS', 'NEAREST'].includes(type)) fail('invalid_gradient_type', `Unsupported gradient type: ${type}`)
     const canonical = {
         format: format.id,
         version: format.version,

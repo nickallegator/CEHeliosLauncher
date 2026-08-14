@@ -54,7 +54,26 @@ async function waitForAttribute(locator, name, expected, timeoutMs = 20_000) {
         if(value === expected) return value
         await new Promise(resolve => setTimeout(resolve, 100))
     }
-    throw new Error(`Timed out waiting for ${name}=${expected}; received ${value || 'unset'}.`)
+    const text = await locator.textContent().catch(() => '')
+    throw new Error(`Timed out waiting for ${name}=${expected}; received ${value || 'unset'}. ${String(text || '').trim()}`)
+}
+
+async function closeOpenDetail(page, closeSelector, detailSelector) {
+    // The custom Windows title bar can overlap the modal's visual close button
+    // in automated, maximized windows. Use a clear point on the modal scrim so
+    // this remains a real user event without relying on page evaluation.
+    const scrim = page.locator(`${detailSelector} > .schematicsModalScrim`)
+    if(await scrim.count()) await scrim.click({ position: { x: 5, y: 100 } })
+    else await page.locator(closeSelector).press('Enter')
+    await page.locator(detailSelector).waitFor({ state: 'hidden', timeout: 10_000 })
+}
+
+async function resetShowroomCatalog(page) {
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+    await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 20_000 })
+    await page.locator('#shellNavCommunity').click()
+    await page.locator('.schematicCard').first().waitFor({ state: 'visible', timeout: 10_000 })
 }
 
 async function run(argv = process.argv.slice(2)) {
@@ -107,13 +126,29 @@ async function run(argv = process.argv.slice(2)) {
         })
         const page = await application.firstWindow()
         const rendererErrors = []
-        page.on('pageerror', error => rendererErrors.push(error?.message || String(error)))
+        page.on('pageerror', error => rendererErrors.push(error?.stack || error?.message || String(error)))
         await page.waitForLoadState('domcontentloaded')
         await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 20_000 })
         await page.locator('#shellNavCommunity').click()
         await page.locator('.schematicCard').first().waitFor({ state: 'visible', timeout: 10_000 })
         console.log(`Showroom ready with ${runtime.entries.length} representative creations.`)
         if(options.verify) {
+            const builderEntry = runtime.entries.find(entry => entry.type === 'builder-presets')
+            if(options.resourceDataDirectory && builderEntry?.typeData?.previewMode !== 'textures') {
+                throw new Error('Builder Preset catalog preview did not resolve its Minecraft block textures.')
+            }
+            for(const type of ['builder-presets', 'automation']) {
+                const card = page.locator(`.schematicCard[data-community-key^="${type}:"]`).first()
+                await card.locator('.schematicPreview').click()
+                await page.locator('#communityContentDetail').waitFor({ state: 'visible', timeout: 10_000 })
+                await waitForAttribute(page.locator('#communityContentRichView'), 'data-state', 'ready')
+                if(type === 'builder-presets' && options.resourceDataDirectory) {
+                    await waitForAttribute(page.locator('.communityGradientCanvas'), 'data-texture-source', 'resources')
+                }
+                await resetShowroomCatalog(page)
+            }
+            console.log('Verified interactive Builder Preset and Automation renderers.')
+            if(options.resourceDataDirectory) console.log('Verified textured Builder Preset catalog and interactive previews.')
             if(runtime.resourceDataDirectory) {
                 const schematicCard = page.locator('.schematicCard[data-community-key^="schematics:"]').first()
                 await schematicCard.locator('.schematicPreview').click()
@@ -121,6 +156,15 @@ async function run(argv = process.argv.slice(2)) {
                 await detailPreview.waitFor({ state: 'visible', timeout: 10_000 })
                 await waitForAttribute(detailPreview, 'data-texture-source', 'resources')
                 console.log('Verified Minecraft block models and textures from the read-only resource source.')
+                await resetShowroomCatalog(page)
+                for(const type of ['battle-trainers', 'resource-packs']) {
+                    const card = page.locator(`.schematicCard[data-community-key^="${type}:"]`).first()
+                    await card.locator('.schematicPreview').click()
+                    await page.locator('#communityContentDetail').waitFor({ state: 'visible', timeout: 10_000 })
+                    await waitForAttribute(page.locator('#communityContentRichView'), 'data-state', 'ready')
+                    await resetShowroomCatalog(page)
+                }
+                console.log('Verified Trainer and Resource Pack interactive stages against local game resources.')
             }
             if(rendererErrors.length > 0) throw new Error(`Renderer error during showroom verification: ${rendererErrors[0]}`)
             await application.close()
@@ -146,4 +190,4 @@ if(require.main === module) {
     })
 }
 
-module.exports = { parseArguments, run, usage, waitForApplicationClose, waitForAttribute }
+module.exports = { closeOpenDetail, parseArguments, resetShowroomCatalog, run, usage, waitForApplicationClose, waitForAttribute }

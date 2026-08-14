@@ -162,6 +162,15 @@ class CommunityApiClient extends SchematicApiClient {
         return { descriptor, artifact: Buffer.from(await response.arrayBuffer()) }
     }
 
+    async previewAssets(type, id, options = {}) {
+        const { data } = await this.request(`/v1/community/items/${encodeURIComponent(type)}/${encodeURIComponent(id)}/preview-assets`, {
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+            signal: options.signal
+        })
+        if(Number(data?.schemaVersion) !== 1 || !Array.isArray(data.assets)) throw new Error('Community preview asset response is invalid.')
+        return data
+    }
+
     async createUpload(metadata, options = {}) {
         const { data } = await this.request('/v1/community/uploads', {
             method: 'POST',

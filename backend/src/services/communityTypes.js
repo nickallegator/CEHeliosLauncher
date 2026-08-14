@@ -11,7 +11,7 @@ const {
 const { MAX_COMPRESSED_BYTES, validateResourcePack } = require('./communityResourcePack')
 
 const compatibilityManifest = JSON.parse(fs.readFileSync(
-    path.resolve(__dirname, '..', '..', 'config', 'community-compatibility-1.0.3-test.1.json'),
+    path.resolve(__dirname, '..', '..', 'config', 'community-compatibility-1.0.4-test.1.json'),
     'utf8'
 ))
 const allowedAutomationNodeTypes = new Set(compatibilityManifest.automationNodeTypes || [])
@@ -73,7 +73,7 @@ function createDefaultCommunityTypeRegistry() {
             displayName: DISPLAY_NAMES[TYPES.RESOURCE_PACKS],
             format: FORMAT_CONTRACTS[TYPES.RESOURCE_PACKS],
             maxBytes: MAX_COMPRESSED_BYTES,
-            validate: context => validateResourcePack(context.filePath)
+            validate: context => validateResourcePack(context.filePath, context.options || {})
         }
     ])
 }

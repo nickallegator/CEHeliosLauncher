@@ -1983,6 +1983,8 @@ async function buildSchematicsResourceStack(){
             resetSchematicsResourceCaches()
         }
         schematicsResourceStack = createResourceStack(providers)
+        schematicsResourceStack.signature = signature
+        schematicsResourceStack.cacheKey = cacheKey
         schematicsResourceStackKey = signature
         schematicsResourceContextKey = cacheKey
         schematicsResourceSignatureCheckedAt = Date.now()
@@ -2001,6 +2003,33 @@ async function buildSchematicsResourceStack(){
         schematicsResourceSignatureCheckedAt = 0
         return null
     }
+}
+
+async function buildCommunityCanonicalResourceStack(){
+    const distro = await DistroAPI.getDistribution()
+    const server = distro?.getServerById(ConfigManager.getSelectedServer())
+    const profileId = server?.rawServer?.id || ConfigManager.getSelectedServer()
+    const minecraftVersion = server?.rawServer?.minecraftVersion
+    if(!profileId || !minecraftVersion) throw new Error('Select a compatible Cobble Power profile before generating a Builder Preset preview.')
+    const dataDirectory = SCHEMATICS_EXTERNAL_RESOURCE_DATA_DIR || ConfigManager.getDataDirectory()
+    const discovered = await discoverProfileResources({ dataDirectory, profileId, minecraftVersion })
+    if(discovered.missingCoordinates.length > 0){
+        throw new Error(`Repair the selected profile before publishing. Missing launcher-managed resources: ${discovered.missingCoordinates.join(', ')}`)
+    }
+    if(!discovered.minecraftJar) throw new Error(`Minecraft ${minecraftVersion} resources are missing. Repair the selected profile before publishing.`)
+    const providers = discovered.activeModJars.map(jarPath => new JarResourceProvider(jarPath))
+    providers.push(new JarResourceProvider(discovered.minecraftJar))
+    const entries = [
+        ...discovered.activeModJars.map(jarPath => ({ type: 'jar', path: jarPath })),
+        { type: 'jar', path: discovered.minecraftJar }
+    ]
+    const cacheKey = `community-publish:${profileId}:${minecraftVersion}`
+    const signature = await computeResourceStackSignature(entries, cacheKey)
+    const stack = createResourceStack(providers)
+    stack.signature = signature
+    stack.cacheKey = cacheKey
+    stack.diagnostics = { profileId, minecraftVersion, resourceCount: entries.length }
+    return stack
 }
 
 async function computeResourceStackSignature(entries, cacheKey){
@@ -2331,17 +2360,18 @@ function drawMissingTextureFallback(ctx, textureId, x, y, size){
     ctx.fillRect(x + half, y + half, size - half, size - half)
 }
 
-async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false } = {}){
+async function buildTextureAtlas(textureIds, { skipAlphaAnalysis = false, resourceStack = null } = {}){
     if(!Array.isArray(textureIds) || textureIds.length === 0){
         schematicsTextureAtlas = null
         return null
     }
-    const stack = await buildSchematicsResourceStack()
+    const stack = resourceStack || await buildSchematicsResourceStack()
     if(!stack){
         schematicsTextureAtlas = null
         return null
     }
-    const key = buildAtlasKey(textureIds)
+    const resourceSignature = String(resourceStack?.cacheKey || resourceStack?.signature || '')
+    const key = `${buildAtlasKey(textureIds)}|${resourceSignature}`
     if(schematicsTextureAtlasCache.has(key)){
         const cached = schematicsTextureAtlasCache.get(key)
         schematicsTextureAtlasCache.delete(key)
@@ -2548,7 +2578,7 @@ async function evictAtlasCacheFiles(){
     }
 }
 
-async function prepareTextureAtlasForSchematic(schematic, { skipAlphaAnalysis = false, preferExisting = false } = {}){
+async function prepareTextureAtlasForSchematic(schematic, { skipAlphaAnalysis = false, preferExisting = false, resourceStack = null } = {}){
     if(!schematic){
         return null
     }
@@ -2562,12 +2592,13 @@ async function prepareTextureAtlasForSchematic(schematic, { skipAlphaAnalysis = 
         return null
     }
     if(preferExisting && schematicsTextureAtlas?.key){
-        const key = buildAtlasKey(textureIds)
+        const resourceSignature = String(resourceStack?.cacheKey || resourceStack?.signature || '')
+        const key = `${buildAtlasKey(textureIds)}|${resourceSignature}`
         if(schematicsTextureAtlas.key === key){
             return schematicsTextureAtlas
         }
     }
-    return buildTextureAtlas(textureIds, { skipAlphaAnalysis })
+    return buildTextureAtlas(textureIds, { skipAlphaAnalysis, resourceStack })
 }
 
 function updateSchematicIndex(entries){

@@ -9,7 +9,7 @@
             <button id="communityContentPublishClose" type="button" class="schematicsDetailButton"><%- lang('community.close') %></button>
         </header>
         <div class="communityContentPublishForm">
-            <label class="schematicsDetailEditRow">
+            <label id="communityContentPreviewFileRow" class="schematicsDetailEditRow">
                 <span><%- lang('community.file') %></span>
                 <input id="communityContentArtifactFile" type="file" />
                 <small id="communityContentArtifactHint"></small>
@@ -25,6 +25,13 @@
                     <span><%- lang('community.previewConfirmation') %></span>
                 </label>
             </figure>
+            <section id="communityResourcePackShowcase" class="communityResourcePackShowcase" hidden aria-labelledby="communityResourcePackShowcaseTitle">
+                <div>
+                    <h3 id="communityResourcePackShowcaseTitle"><%- lang('community.resourcePackShowcase') %></h3>
+                    <p><%- lang('community.resourcePackShowcaseHint') %></p>
+                </div>
+                <ol id="communityResourcePackShowcaseSubjects"></ol>
+            </section>
             <label class="schematicsDetailEditRow">
                 <span><%- lang('community.fieldTitle') %></span>
                 <input id="communityContentPublishName" type="text" maxlength="80" />

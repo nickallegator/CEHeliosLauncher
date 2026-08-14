@@ -34,6 +34,8 @@ async function main(argv = process.argv) {
             sourceCommit: required(args, 'source-commit'),
             sourceRepo: args['source-repo'] ? path.resolve(args['source-repo']) : null,
             communityContractPath: args['community-contract'] ? path.resolve(args['community-contract']) : null,
+            communityRegistryPath: args['community-registry'] ? path.resolve(args['community-registry']) : null,
+            communityRenderRegistryPath: args['community-render-registry'] ? path.resolve(args['community-render-registry']) : null,
             releaseId: args['release-id'],
             expectedPreviousReleaseId: args['expected-previous'],
             outputDir: args.output,

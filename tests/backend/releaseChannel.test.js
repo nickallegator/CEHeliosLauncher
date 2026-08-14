@@ -98,6 +98,7 @@ test('authorized distribution service discovery is injected without rebuilding t
     }, {
         publicApiUrl: 'https://community.example.test/',
         writeMode: 'authenticated',
+        richPreviewsEnabled: true,
         types: { automation: true, 'battle-trainers': false }
     })
     assert.deepEqual(distribution.schematics, {
@@ -111,7 +112,7 @@ test('authorized distribution service discovery is injected without rebuilding t
         schemaVersion: 1,
         enabled: true,
         apiBaseUrl: 'https://community.example.test',
-        features: { catalog: true, publishing: true },
+        features: { catalog: true, publishing: true, richPreviews: true },
         supportedTypes: ['schematics', 'automation']
     })
     assert.deepEqual(injectSchematicsService({ servers: [] }, { publicApiUrl: '' }), { servers: [] })

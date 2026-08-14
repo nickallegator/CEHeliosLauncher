@@ -106,6 +106,27 @@ function validateCommunityContract(contractPath, version) {
     return contract
 }
 
+function validateCommunityRenderRegistry(registryPath, version) {
+    if(!registryPath) throw new Error('A Community render registry artifact is required')
+    const registry = readJson(path.resolve(registryPath))
+    if(registry.schemaVersion !== 1 || registry.modVersion !== version || registry.minecraft !== '1.21.1') {
+        throw new Error(`Community render registry does not identify Cobble Power ${version} for Minecraft 1.21.1`)
+    }
+    if(!Array.isArray(registry.trainerSkins) || !registry.trainerModels || !registry.cobblemon) {
+        throw new Error('Community render registry is missing trainer or Cobblemon resource paths')
+    }
+    return registry
+}
+
+function validateCommunityRegistry(registryPath, version) {
+    if(!registryPath) throw new Error('A Community registry manifest artifact is required')
+    const registry = readJson(path.resolve(registryPath))
+    if(registry.schemaVersion !== 1 || registry.modVersion !== version || !Array.isArray(registry.automationNodes)) {
+        throw new Error(`Community registry manifest does not identify Cobble Power ${version}`)
+    }
+    return registry
+}
+
 function seedCache(filePath, integrity, cacheDir) {
     fs.mkdirSync(cacheDir, { recursive: true })
     const target = path.join(cacheDir, integrity.sha256)
@@ -179,6 +200,12 @@ async function prepareRelease(options) {
     const communityContractPath = options.communityContractPath ? path.resolve(options.communityContractPath) : null
     const communityContract = validateCommunityContract(communityContractPath, version)
     const communityContractIntegrity = await hashFile(communityContractPath)
+    const communityRegistryPath = options.communityRegistryPath ? path.resolve(options.communityRegistryPath) : null
+    const communityRegistry = validateCommunityRegistry(communityRegistryPath, version)
+    const communityRegistryIntegrity = await hashFile(communityRegistryPath)
+    const communityRenderRegistryPath = options.communityRenderRegistryPath ? path.resolve(options.communityRenderRegistryPath) : null
+    const communityRenderRegistry = validateCommunityRenderRegistry(communityRenderRegistryPath, version)
+    const communityRenderRegistryIntegrity = await hashFile(communityRenderRegistryPath)
 
     const outputDir = assertOutputDirectory(options.outputDir || path.join(PACK_ROOT, 'dist', 'release-prepared', releaseId))
     const tempRoot = `${outputDir}.${process.pid}.${Date.now()}.tmp`
@@ -221,8 +248,16 @@ async function prepareRelease(options) {
         const cobblemonKey = `third-party/com/cobblemon/neoforge/${cobblemon.version}/neoforge-${cobblemon.version}.jar`
         const modObjectKey = `maven/net/allegator/cobblepower/cobblepower/${version}/cobblepower-${version}.jar`
         const communityContractKey = `maven/net/allegator/cobblepower/cobblepower/${version}/community-contracts.json`
+        const communityRegistryKey = `maven/net/allegator/cobblepower/cobblepower/${version}/community-registry-manifest.json`
+        const communityRenderRegistryKey = `maven/net/allegator/cobblepower/cobblepower/${version}/community-render-registry.json`
         replaceModuleUrl(distribution, cobblemon.id, cobblemonKey)
         replaceModuleUrl(distribution, modId, modObjectKey)
+        distribution.communityRenderContracts = {
+            schemaVersion: 1,
+            modVersion: version,
+            registry: { url: `r2://${communityRegistryKey}`, ...communityRegistryIntegrity },
+            renderRegistry: { url: `r2://${communityRenderRegistryKey}`, ...communityRenderRegistryIntegrity }
+        }
         writeJsonAtomic(distributionPath, distribution)
 
         const cobblemonCachePath = path.join(cacheDir, cobblemon.integrity.sha256)
@@ -230,6 +265,8 @@ async function prepareRelease(options) {
         const objects = [
             { key: modObjectKey, sourcePath: modPath, integrity: modIntegrity, contentType: 'application/java-archive' },
             { key: communityContractKey, sourcePath: communityContractPath, integrity: communityContractIntegrity, contentType: 'application/json' },
+            { key: communityRegistryKey, sourcePath: communityRegistryPath, integrity: communityRegistryIntegrity, contentType: 'application/json' },
+            { key: communityRenderRegistryKey, sourcePath: communityRenderRegistryPath, integrity: communityRenderRegistryIntegrity, contentType: 'application/json' },
             { key: cobblemonKey, sourcePath: cobblemonCachePath, integrity: cobblemon.integrity, contentType: 'application/java-archive' }
         ].sort((a, b) => a.key.localeCompare(b.key))
         for(const object of objects) object.file = copyObject(tempRoot, object.key, object.sourcePath)
@@ -256,6 +293,19 @@ async function prepareRelease(options) {
                 schemaVersion: communityContract.schemaVersion,
                 supportedTypes: Object.keys(communityContract.types).sort(),
                 ...communityContractIntegrity
+            },
+            communityRegistry: {
+                objectKey: communityRegistryKey,
+                schemaVersion: communityRegistry.schemaVersion,
+                automationNodeCount: communityRegistry.automationNodes.length,
+                ...communityRegistryIntegrity
+            },
+            communityRenderRegistry: {
+                objectKey: communityRenderRegistryKey,
+                schemaVersion: communityRenderRegistry.schemaVersion,
+                minecraft: communityRenderRegistry.minecraft,
+                cobblemon: communityRenderRegistry.cobblemon,
+                ...communityRenderRegistryIntegrity
             },
             createdAt: options.createdAt || new Date().toISOString(),
             notices: [{

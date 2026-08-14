@@ -97,7 +97,9 @@ Collections remain unmounted unless `SCHEMATICS_COLLECTIONS_ENABLED=true`. Their
 
 `COMMUNITY_ENABLED=true` activates the generic Community platform. Each provider is independently gated by `COMMUNITY_AUTOMATION_ENABLED`, `COMMUNITY_BATTLE_TRAINERS_ENABLED`, `COMMUNITY_BUILDER_PRESETS_ENABLED`, and `COMMUNITY_RESOURCE_PACKS_ENABLED`. Start with all four false, then enable Builder Presets, Battle Trainers, Automation, and Resource Packs in that order after pilots pass.
 
-The backend validates against the committed Cobble Power 1.0.3 contract matrix in `config/community-compatibility-1.0.3-test.1.json`. Uploads require a Minecraft-authenticated session, an approved license, rights attestation, and public visibility. Artifacts and previews are immutable after finalization; updates create revisions.
+The backend validates against the committed Cobble Power 1.0.4 contract matrix in `config/community-compatibility-1.0.4-test.1.json`. Uploads require a Minecraft-authenticated session, an approved license, rights attestation, and public visibility. Artifacts and previews are immutable after finalization; updates create revisions.
+
+`COMMUNITY_RICH_PREVIEWS_ENABLED=true` enables immutable Resource Pack render overlays and the signed preview-assets API after the `community_revision_assets` migration has run. Keep it disabled until Cobble Power 1.0.4 and AG Launcher 2.5.0 are deployed and their contract and render-registry hashes have passed release promotion.
 
 Use `COMMUNITY_STORAGE_*` for the shared Community bucket. During migration, omitted values fall back one-for-one to `SCHEMATICS_STORAGE_*`. Signed upload and download URLs expire after 15 minutes. Resource Pack ZIPs are streamed through bounded temporary files and are never expanded into memory.
 

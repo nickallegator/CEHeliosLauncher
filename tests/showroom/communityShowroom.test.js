@@ -66,11 +66,16 @@ test('local showroom serves representative read-only artifacts without productio
     const capabilities = await fetch(`${runtime.apiBaseUrl}/v1/community/capabilities`).then(response => response.json())
     assert.deepEqual(capabilities.categories.map(value => value.id), SHOWROOM_TYPES)
     assert.equal(capabilities.categories.every(value => value.writable === false), true)
+    assert.equal(capabilities.features.richPreviews, true)
 
     const catalog = await fetch(`${runtime.apiBaseUrl}/v1/community/catalog?category=all&sort=popular`).then(response => response.json())
     assert.equal(catalog.items.length, 5)
     assert.equal(new Set(catalog.items.map(value => value.type)).size, 5)
     assert.equal(catalog.items.some(value => Object.hasOwn(value, 'artifact')), false)
+    const builderEntry = catalog.items.find(entry => entry.type === 'builder-presets')
+    assert.equal(builderEntry.typeData.previewMode, 'fallback')
+    const builderFallback = await fetch(`${runtime.apiBaseUrl}${builderEntry.thumbnailUrl}`).then(response => response.text())
+    assert.match(builderFallback, /TEXTURES UNAVAILABLE/)
 
     const schematicEntry = catalog.items.find(entry => entry.type === 'schematics')
     const schematicDetail = await fetch(`${runtime.apiBaseUrl}/v1/schematics/${schematicEntry.id}`).then(response => response.json())
@@ -90,6 +95,11 @@ test('local showroom serves representative read-only artifacts without productio
         assert.equal(artifact.length, entry.revision.sizeBytes)
         assert.equal(digest(artifact), entry.revision.sha256)
     }
+    const packEntry = catalog.items.find(entry => entry.type === 'resource-packs')
+    const previewAssets = await fetch(`${runtime.apiBaseUrl}/v1/community/items/${packEntry.type}/${packEntry.id}/preview-assets`).then(response => response.json())
+    assert.equal(previewAssets.assets[0].role, 'render-overlay')
+    const overlay = Buffer.from(await fetch(previewAssets.assets[0].downloadUrl).then(response => response.arrayBuffer()))
+    assert.equal(digest(overlay), previewAssets.assets[0].sha256)
 
     const publishResponse = await fetch(`${runtime.apiBaseUrl}/v1/community/uploads`, { method: 'POST' })
     assert.equal(publishResponse.status, 403)
@@ -97,8 +107,9 @@ test('local showroom serves representative read-only artifacts without productio
 
     const distribution = JSON.parse(fs.readFileSync(runtime.distributionPath, 'utf8'))
     const profile = distribution.servers.find(server => server.id === SHOWROOM_PROFILE_ID)
-    assert.ok(profile.modules.some(module => module.id === 'net.allegator.cobblepower:cobblepower:1.0.3-test.1'))
+    assert.ok(profile.modules.some(module => module.id === 'net.allegator.cobblepower:cobblepower:1.0.4-test.1'))
     assert.equal(distribution.community.apiBaseUrl, runtime.apiBaseUrl)
+    assert.equal(distribution.community.features.richPreviews, true)
     assert.equal(distribution.schematics.enabled, true)
     assert.equal(distribution.schematics.features.core, true)
     assert.equal(runtime.environment.HELIOS_ACCESS_API_URL, runtime.apiBaseUrl)

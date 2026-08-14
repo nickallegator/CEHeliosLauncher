@@ -3,6 +3,7 @@
 const fs = require('fs')
 const crypto = require('crypto')
 const yauzl = require('yauzl')
+const AdmZip = require('adm-zip')
 const { CommunityValidationError, FORMAT_CONTRACTS, TYPES } = require('@allegator-games/community-core')
 
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024
@@ -11,6 +12,11 @@ const MAX_ENTRY_BYTES = 64 * 1024 * 1024
 const MAX_ENTRIES = 10_000
 const MAX_COMPRESSION_RATIO = 100
 const SUPPORTED_PACK_FORMAT = 34
+const MAX_SHOWCASE_SUBJECTS = 8
+const MAX_SHOWCASE_POKEMON = 4
+const MAX_RENDER_OVERLAY_BYTES = 16 * 1024 * 1024
+const MAX_RENDER_OVERLAY_EXPANDED_BYTES = 64 * 1024 * 1024
+const RESOURCE_LOCATION = /^[a-z0-9_.-]+:[a-z0-9/._-]+$/
 const FORBIDDEN_EXTENSIONS = new Set([
     '.7z', '.apk', '.app', '.bat', '.bin', '.cmd', '.com', '.dll', '.dmg', '.exe', '.gz',
     '.jar', '.js', '.lnk', '.msi', '.ps1', '.rar', '.reg', '.scr', '.sh', '.so', '.tar',
@@ -204,13 +210,148 @@ function parsePackMetadata(buffer) {
     }
 }
 
-async function validateResourcePack(filePath) {
+function discoverShowcaseCandidate(info, payload) {
+    const blockstate = info.name.match(/^assets\/([^/]+)\/blockstates\/(.+)\.json$/i)
+    if(blockstate) {
+        return { kind: 'block', id: `${blockstate[1].toLowerCase()}:${blockstate[2].toLowerCase()}`, state: {}, sourcePath: info.name }
+    }
+    const resolver = info.name.match(/^assets\/cobblemon\/bedrock\/pokemon\/resolvers\/(.+)\.json$/i)
+    if(!resolver || !payload) return null
+    try {
+        const document = JSON.parse(payload.toString('utf8'))
+        const rawSpecies = String(document.species || resolver[1].split('/').at(-1) || '').toLowerCase()
+        const species = rawSpecies.includes(':') ? rawSpecies : `cobblemon:${rawSpecies}`
+        if(!RESOURCE_LOCATION.test(species)) return null
+        return { kind: 'pokemon', species, form: '', gender: 'MALE', sourcePath: info.name }
+    } catch(_error) {
+        return null
+    }
+}
+
+function normalizeShowcase(raw, candidates) {
+    if(raw == null) return null
+    if(Number(raw.schemaVersion) !== 1 || !Array.isArray(raw.subjects)) {
+        throw validationError('invalid_resource_pack_showcase', 'Resource Pack showcase must use schema version 1 and contain a subjects array.')
+    }
+    if(raw.subjects.length > MAX_SHOWCASE_SUBJECTS) {
+        throw validationError('resource_pack_showcase_limit', `Select at most ${MAX_SHOWCASE_SUBJECTS} showcase subjects.`)
+    }
+    const candidateMap = new Map(candidates.map(candidate => [
+        candidate.kind === 'block' ? `block:${candidate.id}` : `pokemon:${candidate.species}`,
+        candidate
+    ]))
+    let pokemonCount = 0
+    const seen = new Set()
+    const subjects = raw.subjects.map((subject, index) => {
+        const kind = String(subject?.kind || '').toLowerCase()
+        if(kind === 'block') {
+            const id = String(subject.id || '').toLowerCase()
+            if(!RESOURCE_LOCATION.test(id)) throw validationError('invalid_showcase_subject', `Showcase block ${index + 1} has an invalid identifier.`)
+            const key = `block:${id}`
+            const candidate = candidateMap.get(key)
+            if(!candidate) throw validationError('unmodified_showcase_subject', `Showcase block ${id} is not changed by this Resource Pack.`)
+            if(seen.has(key)) throw validationError('duplicate_showcase_subject', `Showcase subject ${id} is selected more than once.`)
+            seen.add(key)
+            return { kind, id, state: subject.state && typeof subject.state === 'object' && !Array.isArray(subject.state) ? subject.state : {}, sourcePath: candidate.sourcePath }
+        }
+        if(kind === 'pokemon') {
+            pokemonCount += 1
+            if(pokemonCount > MAX_SHOWCASE_POKEMON) throw validationError('resource_pack_showcase_pokemon_limit', `Select at most ${MAX_SHOWCASE_POKEMON} Pokémon showcase subjects.`)
+            const species = String(subject.species || '').toLowerCase()
+            if(!RESOURCE_LOCATION.test(species)) throw validationError('invalid_showcase_subject', `Showcase Pokémon ${index + 1} has an invalid species.`)
+            const key = `pokemon:${species}`
+            const candidate = candidateMap.get(key)
+            if(!candidate) throw validationError('unmodified_showcase_subject', `Showcase Pokémon ${species} is not changed by this Resource Pack.`)
+            if(seen.has(key)) throw validationError('duplicate_showcase_subject', `Showcase subject ${species} is selected more than once.`)
+            seen.add(key)
+            const gender = String(subject.gender || 'MALE').toUpperCase()
+            if(!['MALE', 'FEMALE', 'GENDERLESS'].includes(gender)) throw validationError('invalid_showcase_subject', 'Showcase Pokémon gender is invalid.')
+            return { kind, species, form: String(subject.form || '').slice(0, 80).toLowerCase(), gender, sourcePath: candidate.sourcePath }
+        }
+        throw validationError('invalid_showcase_subject', `Showcase subject ${index + 1} has an unsupported kind.`)
+    })
+    return { schemaVersion: 1, subjects }
+}
+
+function resourceReferences(document) {
+    const references = new Set()
+    const visit = value => {
+        if(Array.isArray(value)) return value.forEach(visit)
+        if(value && typeof value === 'object') return Object.values(value).forEach(visit)
+        if(typeof value !== 'string') return
+        const match = value.toLowerCase().match(/^([a-z0-9_.-]+):([a-z0-9/._-]+)$/)
+        if(match) references.add(`${match[1]}:${match[2]}`)
+    }
+    visit(document)
+    return references
+}
+
+function resolveReferencePaths(reference, entryNames) {
+    const [namespace, resourcePath] = reference.split(':', 2)
+    const candidates = [
+        `assets/${namespace}/models/${resourcePath}.json`,
+        `assets/${namespace}/textures/${resourcePath}.png`,
+        `assets/${namespace}/${resourcePath}.json`,
+        `assets/${namespace}/${resourcePath}.png`,
+        `assets/${namespace}/bedrock/${resourcePath}.json`,
+        `assets/${namespace}/bedrock/${resourcePath}.geo.json`
+    ]
+    return candidates.filter(value => entryNames.has(value.toLowerCase()))
+}
+
+function buildRenderOverlay(filePath, showcase) {
+    if(!showcase?.subjects?.length) return null
+    const source = new AdmZip(filePath)
+    const entries = source.getEntries().filter(entry => !entry.isDirectory)
+    const byName = new Map(entries.map(entry => [normalizeEntryPath(entry.entryName).toLowerCase(), entry]))
+    const selected = new Set(['pack.mcmeta'])
+    if(byName.has('pack.png')) selected.add('pack.png')
+    for(const entry of entries) {
+        const lower = entry.entryName.toLowerCase()
+        if(lower === 'license.txt' || lower.endsWith('/license.txt') || lower.endsWith('/license.md')) selected.add(lower)
+    }
+    for(const subject of showcase.subjects) selected.add(String(subject.sourcePath).toLowerCase())
+    const pending = [...selected]
+    while(pending.length > 0) {
+        const name = pending.shift()
+        const entry = byName.get(name)
+        if(!entry || !name.endsWith('.json')) continue
+        let document
+        try { document = JSON.parse(entry.getData().toString('utf8')) } catch(_error) { continue }
+        for(const reference of resourceReferences(document)) {
+            for(const resolved of resolveReferencePaths(reference, byName)) {
+                if(!selected.has(resolved)) { selected.add(resolved); pending.push(resolved) }
+            }
+        }
+    }
+    const output = new AdmZip()
+    let expandedBytes = 0
+    for(const name of [...selected].sort()) {
+        const entry = byName.get(name)
+        if(!entry) continue
+        const bytes = entry.getData()
+        expandedBytes += bytes.length
+        if(expandedBytes > MAX_RENDER_OVERLAY_EXPANDED_BYTES) throw validationError('render_overlay_expanded_limit', 'Resource Pack render overlay exceeds 64 MiB expanded.')
+        output.addFile(name, bytes)
+    }
+    const descriptor = { schemaVersion: 1, subjects: showcase.subjects.map(({ sourcePath: _sourcePath, ...subject }) => subject) }
+    output.addFile('ag-community-showcase.json', Buffer.from(`${JSON.stringify(descriptor, null, 2)}\n`, 'utf8'))
+    const bytes = output.toBuffer()
+    if(bytes.length > MAX_RENDER_OVERLAY_BYTES) throw validationError('render_overlay_size_limit', 'Resource Pack render overlay exceeds 16 MiB compressed.')
+    return {
+        role: 'render-overlay', bytes, mimeType: 'application/zip',
+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        metadata: descriptor
+    }
+}
+
+async function validateResourcePack(filePath, options = {}) {
     const stat = await fs.promises.stat(filePath)
     if(!stat.isFile() || stat.size < 1 || stat.size > MAX_COMPRESSED_BYTES) {
         throw validationError('resource_pack_size_limit', 'Resource Pack ZIP must be between 1 byte and 100 MiB.')
     }
     const zip = await openZip(filePath)
-    const state = { entries: 0, expandedBytes: 0, namespaces: new Set(), paths: new Set(), packMetadata: null, packPng: null }
+    const state = { entries: 0, expandedBytes: 0, namespaces: new Set(), paths: new Set(), packMetadata: null, packPng: null, showcaseCandidates: [] }
     try {
         await new Promise((resolve, reject) => {
             zip.on('error', error => reject(validationError('invalid_resource_pack_zip', error.message)))
@@ -228,7 +369,9 @@ async function validateResourcePack(filePath) {
                         state.packPng = await readEntry(zip, entry, 5 * 1024 * 1024)
                         validatePngHeader(state.packPng, info.name)
                     } else if(!info.directory) {
-                        await validateEntryPayload(zip, entry, info)
+                        const payload = await validateEntryPayload(zip, entry, info)
+                        const candidate = discoverShowcaseCandidate(info, payload)
+                        if(candidate) state.showcaseCandidates.push(candidate)
                     }
                     zip.readEntry()
                 } catch(error) {
@@ -250,6 +393,12 @@ async function validateResourcePack(filePath) {
         stream.on('error', reject)
         stream.on('end', () => resolve(hash.digest('hex')))
     })
+    const candidates = [...new Map(state.showcaseCandidates.map(candidate => [
+        candidate.kind === 'block' ? `block:${candidate.id}` : `pokemon:${candidate.species}`,
+        candidate
+    ])).values()].sort((left, right) => (left.id || left.species).localeCompare(right.id || right.species))
+    const showcase = normalizeShowcase(options.showcase, candidates)
+    const renderOverlay = buildRenderOverlay(filePath, showcase)
     return {
         sizeBytes: stat.size,
         sha256,
@@ -259,9 +408,12 @@ async function validateResourcePack(filePath) {
             description: state.packMetadata.description,
             entryCount: state.entries,
             expandedBytes: state.expandedBytes,
-            namespaces: Array.from(state.namespaces).sort()
+            namespaces: Array.from(state.namespaces).sort(),
+            showcaseCandidates: candidates.map(({ sourcePath: _sourcePath, ...candidate }) => candidate),
+            showcase: showcase ? { schemaVersion: 1, subjects: showcase.subjects.map(({ sourcePath: _sourcePath, ...subject }) => subject) } : null
         },
         dependencies: [],
+        renderAssets: renderOverlay ? [renderOverlay] : [],
         previewBuffer: state.packPng,
         filePath
     }
@@ -275,8 +427,13 @@ module.exports = {
     MAX_ENTRIES,
     MAX_ENTRY_BYTES,
     MAX_EXPANDED_BYTES,
+    MAX_RENDER_OVERLAY_BYTES,
+    MAX_RENDER_OVERLAY_EXPANDED_BYTES,
+    MAX_SHOWCASE_POKEMON,
+    MAX_SHOWCASE_SUBJECTS,
     SUPPORTED_PACK_FORMAT,
     normalizeEntryPath,
+    normalizeShowcase,
     parsePackMetadata,
     validatePngHeader,
     validateResourcePack

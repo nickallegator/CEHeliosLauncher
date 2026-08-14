@@ -43,7 +43,7 @@ function entry(type, index) {
         stats: { likes: index, views: index, downloads: index },
         compatibility: {
             minecraft: '1.21.1', loader: 'neoforge',
-            cobblePower: '>=1.0.3-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0'
+            cobblePower: '>=1.0.4-test.1 <1.1.0', cobblemon: '>=1.6.0 <1.7.0'
         },
         revision: {
             id: `22222222-2222-4222-8222-${String(index).padStart(12, '0')}`,

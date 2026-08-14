@@ -17,6 +17,13 @@ const {
 } = require('../../libraries/community-core')
 const { parseCanonicalSchematic } = require('../../libraries/schematics-core')
 const { renderSchematicPreviewSvg } = require('../../libraries/schematics-preview')
+const { renderTexturedGradientSvg, sampleGradient } = require('../../libraries/community-rendering')
+const {
+    JarResourceProvider,
+    createResourceStack,
+    discoverProfileResources,
+    resolveBlockTopTexture
+} = require('../../libraries/minecraft-resources')
 const { validateResourcePack } = require('../../backend/src/services/communityResourcePack')
 
 const SHOWROOM_SCHEMA_VERSION = 1
@@ -215,12 +222,8 @@ function createTrainerArtifact() {
         format: 'cobblepower_battle_projector_trainer',
         version: 1,
         name: 'Engineer Marlow',
-        skin_id: 'agshowroom:copper_engineer',
+        skin_id: 'cobblepower:ace_trainer',
         skill: 6,
-        communityDependencies: [{
-            itemId: RESOURCE_PACK_ITEM_ID,
-            revisionId: REVISION_IDS[TYPES.RESOURCE_PACKS]
-        }],
         team: [
             {
                 species: 'cobblemon:pikachu',
@@ -299,11 +302,34 @@ async function createResourcePackArtifact(workspaceRoot) {
     zip.addFile('assets/cobblepower/lang/en_us.json', jsonBuffer({
         'agshowroom.copper_engineer': 'Engineer Marlow'
     }))
+    zip.addFile('assets/minecraft/blockstates/copper_block.json', jsonBuffer({ variants: { '': { model: 'minecraft:block/copper_block' } } }))
+    zip.addFile('assets/minecraft/models/block/copper_block.json', jsonBuffer({ parent: 'minecraft:block/cube_all', textures: { all: 'cobblepower:block/community_copper' } }))
+    zip.addFile('assets/cobblepower/textures/block/community_copper.png', ONE_PIXEL_PNG)
+    zip.addFile('assets/cobblemon/bedrock/pokemon/resolvers/0025_pikachu/0_pikachu_base.json', jsonBuffer({
+        species: 'cobblemon:pikachu',
+        order: 0,
+        variations: [{
+            aspects: [],
+            poser: 'cobblemon:pikachu',
+            model: 'cobblemon:pikachu_male.geo',
+            texture: 'cobblepower:textures/pokemon/community_pikachu.png',
+            layers: []
+        }]
+    }))
+    zip.addFile('assets/cobblepower/textures/pokemon/community_pikachu.png', ONE_PIXEL_PNG)
     zip.addFile('LICENSE.txt', Buffer.from('Local AG Launcher showroom fixture. Not for redistribution.\n', 'utf8'))
     const bytes = zip.toBuffer()
     const filePath = path.join(workspaceRoot, 'ag-workshop-accents.zip')
     fs.writeFileSync(filePath, bytes)
-    const result = await validateResourcePack(filePath)
+    const result = await validateResourcePack(filePath, {
+        showcase: {
+            schemaVersion: 1,
+            subjects: [
+                { kind: 'block', id: 'minecraft:copper_block', state: {} },
+                { kind: 'pokemon', species: 'cobblemon:pikachu', form: '', gender: 'MALE' }
+            ]
+        }
+    })
     return { bytes, result }
 }
 
@@ -325,9 +351,32 @@ function previewSvg(type, title) {
         `<path d="M76 87h616v258H76z" fill="none" stroke="${copper}" stroke-width="8"/>`,
         `<circle cx="128" cy="128" r="26" fill="${accent}"/><circle cx="640" cy="304" r="18" fill="${copper}"/>`,
         `<text x="384" y="210" fill="#f3eee0" font-family="Segoe UI, sans-serif" font-size="34" font-weight="700" text-anchor="middle">${safeTitle}</text>`,
-        `<text x="384" y="255" fill="${accent}" font-family="Segoe UI, sans-serif" font-size="19" text-anchor="middle">LOCAL COMMUNITY SHOWROOM</text>`,
+        `<text x="384" y="255" fill="${accent}" font-family="Segoe UI, sans-serif" font-size="19" text-anchor="middle">${type === TYPES.BUILDER_PRESETS ? 'TEXTURES UNAVAILABLE' : 'LOCAL COMMUNITY SHOWROOM'}</text>`,
         '</svg>'
     ].join(''), 'utf8')
+}
+
+async function createTexturedGradientPreview(artifact, resourceDataDirectory){
+    if(!resourceDataDirectory) return null
+    const discovered = await discoverProfileResources({
+        dataDirectory: resourceDataDirectory,
+        profileId: SHOWROOM_PROFILE_ID,
+        minecraftVersion: '1.21.1'
+    })
+    if(!discovered.minecraftJar || discovered.missingCoordinates.length > 0) return null
+    const providers = discovered.activeModJars.map(jarPath => new JarResourceProvider(jarPath))
+    providers.push(new JarResourceProvider(discovered.minecraftJar))
+    const stack = createResourceStack(providers)
+    const sample = sampleGradient(artifact.bytes)
+    if(sample.model.pins.length === 0 || sample.blocks.some(blockId => !blockId)) return null
+    const blockIds = [...new Set([...sample.blocks, ...sample.model.pins.map(pin => pin.block)].filter(Boolean))].sort()
+    const textures = new Map()
+    for(const blockId of blockIds){
+        try { textures.set(blockId, await resolveBlockTopTexture(stack, blockId)) }
+        catch(_error) { return null }
+    }
+    const rendered = renderTexturedGradientSvg(sample, textures, { width: 768, height: 432 })
+    return rendered.missing.length === 0 ? Buffer.from(rendered.svg, 'utf8') : null
 }
 
 function createEntry(type, definition, artifact) {
@@ -367,7 +416,8 @@ function createEntry(type, definition, artifact) {
         thumbnailUrl: `/v1/community/items/${type}/${itemId}/preview`,
         capabilities: { canEdit: false, canDelete: false, canReport: true, liked: false },
         artifact: bytes,
-        preview: previewSvg(type, definition.title)
+        preview: previewSvg(type, definition.title),
+        renderAssets: result.renderAssets || []
     }
 }
 
@@ -442,7 +492,7 @@ function schematicDetail(entry) {
     }
 }
 
-async function createShowroomFixtures(workspaceRoot) {
+async function createShowroomFixtures(workspaceRoot, resourceDataDirectory = null) {
     fs.mkdirSync(workspaceRoot, { recursive: true })
     const artifacts = {
         [SCHEMATIC_TYPE]: createSchematicArtifact(),
@@ -488,9 +538,14 @@ async function createShowroomFixtures(workspaceRoot) {
             publishedAt: '2026-08-04T12:00:00.000Z', updatedAt: '2026-08-08T09:00:00.000Z'
         }
     }
-    return SHOWROOM_TYPES.map(type => type === SCHEMATIC_TYPE
+    const entries = SHOWROOM_TYPES.map(type => type === SCHEMATIC_TYPE
         ? createSchematicEntry(definitions[type], artifacts[type])
         : createEntry(type, definitions[type], artifacts[type]))
+    const builder = entries.find(entry => entry.type === TYPES.BUILDER_PRESETS)
+    const texturedPreview = await createTexturedGradientPreview(artifacts[TYPES.BUILDER_PRESETS], resourceDataDirectory)
+    if(texturedPreview) builder.preview = texturedPreview
+    builder.typeData.previewMode = texturedPreview ? 'textures' : 'fallback'
+    return entries
 }
 
 function publicEntry(entry) {
@@ -498,6 +553,7 @@ function publicEntry(entry) {
     delete value.artifact
     delete value.preview
     delete value.canonical
+    delete value.renderAssets
     return value
 }
 
@@ -592,6 +648,7 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 defaultCategory: 'all',
                 defaultSort: 'popular',
                 showroom: true,
+                features: { richPreviews: true },
                 categories: SHOWROOM_TYPES.map(id => ({ id, readable: true, writable: false }))
             })
             return
@@ -655,6 +712,24 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
             else sendBuffer(request, response, 200, entry.preview, 'image/svg+xml; charset=utf-8')
             return
         }
+        const previewAssetsMatch = url.pathname.match(/^\/v1\/community\/items\/([^/]+)\/([^/]+)\/preview-assets$/)
+        if(previewAssetsMatch && request.method === 'GET') {
+            const entry = byKey.get(`${decodeURIComponent(previewAssetsMatch[1])}:${decodeURIComponent(previewAssetsMatch[2])}`)
+            if(!entry) writeJson(response, 404, { error: 'not_found' })
+            else writeJson(response, 200, {
+                schemaVersion: 1,
+                revisionId: entry.revision.id,
+                assets: (entry.renderAssets || []).map((asset, index) => ({
+                    role: asset.role,
+                    sha256: asset.sha256,
+                    sizeBytes: asset.bytes.length,
+                    mimeType: asset.mimeType,
+                    downloadUrl: `${baseUrl}/showroom/render-assets/${entry.type}/${entry.id}/${index}`,
+                    metadata: asset.metadata || {}
+                }))
+            })
+            return
+        }
         const downloadMatch = url.pathname.match(/^\/v1\/community\/items\/([^/]+)\/([^/]+)\/download$/)
         if(downloadMatch && request.method === 'GET') {
             const entry = byKey.get(`${decodeURIComponent(downloadMatch[1])}:${decodeURIComponent(downloadMatch[2])}`)
@@ -679,6 +754,14 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 'Content-Disposition': `attachment; filename="ag-showroom-${entry.type}-${entry.id}.${entry.type === TYPES.RESOURCE_PACKS ? 'zip' : 'json'}"`,
                 'X-Content-SHA256': entry.revision.sha256
             })
+            return
+        }
+        const renderAssetMatch = url.pathname.match(/^\/showroom\/render-assets\/([^/]+)\/([^/]+)\/(\d+)$/)
+        if(renderAssetMatch && ['GET', 'HEAD'].includes(request.method)) {
+            const entry = byKey.get(`${decodeURIComponent(renderAssetMatch[1])}:${decodeURIComponent(renderAssetMatch[2])}`)
+            const asset = entry?.renderAssets?.[Number(renderAssetMatch[3])]
+            if(!asset) writeJson(response, 404, { error: 'not_found' })
+            else sendBuffer(request, response, 200, asset.bytes, asset.mimeType, { 'X-Content-SHA256': asset.sha256 })
             return
         }
         const engagementMatch = url.pathname.match(/^\/v1\/community\/items\/([^/]+)\/([^/]+)\/(like|view|report)$/)
@@ -752,11 +835,11 @@ function injectShowroomDistribution(source, baseUrl) {
     const marker = Buffer.from('AG Launcher local Community showroom marker. This is not a mod JAR.\n', 'utf8')
     profile.name = 'Cobble Power Community Showroom'
     profile.description = 'Disposable local profile for previewing and installing Community fixture content.'
-    profile.version = '1.0.3-test.1-showroom'
+    profile.version = '1.0.4-test.1-showroom'
     profile.modules = (profile.modules || []).filter(module => !String(module.id).startsWith('net.allegator.cobblepower:cobblepower:'))
     profile.modules.push({
-        id: 'net.allegator.cobblepower:cobblepower:1.0.3-test.1',
-        name: 'Cobble Power 1.0.3-test.1 (showroom compatibility marker)',
+        id: 'net.allegator.cobblepower:cobblepower:1.0.4-test.1',
+        name: 'Cobble Power 1.0.4-test.1 (showroom compatibility marker)',
         type: 'ForgeMod',
         required: { value: false, def: false },
         artifact: {
@@ -766,7 +849,12 @@ function injectShowroomDistribution(source, baseUrl) {
             path: 'mods/cobblepower-showroom-marker.jar'
         }
     })
-    distribution.community = { schemaVersion: 1, enabled: true, apiBaseUrl: baseUrl }
+    distribution.community = {
+        schemaVersion: 1,
+        enabled: true,
+        apiBaseUrl: baseUrl,
+        features: { catalog: true, publishing: false, richPreviews: true }
+    }
     distribution.schematics = {
         schemaVersion: 2,
         enabled: true,
@@ -838,7 +926,7 @@ async function createShowroomEnvironment(options = {}) {
     const fixtureDirectory = path.join(rootDirectory, 'fixtures')
     fs.mkdirSync(launcherDirectory, { recursive: true })
     fs.mkdirSync(gameDataDirectory, { recursive: true })
-    const entries = await createShowroomFixtures(fixtureDirectory)
+    const entries = await createShowroomFixtures(fixtureDirectory, resourceDataDirectory)
     const api = await startShowroomServer(entries)
     try {
         const sourceDistribution = JSON.parse(fs.readFileSync(path.join(appDirectory, 'distribution_dev.json'), 'utf8'))
