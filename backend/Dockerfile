@@ -9,6 +9,10 @@ RUN npm ci --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
+# Local workspace packages execute from /app/libraries, outside the backend's
+# normal ancestor lookup path. Keep one production dependency tree and expose
+# it to those packages without duplicating node_modules in the image.
+ENV NODE_PATH=/app/backend/node_modules
 WORKDIR /app
 COPY --from=dependencies /app/backend/node_modules ./backend/node_modules
 COPY libraries/schematics-core ./libraries/schematics-core

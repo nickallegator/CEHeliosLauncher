@@ -11,6 +11,8 @@ const { createExternalTokenEncryption } = require('../../backend/src/services/ex
 const { createModrinthProvider, isPrivateAddress, validateDownloadUrl } = require('../../backend/src/services/modrinth')
 const { compareIndex, normalizeChannels } = require('../../backend/src/services/modrinthSources')
 
+const root = path.resolve(__dirname, '..', '..')
+
 const settings = {
     clientId: 'client-id', clientSecret: 'never-exposed', redirectUri: 'https://api.example.test/v1/integrations/modrinth/oauth/callback',
     scopes: ['USER_READ','PROJECT_READ'], authorizeUrl: 'https://modrinth.com/auth/authorize',
@@ -80,6 +82,12 @@ test('Modrinth migration makes revision object storage optional and backfills R2
     assert.match(sql, /create table if not exists community_revision_sources/i)
     assert.match(sql, /select id, 'r2', object_key/i)
     assert.match(sql, /unique \(provider, provider_project_id\)/i)
+})
+
+test('backend container exposes production dependencies to local workspace packages', () => {
+    const dockerfile = fs.readFileSync(path.join(root, 'backend', 'Dockerfile'), 'utf8')
+    assert.match(dockerfile, /ENV NODE_PATH=\/app\/backend\/node_modules/)
+    assert.match(dockerfile, /COPY --from=dependencies \/app\/backend\/node_modules \.\/backend\/node_modules/)
 })
 
 test('release channels and review diffs are deterministic and release-safe', () => {
