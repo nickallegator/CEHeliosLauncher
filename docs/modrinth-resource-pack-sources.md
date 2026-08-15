@@ -24,6 +24,7 @@ Configure the Community backend:
 
 ```text
 COMMUNITY_MODRINTH_ENABLED=false
+COMMUNITY_MODRINTH_PUBLIC_ENABLED=false
 MODRINTH_CLIENT_ID=<application id>
 MODRINTH_CLIENT_SECRET=<managed secret>
 MODRINTH_REDIRECT_URI=https://cobblepower-schematics-api.onrender.com/v1/integrations/modrinth/oauth/callback
@@ -34,6 +35,13 @@ EXTERNAL_TOKEN_ENCRYPTION_KEY=<32 bytes encoded as base64>
 EXTERNAL_TOKEN_ENCRYPTION_KEY_ID=v1
 MODRINTH_SYNC_CONCURRENCY=4
 ```
+
+Keep the credentials on the Community service only. On the release/access
+service, leave `COMMUNITY_MODRINTH_ENABLED=false` and set
+`COMMUNITY_MODRINTH_PUBLIC_ENABLED=true` to advertise the enabled Community
+capability in authorized distributions without mounting OAuth routes or copying
+OAuth secrets to that service. On the Community service, set both values to
+`true` when enabling the pilot.
 
 Generate the encryption key locally and copy only its output into the managed secret:
 

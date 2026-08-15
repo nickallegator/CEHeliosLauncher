@@ -102,7 +102,10 @@ const config = {
         enabled: parseBoolean(getEnv('COMMUNITY_ENABLED', getEnv('SCHEMATICS_ENABLED', 'false'))),
         richPreviewsEnabled: parseBoolean(getEnv('COMMUNITY_RICH_PREVIEWS_ENABLED', 'false')),
         packStudioEnabled: parseBoolean(getEnv('COMMUNITY_PACK_STUDIO_ENABLED', 'false')),
-        modrinthEnabled: parseBoolean(getEnv('COMMUNITY_MODRINTH_ENABLED', 'false')),
+        modrinthEnabled: parseBoolean(getEnv(
+            'COMMUNITY_MODRINTH_PUBLIC_ENABLED',
+            getEnv('COMMUNITY_MODRINTH_ENABLED', 'false')
+        )),
         publicApiUrl: getEnv('COMMUNITY_PUBLIC_API_URL', getEnv('SCHEMATICS_PUBLIC_API_URL', null)),
         writeMode: getEnv('COMMUNITY_WRITE_MODE', getEnv('SCHEMATICS_WRITE_MODE', 'admin')).trim().toLowerCase(),
         uploadRateLimit: parseNumber(getEnv('COMMUNITY_UPLOADS_PER_HOUR', '10'), 10),
