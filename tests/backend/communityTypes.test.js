@@ -198,6 +198,9 @@ test('Resource Pack validator discovers selected subjects and builds a bounded r
     assert.ok(result.renderAssets[0].bytes.length > 0)
     const overlayPaths = new Set(new AdmZip(result.renderAssets[0].bytes).getEntries().map(entry => entry.entryName.toLowerCase()))
     assert.equal(overlayPaths.has('assets/cobblepower/textures/pokemon/showcase.png'), true)
+    await assert.rejects(validateResourcePack(filePath, {
+        showcase: { schemaVersion: 1, subjects: [{ kind: 'pokemon', species: 'cobblemon:pikachu', shiny: true, gender: 'MALE' }] }
+    }), error => error.code === 'unsupported_shiny_showcase')
 })
 
 test('Resource Pack validator rejects malformed content files', async t => {
@@ -236,12 +239,82 @@ test('Resource Pack validator accepts dedicated Cobblemon model namespaces witho
     })))
     zip.addFile('assets/example_models/bedrock/pokemon/models/cosmog/cosmog.geo.json', Buffer.from(JSON.stringify({ 'minecraft:geometry': [] })))
     zip.addFile('assets/example_models/textures/pokemon/cosmog.png', Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'))
+    zip.addFile('assets/example_models/bedrock/pokemon/resolvers/0_aggron_base.json', Buffer.from(JSON.stringify({
+        species: 'cobblemon:aggron', order: 0, variations: [{ aspects: [], poser: 'example_models:aggron' }]
+    })))
+    zip.addFile('assets/example_models/bedrock/pokemon/posers/aggron.json', Buffer.from(JSON.stringify({ poses: {} })))
     zip.writeZip(filePath)
     const result = await validateResourcePack(filePath, {
-        showcase: { schemaVersion: 1, subjects: [{ kind: 'pokemon', species: 'cobblemon:cosmog', form: '', gender: 'GENDERLESS' }] }
+        showcase: { schemaVersion: 1, subjects: [
+            { kind: 'pokemon', species: 'cobblemon:cosmog', form: '', gender: 'GENDERLESS' },
+            { kind: 'pokemon', species: 'cobblemon:aggron', form: '', gender: 'MALE' }
+        ] }
     })
-    assert.equal(result.typeData.showcaseCandidates[0].resourceNamespace, 'example_models')
-    assert.equal(result.typeData.showcase.subjects[0].resourceNamespace, 'example_models')
+    const cosmog = result.typeData.showcaseCandidates.find(value => value.species === 'cobblemon:cosmog')
+    const aggron = result.typeData.showcaseCandidates.find(value => value.species === 'cobblemon:aggron')
+    assert.equal(cosmog.resourceNamespace, 'example_models')
+    assert.equal(cosmog.pokemonOverride.scope, 'full')
+    assert.deepEqual(aggron.pokemonOverride, { schemaVersion: 1, scope: 'partial', provides: ['poser'] })
+    assert.equal(result.typeData.showcase.subjects.find(value => value.species === 'cobblemon:aggron').pokemonOverride.scope, 'partial')
+    const overlayPaths = new Set(new AdmZip(result.renderAssets[0].bytes).getEntries().map(entry => entry.entryName.toLowerCase()))
+    assert.equal(overlayPaths.has('assets/example_models/bedrock/pokemon/posers/aggron.json'), true)
+})
+
+test('Resource Pack validator exposes regional forms and resolver-free partial Pokemon assets', async t => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ag-resource-pack-forms-test-'))
+    t.after(() => fs.promises.rm(directory, { recursive: true, force: true }))
+    const filePath = path.join(directory, 'forms.zip')
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    const zip = new AdmZip()
+    zip.addFile('pack.mcmeta', Buffer.from(JSON.stringify({ pack: { pack_format: 34, description: 'Forms' } })))
+    zip.addFile('assets/example_models/bedrock/pokemon/resolvers/2_darumaka_galar.json', Buffer.from(JSON.stringify({
+        species: 'cobblemon:darumaka', variations: [{
+            aspects: ['galarian'], model: 'example_models:darumaka_galar.geo',
+            texture: 'example_models:textures/pokemon/darumaka_galar/darumaka_galar.png'
+        }]
+    })))
+    zip.addFile('assets/example_models/bedrock/pokemon/models/darumaka_galar/darumaka_galar.geo.json', Buffer.from(JSON.stringify({ 'minecraft:geometry': [] })))
+    zip.addFile('assets/example_models/textures/pokemon/darumaka_galar/darumaka_galar.png', png)
+    zip.addFile('assets/example_models/bedrock/pokemon/resolvers/3_dialga_origin.json', Buffer.from(JSON.stringify({
+        species: 'cobblemon:dialga', variations: [{ aspects: ['origin-forme'], poser: 'example_models:dialga_origin' }]
+    })))
+    zip.addFile('assets/example_models/bedrock/pokemon/posers/dialga_origin.json', Buffer.from(JSON.stringify({ poses: {} })))
+    zip.addFile('assets/example_models/bedrock/pokemon/resolvers/4_eevee_shiny.json', Buffer.from(JSON.stringify({
+        species: 'cobblemon:eevee', variations: [{
+            aspects: ['shiny'], texture: 'example_models:textures/pokemon/eevee/eevee_shiny.png'
+        }]
+    })))
+    zip.addFile('assets/example_models/textures/pokemon/eevee/eevee_shiny.png', png)
+    zip.addFile('assets/example_models/bedrock/pokemon/posers/gliscor.json', Buffer.from(JSON.stringify({ poses: {} })))
+    zip.addFile('assets/example_models/bedrock/pokemon/animations/gliscor/gliscor.animation.json', Buffer.from(JSON.stringify({ animations: {} })))
+    zip.addFile('assets/cobblemon/bedrock/pokemon/animations/unown/unown.animation.json', Buffer.from(JSON.stringify({ animations: {} })))
+    zip.addFile('assets/cobblemon/bedrock/pokemon/models/boltund/boltund.geo.json', Buffer.from(JSON.stringify({ 'minecraft:geometry': [] })))
+    zip.writeZip(filePath)
+
+    const result = await validateResourcePack(filePath, { showcase: { schemaVersion: 1, subjects: [
+        { kind: 'pokemon', species: 'cobblemon:darumaka', aspects: ['galarian'], gender: 'MALE' },
+        { kind: 'pokemon', species: 'cobblemon:gliscor', gender: 'MALE' },
+        { kind: 'pokemon', species: 'cobblemon:eevee', shiny: true, gender: 'MALE' }
+    ] } })
+    const candidates = result.typeData.showcaseCandidates
+    const darumaka = candidates.find(value => value.species === 'cobblemon:darumaka' && value.aspects.includes('galarian'))
+    assert.equal(darumaka.form, 'galarian')
+    assert.equal(darumaka.pokemonOverride.scope, 'full')
+    assert.ok(candidates.some(value => value.species === 'cobblemon:dialga' && value.aspects.includes('origin-forme')))
+    assert.equal(candidates.some(value => value.species === 'cobblemon:dialga_origin'), false)
+    const eevee = candidates.find(value => value.species === 'cobblemon:eevee')
+    assert.equal(eevee.defaultShiny, true)
+    assert.equal(eevee.pokemonOverride.shinyOnly, true)
+    assert.equal(result.typeData.showcase.subjects.find(value => value.species === 'cobblemon:eevee').shiny, true)
+    for(const [species, provides] of [
+        ['gliscor', ['poser', 'animations']], ['unown', ['animations']], ['boltund', ['model']]
+    ]) {
+        const candidate = candidates.find(value => value.species === `cobblemon:${species}`)
+        assert.ok(candidate, species)
+        assert.equal(candidate.pokemonOverride.scope, 'partial')
+        assert.deepEqual(candidate.pokemonOverride.provides, provides)
+    }
+    assert.deepEqual(result.typeData.showcase.subjects[0].aspects, ['galarian'])
 })
 
 test('Resource Pack validator rejects unrelated mod namespaces', async t => {

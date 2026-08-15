@@ -61,9 +61,10 @@ function writeFilesTransaction(entries) {
     try {
         for(const entry of entries) {
             fs.mkdirSync(path.dirname(entry.path), { recursive: true })
-            if(entry.content != null) {
+            if(entry.content != null || entry.sourcePath) {
                 const temporaryPath = `${entry.path}.${transactionId}.tmp`
-                fs.writeFileSync(temporaryPath, entry.content)
+                if(entry.sourcePath) fs.copyFileSync(entry.sourcePath, temporaryPath, fs.constants.COPYFILE_EXCL)
+                else fs.writeFileSync(temporaryPath, entry.content)
                 staged.push({ path: entry.path, temporaryPath })
             } else {
                 staged.push({ path: entry.path, temporaryPath: null })

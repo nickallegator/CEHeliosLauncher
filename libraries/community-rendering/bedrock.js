@@ -304,9 +304,13 @@ function selectResolverVariation(resolvers, aspects = []) {
         .sort((left, right) => left.order - right.order || left.aspects.length - right.aspects.length)
     const resolved = {}
     for(const variation of candidates) {
-        for(const key of ['model', 'texture', 'poser', 'layers', 'sourcePath']) {
-            if(variation[key] != null) resolved[key] = variation[key]
+        for(const key of ['model', 'texture', 'poser', 'layers']) {
+            if(variation[key] != null) {
+                resolved[key] = variation[key]
+                if(variation.sourcePath) resolved[`${key}SourcePath`] = variation.sourcePath
+            }
         }
+        if(variation.sourcePath) resolved.sourcePath = variation.sourcePath
     }
     return Object.keys(resolved).length ? resolved : null
 }

@@ -171,6 +171,49 @@ class CommunityApiClient extends SchematicApiClient {
         return data
     }
 
+    async composerComponents(params = {}, options = {}) {
+        const query = normalizeCommunityParams(params).toString()
+        const { data } = await this.request(`/v1/community/composer/components${query ? `?${query}` : ''}`, {
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+            signal: options.signal
+        })
+        if(Number(data?.schemaVersion) !== 1 || !Array.isArray(data.items)) throw new Error('Pack Studio component response is invalid.')
+        return data
+    }
+
+    async resolveComposition(project, options = {}) {
+        const { data } = await this.request('/v1/community/composer/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) },
+            body: JSON.stringify({
+                schemaVersion: 1,
+                selections: project.selections || [],
+                conflictResolutions: project.conflictResolutions || {}
+            }),
+            signal: options.signal
+        })
+        if(Number(data?.schemaVersion) !== 1 || !Array.isArray(data.sources) || !data.plan) throw new Error('Pack Studio resolution response is invalid.')
+        return data
+    }
+
+    async setCompositionGrant(itemId, revisionId, enabled, options = {}) {
+        const { data } = await this.request(`/v1/community/items/resource-packs/${encodeURIComponent(itemId)}/revisions/${encodeURIComponent(revisionId)}/composition`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) },
+            body: JSON.stringify({ enabled: enabled === true, termsAccepted: enabled === true }),
+            signal: options.signal
+        })
+        return data
+    }
+
+    async compositionGrant(itemId, revisionId, options = {}) {
+        const { data } = await this.request(`/v1/community/items/resource-packs/${encodeURIComponent(itemId)}/revisions/${encodeURIComponent(revisionId)}/composition`, {
+            headers: { Accept: 'application/json', ...(options.headers || {}) },
+            signal: options.signal
+        })
+        return data
+    }
+
     async createUpload(metadata, options = {}) {
         const { data } = await this.request('/v1/community/uploads', {
             method: 'POST',

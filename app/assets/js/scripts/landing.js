@@ -787,6 +787,7 @@ const SCHEMATICS_LAZY_SCRIPT_PATHS = [
     './assets/js/scripts/landing/schematics/edit.js',
     './assets/js/scripts/landing/schematics/detail.js',
     './assets/js/scripts/landing/schematics/community-content.js',
+    './assets/js/scripts/landing/schematics/pack-studio.js',
     './assets/js/scripts/landing/schematics/index.js'
 ]
 

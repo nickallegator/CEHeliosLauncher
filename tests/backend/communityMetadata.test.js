@@ -43,6 +43,24 @@ test('Community upload metadata preserves a bounded Resource Pack showcase', () 
     assert.equal(metadata.showcase.subjects[1].species, 'cobblemon:pikachu')
 })
 
+test('Pack Studio publication requires an explicit versioned composition grant opt-in', () => {
+    assert.throws(() => _test.cleanMetadata({
+        title: 'Composable Pack',
+        license: 'Community-Use-1.0',
+        rightsAttested: true,
+        packStudioOptIn: true
+    }), error => error.code === 'pack_studio_terms_required')
+    const metadata = _test.cleanMetadata({
+        title: 'Composable Pack',
+        license: 'Community-Use-1.0',
+        rightsAttested: true,
+        packStudioOptIn: true,
+        packStudioTermsAccepted: true
+    })
+    assert.equal(metadata.packStudioOptIn, true)
+    assert.equal(metadata.packStudioTermsAccepted, true)
+})
+
 test('Community upload metadata requires a distribution-rights attestation', () => {
     assert.throws(() => _test.cleanMetadata({
         title: 'Unattested',

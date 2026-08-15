@@ -124,7 +124,7 @@ test('generic Community types migrate, publish, browse, engage, and download thr
         env: {
             ...process.env, NODE_ENV: 'test', PORT: String(PORT), DATABASE_URL,
             RELEASES_ENABLED: 'false', SCHEMATICS_ENABLED: 'false', COMMUNITY_ENABLED: 'true', COMMUNITY_WRITE_MODE: 'authenticated',
-            COMMUNITY_RICH_PREVIEWS_ENABLED: 'true',
+            COMMUNITY_RICH_PREVIEWS_ENABLED: 'true', COMMUNITY_PACK_STUDIO_ENABLED: 'true',
             COMMUNITY_AUTOMATION_ENABLED: 'true', COMMUNITY_BATTLE_TRAINERS_ENABLED: 'true',
             COMMUNITY_BUILDER_PRESETS_ENABLED: 'true', COMMUNITY_RESOURCE_PACKS_ENABLED: 'true',
             COMMUNITY_STORAGE_PROVIDER: 's3', COMMUNITY_STORAGE_BUCKET: BUCKET, COMMUNITY_STORAGE_REGION: 'us-east-1',
@@ -156,12 +156,15 @@ test('generic Community types migrate, publish, browse, engage, and download thr
     pilots.push(await publish(session.token, 'battle-trainers', trainer(), preview))
     pilots.push(await publish(session.token, 'automation', automation(), preview))
     pilots.push(await publish(session.token, 'resource-packs', resourcePack(temp), null, {
-        showcase: { schemaVersion: 1, subjects: [{ kind: 'block', id: 'cobblepower:pilot', state: {} }] }
+        showcase: { schemaVersion: 1, subjects: [{ kind: 'block', id: 'cobblepower:pilot', state: {} }] },
+        packStudioOptIn: true,
+        packStudioTermsAccepted: true
     }))
     assert.deepEqual(pilots.map(item => item.type), ['builder-presets', 'battle-trainers', 'automation', 'resource-packs'])
 
     const capabilities = await responseJson(await fetch(`${BASE}/v1/community/capabilities`), 200)
     assert.ok(['builder-presets', 'battle-trainers', 'automation', 'resource-packs'].every(type => capabilities.categories.some(item => item.id === type)))
+    assert.equal(capabilities.features.packStudio, true)
     const catalog = await responseJson(await fetch(`${BASE}/v1/community/catalog?category=all&sort=popular&limit=20`), 200)
     assert.ok(pilots.every(pilot => catalog.items.some(item => item.key === `${pilot.type}:${pilot.id}`)))
 
@@ -181,6 +184,36 @@ test('generic Community types migrate, publish, browse, engage, and download thr
     assert.equal(previewAssets.assets.length, 1)
     assert.equal(previewAssets.assets[0].role, 'render-overlay')
     assert.equal((await fetch(previewAssets.assets[0].downloadUrl)).ok, true)
+
+    const components = await responseJson(await fetch(`${BASE}/v1/community/composer/components?kind=block&query=pilot`), 200)
+    assert.equal(components.schemaVersion, 1)
+    assert.equal(components.items.length, 1)
+    assert.equal(components.items[0].key, 'block:cobblepower:pilot')
+    const resolution = await responseJson(await fetch(`${BASE}/v1/community/composer/resolve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            schemaVersion: 1,
+            selections: [{
+                sourceItemId: resourcePackPilot.id,
+                sourceRevisionId: resourcePackPilot.revision.id,
+                componentKey: components.items[0].key
+            }],
+            conflictResolutions: {}
+        })
+    }), 200)
+    assert.equal(resolution.plan.conflicts.length, 0)
+    assert.equal(resolution.sources.length, 1)
+    assert.equal((await fetch(resolution.sources[0].downloadUrl)).ok, true)
+    const grant = await responseJson(await fetch(`${BASE}/v1/community/items/resource-packs/${resourcePackPilot.id}/revisions/${resourcePackPilot.revision.id}/composition`), 200)
+    assert.equal(grant.enabled, true)
+    await responseJson(await fetch(`${BASE}/v1/community/items/resource-packs/${resourcePackPilot.id}/revisions/${resourcePackPilot.revision.id}/composition`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false, termsAccepted: false })
+    }), 200)
+    assert.equal((await fetch(`${BASE}/v1/community/composer/resolve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selections: [{ sourceItemId: resourcePackPilot.id, sourceRevisionId: resourcePackPilot.revision.id, componentKey: components.items[0].key }] })
+    })).status, 409)
 
     const traversal = await fetch(`${BASE}/v1/community/items/resource-packs/not-a-uuid/download`)
     assert.equal(traversal.status, 400)

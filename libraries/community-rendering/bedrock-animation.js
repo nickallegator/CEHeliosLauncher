@@ -65,7 +65,8 @@ function compileExpression(value) {
                 consume('(')
                 const parameters = []
                 if(!peek(')')) {
-                    do { parameters.push(additive()); if(!peek(',')) break; consume(',') } while(true)
+                    parameters.push(additive())
+                    while(peek(',')) { consume(','); parameters.push(additive()) }
                 }
                 consume(')')
                 const fn = FUNCTIONS[name]
@@ -180,7 +181,19 @@ function inferredLength(animation) {
     return maximum || DEFAULT_EXPRESSION_LOOP_SECONDS
 }
 
+function bedrockAnimationIdentity(value) {
+    const sourceId = String(value || '').trim()
+    const segments = sourceId.replace(/^animation\./i, '').split('.').filter(Boolean)
+    const id = segments.pop() || sourceId
+    return {
+        sourceId,
+        group: segments.join('.'),
+        id
+    }
+}
+
 function compileAnimation(id, animation) {
+    const identity = bedrockAnimationIdentity(id)
     const bones = Object.fromEntries(Object.entries(animation?.bones || {}).map(([name, bone]) => [name, {
         rotation: channelCompiler(bone?.rotation, 0),
         position: channelCompiler(bone?.position, 0),
@@ -190,9 +203,10 @@ function compileAnimation(id, animation) {
         hasScale: bone?.scale != null
     }]))
     return {
-        id: shortAnimationId(id),
-        sourceId: String(id),
-        label: displayName(shortAnimationId(id)),
+        id: identity.id,
+        group: identity.group,
+        sourceId: identity.sourceId,
+        label: displayName(identity.id),
         loop: animation?.loop === true,
         length: inferredLength(animation),
         sample(timeSeconds) {
@@ -215,61 +229,135 @@ function compileBedrockAnimations(documents) {
     for(const document of documents || []) {
         for(const [id, animation] of Object.entries(document?.animations || {}).sort(([left], [right]) => left.localeCompare(right))) {
             if(!animation?.bones || typeof animation.bones !== 'object') continue
-            try { values.set(shortAnimationId(id), compileAnimation(id, animation)) } catch { /* Unsupported expressions do not disable other animations. */ }
+            // Several forms can share a resource folder and reuse short names
+            // such as `ground_idle`. Cobblemon addresses them by the complete
+            // animation ID, so retaining only the final segment would silently
+            // pose one form with another form's clip.
+            try { values.set(String(id).toLowerCase(), compileAnimation(id, animation)) } catch { /* Unsupported expressions do not disable other animations. */ }
         }
     }
-    return [...values.values()].sort((left, right) => left.label.localeCompare(right.label) || left.id.localeCompare(right.id))
+    return [...values.values()].sort((left, right) => left.label.localeCompare(right.label)
+        || left.group.localeCompare(right.group)
+        || left.id.localeCompare(right.id))
 }
 
-function poserAnimationIds(poser, posePreference = ['STAND', 'NONE', 'PORTRAIT', 'PROFILE']) {
+function poserAnimationReferences(poser, posePreference = ['STAND', 'NONE', 'PORTRAIT', 'PROFILE']) {
     const poses = Object.entries(poser?.poses || {})
     const ranked = poses.sort(([, left], [, right]) => {
         const rank = pose => Math.min(...(posePreference || []).map((type, index) => (pose?.poseTypes || []).includes(type) ? index : 999))
         return Number(Boolean(left?.isBattle)) - Number(Boolean(right?.isBattle)) || rank(left) - rank(right)
     })
-    const ids = []
+    const references = []
+    const seen = new Set()
     for(const [, pose] of ranked) {
         for(const expression of pose?.animations || []) {
-            const match = String(expression).match(/q\.bedrock\s*\(\s*['"][^'"]+['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i)
-            if(match && !ids.includes(match[1])) ids.push(match[1])
+            const match = String(expression).match(/q\.bedrock\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i)
+            if(!match) continue
+            const reference = { group: match[1], id: match[2] }
+            const key = `${reference.group.toLowerCase()}:${reference.id.toLowerCase()}`
+            if(!seen.has(key)) { seen.add(key); references.push(reference) }
         }
+    }
+    return references
+}
+
+function poserAnimationIds(poser, posePreference = ['STAND', 'NONE', 'PORTRAIT', 'PROFILE']) {
+    const ids = []
+    for(const reference of poserAnimationReferences(poser, posePreference)) {
+        if(!ids.includes(reference.id)) ids.push(reference.id)
     }
     return ids
 }
 
+function findReferencedAnimation(values, reference) {
+    const group = String(reference?.group || '').toLowerCase()
+    const id = String(reference?.id || '').toLowerCase()
+    const exact = values.find(animation => animation.group.toLowerCase() === group && animation.id.toLowerCase() === id)
+    if(exact) return exact
+    const shortMatches = values.filter(animation => animation.id.toLowerCase() === id)
+    return shortMatches.length === 1 ? shortMatches[0] : null
+}
+
+function scopedBedrockAnimations(animations, poser) {
+    const values = animations || []
+    const groups = new Set(poserAnimationReferences(poser).map(reference => reference.group.toLowerCase()))
+    if(groups.size === 0) return values
+    const scoped = values.filter(animation => groups.has(animation.group.toLowerCase()))
+    return scoped.length ? scoped : values
+}
+
 function selectDefaultBedrockAnimation(animations, poser) {
     const values = animations || []
-    const byId = new Map(values.map(animation => [animation.id.toLowerCase(), animation]))
-    for(const id of poserAnimationIds(poser)) if(byId.has(id.toLowerCase())) return byId.get(id.toLowerCase())
+    for(const reference of poserAnimationReferences(poser)) {
+        const animation = findReferencedAnimation(values, reference)
+        if(animation) return animation
+    }
+    const scoped = scopedBedrockAnimations(values, poser)
     const priorities = ['ground_idle', 'idle', 'standing']
-    for(const id of priorities) if(byId.has(id)) return byId.get(id)
-    return values.find(animation => animation.id.toLowerCase().includes('idle') && !animation.id.toLowerCase().includes('_size'))
-        || values.find(animation => animation.id.toLowerCase() === 'pose')
-        || values[0]
+    for(const id of priorities) {
+        const animation = scoped.find(value => value.id.toLowerCase() === id)
+        if(animation) return animation
+    }
+    return scoped.find(animation => animation.id.toLowerCase().includes('idle') && !animation.id.toLowerCase().includes('_size'))
+        || scoped.find(animation => animation.id.toLowerCase() === 'pose')
+        || scoped[0]
         || null
+}
+
+function selectStaticBedrockAnimation(animations, poser) {
+    const scoped = scopedBedrockAnimations(animations || [], poser)
+    return scoped.find(animation => animation.id.toLowerCase() === 'render')
+        || scoped.find(animation => animation.id.toLowerCase() === 'pose')
+        || null
+}
+
+function composeBedrockPoses(basePose, overlayPose) {
+    const baseBones = basePose?.bones || {}
+    const overlayBones = overlayPose?.bones || {}
+    const names = new Set([...Object.keys(baseBones), ...Object.keys(overlayBones)])
+    const bones = {}
+    const combine = (left, right, operation, identity) => [0, 1, 2].map(index => operation(
+        Number(left?.[index] ?? identity),
+        Number(right?.[index] ?? identity)
+    ))
+    for(const name of names) {
+        const base = baseBones[name] || {}
+        const overlay = overlayBones[name] || {}
+        const bone = {}
+        if(base.rotation || overlay.rotation) bone.rotation = combine(base.rotation, overlay.rotation, (left, right) => left + right, 0)
+        if(base.position || overlay.position) bone.position = combine(base.position, overlay.position, (left, right) => left + right, 0)
+        if(base.scale || overlay.scale) bone.scale = combine(base.scale, overlay.scale, (left, right) => left * right, 1)
+        bones[name] = bone
+    }
+    return { bones }
 }
 
 function selectableBedrockAnimations(animations, poser) {
     const values = animations || []
-    const byId = new Map(values.map(animation => [animation.id.toLowerCase(), animation]))
+    const scoped = scopedBedrockAnimations(values, poser)
     const result = []
-    for(const id of poserAnimationIds(poser)) {
-        const animation = byId.get(id.toLowerCase())
+    for(const reference of poserAnimationReferences(poser)) {
+        const animation = findReferencedAnimation(scoped, reference)
         if(animation && !result.includes(animation)) result.push(animation)
     }
-    for(const animation of values) {
+    for(const animation of scoped) {
         const id = animation.id.toLowerCase()
         if(result.includes(animation) || id === 'pose' || id === 'render' || id.endsWith('_size')) continue
         result.push(animation)
     }
-    return result.length ? result : values
+    return result.length ? result : scoped
 }
 
 module.exports = {
+    bedrockAnimationIdentity,
     compileBedrockAnimations,
     compileExpression,
+    composeBedrockPoses,
     poserAnimationIds,
+    poserAnimationReferences,
+    scopedBedrockAnimations,
     selectableBedrockAnimations,
     selectDefaultBedrockAnimation,
+    selectStaticBedrockAnimation,
     shortAnimationId
 }

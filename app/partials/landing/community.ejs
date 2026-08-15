@@ -6,6 +6,7 @@
                     <div id="schematicsTitle"><%- lang('community.title') %></div>
                     <div id="schematicsSubtitle"><%- lang('community.subtitle') %></div>
                 </div>
+                <button id="communityPackStudioOpen" type="button" class="workshopButton secondary" hidden><%- lang('community.packStudioAction') %></button>
             </div>
             <div id="schematicsActionGroup">
                 <div id="schematicsControlsRow">
@@ -186,6 +187,7 @@
                 </div>
                 <div id="schematicsCreatorGrid" class="schematicsCreatorGrid" role="list"></div>
             </div>
+            <%- include('community/pack-studio.ejs') %>
             <%- include('community/modals/detail.ejs') %>
             <%- include('community/modals/content-detail.ejs') %>
             <%- include('community/modals/content-publish.ejs') %>

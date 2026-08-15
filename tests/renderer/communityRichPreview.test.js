@@ -12,11 +12,13 @@ const {
     computeTexturedGradientLayout,
     compileBedrockAnimations,
     compileExpression,
+    composeBedrockPoses,
     composeBedrockBoneRotation,
     fitGraph,
     normalizeAutomationBundle,
     normalizeGradientType,
     parseBedrockGeometry,
+    poserAnimationReferences,
     renderAutomationSvg,
     renderGraphCanvas,
     renderTexturedGradientSvg,
@@ -29,8 +31,23 @@ const {
 const { resolveBlockTopTexture } = require('../../libraries/minecraft-resources')
 const { CommunityArtifactCache, hashBuffer } = require('../../app/assets/js/communityartifactcache')
 const { drawTexture } = require('../../app/assets/js/communitypreviews/gradient')
-const { configureTextureUpload, orbitEye, orbitFromDrag } = require('../../app/assets/js/communitypreviews/model-viewer')
-const { normalizeSubjects, rendererGroup, subjectKey } = require('../../app/assets/js/communitypreviews/resource-pack')
+const {
+    cameraDistanceLimits,
+    clampCameraDistance,
+    configureTextureUpload,
+    orbitEye,
+    orbitFromDrag
+} = require('../../app/assets/js/communitypreviews/model-viewer')
+const { AnimatedPokemonPreview } = require('../../app/assets/js/communitypreviews/animated-pokemon')
+const { captureScrollPosition } = require('../../app/assets/js/communityscroll')
+const {
+    ResourcePackCommunityPreview,
+    normalizeSubjects,
+    pokemonAnimationResources,
+    pokemonResources,
+    rendererGroup,
+    subjectKey
+} = require('../../app/assets/js/communitypreviews/resource-pack')
 
 const gradientSource = {
     format: 'cobblepower_gradient', version: 1,
@@ -59,7 +76,7 @@ test('poser standing metadata selects idle while keyframed animations interpolat
         'animation.example.walk': { loop: true, animation_length: 2, bones: { body: { position: { 0: [0, 0, 0], 2: [2, 0, 0] } } } },
         'animation.example.ground_idle': { loop: true, bones: { body: { rotation: [0, 0, 'math.sin(q.anim_time*90)*5'] } } }
     } }])
-    const poser = { poses: { standing: { poseTypes: ['STAND'], isBattle: false, animations: ["q.bedrock('example', 'ground_idle')"] } } }
+    const poser = { poses: { standing: { poseTypes: ['STAND'], isBattle: false, animations: ['q.bedrock(\'example\', \'ground_idle\')'] } } }
     assert.equal(selectDefaultBedrockAnimation(animations, poser).id, 'ground_idle')
     assert.deepEqual(selectableBedrockAnimations([
         ...animations,
@@ -70,6 +87,65 @@ test('poser standing metadata selects idle while keyframed animations interpolat
     ], poser).map(animation => animation.id), ['ground_idle', 'walk'])
     const walk = animations.find(animation => animation.id === 'walk')
     assert.deepEqual(walk.sample(1).bones.body.position, [1, 0, 0])
+})
+
+test('Bedrock animation groups prevent sibling Pokemon forms from overwriting each other', () => {
+    const animations = compileBedrockAnimations([
+        { animations: {
+            'animation.zygarde.battle_idle': { loop: true, bones: { body: { position: [1, 0, 0] } } },
+            'animation.zygarde.ground_walk': { loop: true, bones: { body: { rotation: [1, 0, 0] } } }
+        } },
+        { animations: {
+            'animation.zygarde_complete.pose': { bones: { leg: { rotation: [20, 0, 0] } } },
+            'animation.zygarde_complete.battle_idle': { loop: true, bones: { leg: { rotation: [2.5, 0, 0] } } },
+            'animation.zygarde_complete.ground_walk': { loop: true, bones: { leg: { rotation: [7, 0, 0] } } }
+        } },
+        { animations: {
+            'animation.zygarde_tenpercent.battle_idle': { loop: true, bones: { neck: { rotation: [45, 0, 0] } } }
+        } }
+    ])
+    const poser = { poses: { standing: {
+        poseTypes: ['STAND'],
+        animations: ['q.bedrock(\'zygarde_complete\', \'battle_idle\')']
+    } } }
+    assert.deepEqual(poserAnimationReferences(poser), [{ group: 'zygarde_complete', id: 'battle_idle' }])
+    assert.equal(animations.filter(animation => animation.id === 'battle_idle').length, 3)
+    const selected = selectableBedrockAnimations(animations, poser)
+    assert.deepEqual(selected.map(animation => `${animation.group}:${animation.id}`), [
+        'zygarde_complete:battle_idle',
+        'zygarde_complete:ground_walk'
+    ])
+    assert.deepEqual(selectDefaultBedrockAnimation(selected, poser).sample(0).bones, {
+        leg: { rotation: [2.5, 0, 0] }
+    })
+})
+
+test('supplemental Pokemon animations layer over the active base pose without resetting untouched bones', () => {
+    const basePose = { bones: {
+        tail: { rotation: [-37.5, 0, 0], position: [0, 1, 0], scale: [1, 1, 1] },
+        head: { rotation: [0, 5, 0] }
+    } }
+    const cryPose = { bones: {
+        head: { rotation: [10, 0, 0], position: [0, 0, -1], scale: [1, 1.1, 1] },
+        jaw: { rotation: [25, 0, 0] }
+    } }
+    assert.deepEqual(composeBedrockPoses(basePose, cryPose), { bones: {
+        tail: { rotation: [-37.5, 0, 0], position: [0, 1, 0], scale: [1, 1, 1] },
+        head: { rotation: [10, 5, 0], position: [0, 0, -1], scale: [1, 1.1, 1] },
+        jaw: { rotation: [25, 0, 0] }
+    } })
+    const baseAnimation = { id: 'ground_idle', sample: () => basePose }
+    const cryAnimation = { id: 'cry', sample: () => cryPose }
+    const preview = {
+        animation: cryAnimation,
+        baseAnimation,
+        primaryAnimationIds: new Set(['ground_idle', 'ground_walk']),
+        resources: { pose: null },
+        isLayeredAnimation: AnimatedPokemonPreview.prototype.isLayeredAnimation
+    }
+    assert.deepEqual(AnimatedPokemonPreview.prototype.samplePose.call(preview, .5), composeBedrockPoses(basePose, cryPose))
+    preview.animation = baseAnimation
+    assert.deepEqual(AnimatedPokemonPreview.prototype.samplePose.call(preview, .5), basePose)
 })
 
 test('Bedrock animation composition matches Cobblemon ModelPart axes for Dialga-like legs', () => {
@@ -339,6 +415,41 @@ test('Community model controls use the same orbit direction, sensitivity, and pi
     assert.ok(Math.abs(eye[2] + 4) < 1e-12)
 })
 
+test('Community model zoom limits scale from the fitted model instead of a fixed global ceiling', () => {
+    assert.deepEqual(cameraDistanceLimits(2.5), { minimum: 0.75, maximum: 12 })
+    assert.deepEqual(cameraDistanceLimits(40), { minimum: 6, maximum: 160 })
+    assert.equal(clampCameraDistance(400, 40), 160)
+    assert.equal(clampCameraDistance(80, 40), 80)
+    assert.equal(clampCameraDistance(1, 40), 6)
+    assert.deepEqual(cameraDistanceLimits(Number.POSITIVE_INFINITY), { minimum: 0.75, maximum: 12 })
+    assert.equal(clampCameraDistance(Number.NaN, 40), 40)
+    assert.ok(cameraDistanceLimits(40).maximum >= 40)
+})
+
+test('Community resource lists retain their viewport while selection state changes', () => {
+    const scrollContainer = { scrollTop: 384, scrollLeft: 12 }
+    const restore = captureScrollPosition(scrollContainer)
+    scrollContainer.scrollTop = 0
+    scrollContainer.scrollLeft = 0
+    restore()
+    assert.deepEqual(scrollContainer, { scrollTop: 384, scrollLeft: 12 })
+
+    const buttons = [
+        { dataset: { subjectKey: 'block:minecraft:copper_block' }, setAttribute(name, value) { this[name] = value } },
+        { dataset: { subjectKey: 'pokemon:cobblemon:pikachu::MALE' }, setAttribute(name, value) { this[name] = value } }
+    ]
+    const preview = Object.create(ResourcePackCommunityPreview.prototype)
+    preview.subjects = [
+        { kind: 'block', id: 'minecraft:copper_block' },
+        { kind: 'pokemon', species: 'cobblemon:pikachu', gender: 'MALE' }
+    ]
+    preview.subjectIndex = 1
+    preview.resourceList = { querySelectorAll: () => buttons }
+    preview.updateResourceSelection()
+    assert.equal(buttons[0]['aria-selected'], 'false')
+    assert.equal(buttons[1]['aria-selected'], 'true')
+})
+
 test('Resource Pack preview resources combine the complete candidate list with selected showcases deterministically', () => {
     const subjects = normalizeSubjects([
         { kind: 'pokemon', species: 'cobblemon:pikachu', form: '', gender: 'MALE' },
@@ -355,6 +466,112 @@ test('Resource Pack preview resources combine the complete candidate list with s
         'block:minecraft:cut_copper',
         'pokemon:cobblemon:pikachu::MALE'
     ])
+})
+
+test('Resource Pack preview groups shiny variants beneath one form subject', () => {
+    const subjects = normalizeSubjects([
+        { kind: 'pokemon', species: 'cobblemon:darumaka', aspects: ['galarian'], variantLabel: 'Galarian', gender: 'MALE' },
+        { kind: 'pokemon', species: 'cobblemon:darumaka', aspects: ['galarian', 'shiny'], shiny: true, gender: 'MALE' }
+    ], { subjects: [] })
+    assert.equal(subjects.length, 1)
+    assert.deepEqual(subjects[0].aspects, ['galarian'])
+    assert.equal(subjects[0].shiny, true)
+    assert.equal(subjectKey(subjects[0]), 'pokemon:cobblemon:darumaka:galarian:MALE')
+})
+
+test('Resource Pack Pokemon previews resolve shiny textures without changing the form identity', async () => {
+    const resolverPath = 'assets/cobblemon/bedrock/pokemon/resolvers/eevee/eevee.json'
+    const geometryPath = 'assets/cobblemon/bedrock/pokemon/models/eevee/eevee.geo.json'
+    const normalTexture = 'assets/cobblemon/textures/pokemon/eevee/eevee.png'
+    const shinyTexture = 'assets/cobblemon/textures/pokemon/eevee/eevee_shiny.png'
+    const documents = new Map([
+        [resolverPath, { species: 'cobblemon:eevee', variations: [
+            { model: 'cobblemon:eevee.geo', texture: 'cobblemon:textures/pokemon/eevee/eevee.png' },
+            { aspects: ['shiny'], texture: 'cobblemon:textures/pokemon/eevee/eevee_shiny.png' }
+        ] }],
+        [geometryPath, { format_version: '1.12.0', 'minecraft:geometry': [] }]
+    ])
+    const stack = {
+        async list(prefix) { return [...documents.keys()].filter(value => value.startsWith(prefix)) },
+        async getJson(filePath) { return documents.get(filePath) || null },
+        async getBuffer(filePath) {
+            if(filePath === normalTexture) return Buffer.from('normal')
+            if(filePath === shinyTexture) return Buffer.from('shiny')
+            return null
+        }
+    }
+    const normal = await pokemonResources({ species: 'cobblemon:eevee', aspects: [], gender: 'MALE' }, stack)
+    const shiny = await pokemonResources({ species: 'cobblemon:eevee', aspects: ['shiny'], gender: 'MALE' }, stack)
+    assert.equal(normal.texture.toString(), 'normal')
+    assert.equal(shiny.texture.toString(), 'shiny')
+    assert.equal(normal.variation.model, shiny.variation.model)
+    assert.equal(normal.shinyAvailable, true)
+})
+
+test('Resource Pack Pokemon previews resolve custom namespaces and species-level animation folders', async () => {
+    const resolverPath = 'assets/cobblemon_reanimodel/bedrock/pokemon/resolvers/0_barbaracle_base.json'
+    const poserPath = 'assets/cobblemon_reanimodel/bedrock/pokemon/posers/barbaracle_preview.json'
+    const animationPath = 'assets/cobblemon_reanimodel/bedrock/pokemon/animations/barbaracle/barbaracle.animation.json'
+    const geometryPath = 'assets/cobblemon_reanimodel/bedrock/pokemon/models/barbaracle/barbaracle.geo.json'
+    const texturePath = 'assets/cobblemon_reanimodel/textures/pokemon/barbaracle/barbaracle.png'
+    const documents = new Map([
+        [resolverPath, {
+            species: 'cobblemon:barbaracle',
+            variations: [{
+                model: 'cobblemon_reanimodel:barbaracle.geo',
+                poser: 'cobblemon_reanimodel:barbaracle_preview',
+                texture: 'cobblemon_reanimodel:textures/pokemon/barbaracle/barbaracle.png'
+            }]
+        }],
+        [poserPath, { poses: { standing: { poseTypes: ['STAND'], animations: ['q.bedrock(\'barbaracle\', \'ground_idle\')'] } } }],
+        [animationPath, { animations: { 'animation.barbaracle.ground_idle': { loop: true, bones: {} } } }],
+        [geometryPath, { format_version: '1.12.0', 'minecraft:geometry': [] }]
+    ])
+    const stack = {
+        async list(prefix) {
+            return [...documents.keys()].filter(value => value.startsWith(prefix))
+        },
+        async getJson(filePath) { return documents.get(filePath) || null },
+        async getBuffer(filePath) { return filePath === texturePath ? Buffer.from('png') : null }
+    }
+    const result = await pokemonResources({
+        species: 'cobblemon:barbaracle', form: '', gender: 'MALE', resourceNamespace: 'cobblemon_reanimodel'
+    }, stack)
+    assert.equal(result.variation.model, 'cobblemon_reanimodel:barbaracle.geo')
+    assert.deepEqual(result.animations.map(value => value.id), ['ground_idle'])
+    assert.deepEqual(result.animations.map(value => value.group), ['barbaracle'])
+    const animationResources = await pokemonAnimationResources(stack, result.variation, resolverPath, 'cobblemon:barbaracle')
+    assert.equal(animationResources.documents.length, 1)
+})
+
+test('Resource Pack Pokemon previews preserve base resolver provenance beneath partial poser overlays', async () => {
+    const baseResolver = 'assets/cobblemon/bedrock/pokemon/resolvers/0306_aggron/0_aggron_base.json'
+    const overlayResolver = 'assets/cobblemon_reanimodel/bedrock/pokemon/resolvers/0_aggron_base.json'
+    const poserPath = 'assets/cobblemon_reanimodel/bedrock/pokemon/posers/aggron.json'
+    const animationPath = 'assets/cobblemon/bedrock/pokemon/animations/0306_aggron/aggron.animation.json'
+    const geometryPath = 'assets/cobblemon/bedrock/pokemon/models/0306_aggron/aggron.geo.json'
+    const texturePath = 'assets/cobblemon/textures/pokemon/0306_aggron/aggron.png'
+    const documents = new Map([
+        [baseResolver, { species: 'cobblemon:aggron', order: 0, variations: [{
+            model: 'cobblemon:aggron.geo', poser: 'cobblemon:aggron', texture: 'cobblemon:textures/pokemon/0306_aggron/aggron.png'
+        }] }],
+        [overlayResolver, { species: 'cobblemon:aggron', order: 0, variations: [{ poser: 'cobblemon_reanimodel:aggron' }] }],
+        [poserPath, { poses: { standing: { poseTypes: ['STAND'], animations: ['q.bedrock(\'aggron\', \'ground_idle\')'] } } }],
+        [animationPath, { animations: { 'animation.aggron.ground_idle': { loop: true, bones: {} } } }],
+        [geometryPath, { format_version: '1.12.0', 'minecraft:geometry': [] }]
+    ])
+    const stack = {
+        async list(prefix) { return [...documents.keys()].filter(value => value.startsWith(prefix)) },
+        async getJson(filePath) { return documents.get(filePath) || null },
+        async getBuffer(filePath) { return filePath === texturePath ? Buffer.from('png') : null }
+    }
+    const result = await pokemonResources({
+        species: 'cobblemon:aggron', form: '', gender: 'MALE', resourceNamespace: 'cobblemon_reanimodel'
+    }, stack)
+    assert.equal(result.variation.modelSourcePath, baseResolver)
+    assert.equal(result.variation.poserSourcePath, overlayResolver)
+    assert.deepEqual(result.animations.map(value => value.id), ['ground_idle'])
+    assert.deepEqual(result.animations.map(value => value.group), ['aggron'])
 })
 
 test('Resource Pack comparison groups forward camera lifecycle calls to both renderers', () => {
@@ -403,5 +620,9 @@ test('Community artifact cache verifies checksums, repairs corruption, and evict
     assert.deepEqual(cache.get(digest, bytes.length), bytes)
     fs.writeFileSync(filePath, 'corrupt')
     assert.equal(cache.get(digest, bytes.length), null)
+    const sourcePath = path.join(directory, 'streaming-source.zip')
+    fs.writeFileSync(sourcePath, bytes)
+    assert.equal(cache.putFile(digest, sourcePath, { sizeBytes: bytes.length }), cache.objectPath(digest))
+    assert.equal(cache.getPath(digest, bytes.length), cache.objectPath(digest))
     assert.throws(() => cache.put('0'.repeat(64), bytes), error => error.code === 'community_checksum_mismatch')
 })

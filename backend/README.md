@@ -101,6 +101,8 @@ The backend validates against the committed Cobble Power 1.0.4 contract matrix i
 
 `COMMUNITY_RICH_PREVIEWS_ENABLED=true` enables immutable Resource Pack render overlays and the signed preview-assets API after the `community_revision_assets` migration has run. Keep it disabled until Cobble Power 1.0.4 and AG Launcher 2.5.0 are deployed and their contract and render-registry hashes have passed release promotion.
 
+`COMMUNITY_PACK_STUDIO_ENABLED=true` enables opted-in Resource Pack component search, resolution, and owner grant management after `2026-08-14_resource_pack_studio.sql` has run and existing revisions have been indexed with `npm run community:pack-studio:index`. Set the same flag on the release-only service so authorized distributions advertise Pack Studio, while leaving `COMMUNITY_ENABLED=false` and Community storage credentials unset there. Resolution defaults to 120 requests per IP per hour through `COMMUNITY_COMPOSER_RESOLVES_PER_HOUR`.
+
 Use `COMMUNITY_STORAGE_*` for the shared Community bucket. During migration, omitted values fall back one-for-one to `SCHEMATICS_STORAGE_*`. Signed upload and download URLs expire after 15 minutes. Resource Pack ZIPs are streamed through bounded temporary files and are never expanded into memory.
 
 Generic endpoints are:

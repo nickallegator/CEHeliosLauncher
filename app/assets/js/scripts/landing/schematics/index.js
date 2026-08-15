@@ -1,7 +1,7 @@
 function initSchematics(){
     if(!schematicsRouteListenerBound){
         window.addEventListener('helios:shell-route-change', (event) => {
-            if(event.detail?.route !== 'community'){
+            if(!String(event.detail?.route || '').startsWith('community')){
                 if(schematicsScroll) schematicsState.scrollTop = schematicsScroll.scrollTop
                 cancelSchematicsRouteWork()
             } else if(schematicsScroll){
@@ -120,6 +120,7 @@ function initSchematics(){
     }
     setCommunitySection('content', { skipFetch: true })
     if(typeof initGenericCommunityContent === 'function') initGenericCommunityContent()
+    if(typeof initPackStudio === 'function') initPackStudio().catch(error => loggerLanding.warn('Pack Studio initialization failed.', error))
     setCommunityCategory(schematicsState.category || 'all', { skipFetch: true })
     communityCategoryFilters?.addEventListener('click', (event) => {
         const button = event.target.closest('[data-community-category]')

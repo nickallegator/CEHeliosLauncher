@@ -3,6 +3,7 @@
 const SHELL_ROUTES = Object.freeze({
     home: 'home',
     community: 'community',
+    packStudio: 'community/pack-studio',
     schematics: 'community',
     news: 'news',
     settings: 'settings'
@@ -39,7 +40,7 @@ function applyLandingRoute(route){
     landing.dataset.shellRoute = route
     setHidden(home, route !== SHELL_ROUTES.home)
     setHidden(news, route !== SHELL_ROUTES.news)
-    setHidden(schematics, route !== SHELL_ROUTES.community)
+    setHidden(schematics, !route.startsWith('community'))
     setShellNavigationState(route)
     shellRoute = route
     window.dispatchEvent(new CustomEvent('helios:shell-route-change', { detail: { route } }))
@@ -63,10 +64,10 @@ async function navigateShellRoute(route){
         return
     }
 
-    if(next === SHELL_ROUTES.community){
+    if(next.startsWith('community')){
         if(newsActive) document.getElementById('newsButton')?.click()
         if(!schematicsActive) document.getElementById('schematicsButton')?.click()
-        else applyLandingRoute(SHELL_ROUTES.community)
+        applyLandingRoute(next)
         return
     }
 

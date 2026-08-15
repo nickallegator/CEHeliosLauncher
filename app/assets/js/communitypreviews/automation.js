@@ -2,6 +2,7 @@
 
 /* global document */
 
+const { loadWorkspaceLibrary } = require('../workspacelibrary')
 const {
     GraphSpatialIndex,
     fitGraph,
@@ -9,7 +10,7 @@ const {
     renderGraphCanvas,
     screenToWorld,
     zoomAt
-} = require('../../../../libraries/community-rendering')
+} = loadWorkspaceLibrary('community-rendering')
 
 class AutomationCommunityPreview {
     constructor(options) {

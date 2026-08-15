@@ -101,10 +101,12 @@ const config = {
     community: {
         enabled: parseBoolean(getEnv('COMMUNITY_ENABLED', getEnv('SCHEMATICS_ENABLED', 'false'))),
         richPreviewsEnabled: parseBoolean(getEnv('COMMUNITY_RICH_PREVIEWS_ENABLED', 'false')),
+        packStudioEnabled: parseBoolean(getEnv('COMMUNITY_PACK_STUDIO_ENABLED', 'false')),
         publicApiUrl: getEnv('COMMUNITY_PUBLIC_API_URL', getEnv('SCHEMATICS_PUBLIC_API_URL', null)),
         writeMode: getEnv('COMMUNITY_WRITE_MODE', getEnv('SCHEMATICS_WRITE_MODE', 'admin')).trim().toLowerCase(),
         uploadRateLimit: parseNumber(getEnv('COMMUNITY_UPLOADS_PER_HOUR', '10'), 10),
         reportRateLimit: parseNumber(getEnv('COMMUNITY_REPORTS_PER_DAY', '10'), 10),
+        composerRateLimit: parseNumber(getEnv('COMMUNITY_COMPOSER_RESOLVES_PER_HOUR', '120'), 120),
         types: {
             automation: parseBoolean(getEnv('COMMUNITY_AUTOMATION_ENABLED', 'false')),
             'battle-trainers': parseBoolean(getEnv('COMMUNITY_BATTLE_TRAINERS_ENABLED', 'false')),

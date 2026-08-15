@@ -1,8 +1,14 @@
 'use strict'
 
-/* global document, performance, requestAnimationFrame, cancelAnimationFrame, window */
+/* global document, requestAnimationFrame, cancelAnimationFrame, window */
 
-const { parseBedrockGeometry, selectDefaultBedrockAnimation } = require('../../../../libraries/community-rendering')
+const { loadWorkspaceLibrary } = require('../workspacelibrary')
+const {
+    composeBedrockPoses,
+    parseBedrockGeometry,
+    poserAnimationIds,
+    selectDefaultBedrockAnimation
+} = loadWorkspaceLibrary('community-rendering')
 const { CommunityModelViewer } = require('./model-viewer')
 
 const FRAME_INTERVAL_MS = 1000 / 15
@@ -12,7 +18,9 @@ class AnimatedPokemonPreview {
         this.canvas = canvas
         this.resources = resources
         this.animations = resources.animations || []
-        this.animation = selectDefaultBedrockAnimation(this.animations, resources.poser)
+        this.baseAnimation = selectDefaultBedrockAnimation(this.animations, resources.poser)
+        this.animation = this.baseAnimation
+        this.primaryAnimationIds = new Set(poserAnimationIds(resources.poser).map(value => value.toLowerCase()))
         this.playing = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
         this.destroyed = false
         this.frameHandle = null
@@ -29,7 +37,7 @@ class AnimatedPokemonPreview {
     }
 
     async initialize() {
-        const pose = this.animation?.sample(0) || this.resources.pose || null
+        const pose = this.samplePose(0)
         const mesh = parseBedrockGeometry(this.resources.geometry, { pose, hiddenBones: this.resources.hiddenBones })
         this.normalization = mesh.normalization
         await this.viewer.setModel(mesh, this.resources.texture)
@@ -44,6 +52,9 @@ class AnimatedPokemonPreview {
 
     getAnimationId() { return this.animation?.id || '' }
     isPlaying() { return this.playing }
+    isLayeredAnimation() {
+        return Boolean(this.animation && this.animation !== this.baseAnimation && !this.primaryAnimationIds.has(this.animation.id.toLowerCase()))
+    }
 
     setAnimation(id) {
         const next = this.animations.find(animation => animation.id === id)
@@ -65,15 +76,54 @@ class AnimatedPokemonPreview {
         this.updateDataset()
     }
 
+    supportsShiny() { return this.resources.shinyAvailable === true }
+    appearanceStructureKey(resources = this.resources) {
+        const variation = resources?.variation || {}
+        const animations = (resources?.animations || []).map(value => `${value.group || ''}:${value.id || ''}`).sort()
+        return JSON.stringify([variation.model || '', variation.poser || '', variation.layers || null, animations])
+    }
+    canUpdateAppearance(resources) { return this.appearanceStructureKey(resources) === this.appearanceStructureKey() }
+    async updateAppearance(resources) {
+        if(!this.canUpdateAppearance(resources)) return false
+        const updated = await this.viewer.setTexture(resources.texture)
+        if(updated === false) return false
+        if(this.destroyed) return false
+        this.resources = { ...this.resources, ...resources }
+        this.updateDataset()
+        return true
+    }
+    getState() {
+        return {
+            animationId: this.getAnimationId(),
+            playing: this.playing,
+            camera: this.viewer.getCamera?.() || null
+        }
+    }
+    setState(state) {
+        if(!state) return
+        if(state.animationId) this.setAnimation(state.animationId)
+        this.setPlaying(state.playing)
+        this.viewer.setCamera?.(state.camera)
+    }
+
     updateDataset() {
         this.canvas.dataset.animationId = this.getAnimationId()
         this.canvas.dataset.animationPlaying = String(this.playing)
+        this.canvas.dataset.animationLayered = String(this.isLayeredAnimation())
         this.canvas.dataset.animationFrame = String(this.frameCount)
+    }
+
+    samplePose(timeSeconds) {
+        const selected = this.animation?.sample(timeSeconds) || null
+        if(!selected) return this.resources.pose || null
+        if(!this.isLayeredAnimation()) return selected
+        const base = this.baseAnimation?.sample(timeSeconds) || this.resources.pose || null
+        return composeBedrockPoses(base, selected)
     }
 
     updateFrame(timeSeconds) {
         if(this.destroyed || !this.animation) return
-        const pose = this.animation.sample(timeSeconds)
+        const pose = this.samplePose(timeSeconds)
         const mesh = parseBedrockGeometry(this.resources.geometry, {
             pose,
             hiddenBones: this.resources.hiddenBones,

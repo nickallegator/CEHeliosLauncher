@@ -28,6 +28,13 @@ const { compatibilityManifest, createDefaultCommunityTypeRegistry } = require('.
 const sessions = require('../services/sessions')
 const store = require('../services/store')
 const { createCommunityCatalog } = require('../services/communityCatalog')
+const {
+    describeCompositionUpdates,
+    listComponents,
+    loadSourcesForSelections,
+    persistCompositionIndex,
+    resolveComposition
+} = require('../services/communityPackStudio')
 
 const router = express.Router()
 const typeRegistry = createDefaultCommunityTypeRegistry()
@@ -123,6 +130,10 @@ function cleanMetadata(body = {}) {
     if(body.rightsAttested !== true) {
         throw new CommunityValidationError('rights_attestation_required', 'You must attest that you have the right to distribute this content.')
     }
+    const packStudioOptIn = body.packStudioOptIn === true
+    if(packStudioOptIn && body.packStudioTermsAccepted !== true) {
+        throw new CommunityValidationError('pack_studio_terms_required', 'Accept the Pack Studio composition grant before opting in.')
+    }
     return {
         title,
         description: cleanText(body.description, 2000),
@@ -133,6 +144,8 @@ function cleanMetadata(body = {}) {
         compatibility: normalizeCompatibility(body.compatibility, {
             allowedRanges: [compatibilityManifest.compatibility]
         }),
+        packStudioOptIn,
+        packStudioTermsAccepted: packStudioOptIn,
         ...(body.showcase == null ? {} : { showcase: cleanShowcase(body.showcase) })
     }
 }
@@ -288,7 +301,16 @@ router.get('/community/capabilities', (_req, res) => {
     res.set('Cache-Control', 'public, max-age=300')
     res.json({
         ...catalog.capabilities(),
-        features: { richPreviews: config.community.richPreviewsEnabled === true },
+        features: {
+            richPreviews: config.community.richPreviewsEnabled === true,
+            packStudio: config.community.packStudioEnabled === true
+        },
+        composer: config.community.packStudioEnabled ? {
+            schemaVersion: 1,
+            componentKinds: ['block','pokemon','item','sound','font','language','ui','texture','generic'],
+            maxSelections: 512,
+            grantTermsUrl: '/v1/community/licenses/AG-Pack-Studio-Composition-Grant-1.0'
+        } : null,
         licenses: config.community.allowedLicenses.map(id => ({ id, url: `/v1/community/licenses/${encodeURIComponent(id)}` }))
     })
 })
@@ -324,17 +346,149 @@ router.get('/community/catalog', asyncRoute(async (req, res) => {
     res.json(result)
 }))
 
+router.get('/community/composer/components', asyncRoute(async (req, res) => {
+    if(!config.community.packStudioEnabled) {
+        res.status(404).json({ error: 'pack_studio_disabled' })
+        return
+    }
+    const result = await listComponents(db, req.query)
+    res.set('Cache-Control', 'public, max-age=60, stale-if-error=86400')
+    res.json(result)
+}))
+
+router.post('/community/composer/resolve', asyncRoute(async (req, res) => {
+    if(!config.community.packStudioEnabled) {
+        res.status(404).json({ error: 'pack_studio_disabled' })
+        return
+    }
+    if(!await consumeLimit(res, {
+        subject: `ip:${req.ip}`,
+        action: 'pack-studio-resolve',
+        limit: config.community.composerRateLimit,
+        windowMs: 60 * 60 * 1000
+    })) return
+    const selections = Array.isArray(req.body?.selections) ? req.body.selections.map(value => ({
+        sourceItemId: cleanText(value?.sourceItemId, 80).toLowerCase(),
+        sourceRevisionId: cleanText(value?.sourceRevisionId, 80).toLowerCase(),
+        componentKey: cleanText(value?.componentKey, 320).toLowerCase()
+    })) : []
+    const resolutions = req.body?.conflictResolutions && typeof req.body.conflictResolutions === 'object' && !Array.isArray(req.body.conflictResolutions)
+        ? Object.fromEntries(Object.entries(req.body.conflictResolutions).slice(0, 1024).map(([key, value]) => [cleanText(key, 600), cleanText(value, 700)]))
+        : {}
+    const sources = await loadSourcesForSelections(db, selections)
+    for(const selection of selections) {
+        const source = sources.find(value => String(value.revisionId) === selection.sourceRevisionId)
+        if(!source || String(source.itemId) !== selection.sourceItemId) {
+            throw new CommunityValidationError('composition_source_mismatch', 'A Pack Studio selection does not match its source item.')
+        }
+    }
+    const plan = resolveComposition(sources, selections, resolutions)
+    const updates = await describeCompositionUpdates(db, sources, selections)
+    const storage = getCommunityObjectStorage()
+    const descriptors = await Promise.all(sources.map(async source => ({
+        itemId: source.itemId,
+        revisionId: source.revisionId,
+        title: source.title,
+        creator: source.creator,
+        license: source.license,
+        sha256: source.sha256,
+        sizeBytes: source.sizeBytes,
+        compatibility: source.compatibility,
+        updateAvailable: source.currentRevisionId != null && source.currentRevisionId !== source.revisionId,
+        update: updates.get(String(source.revisionId)) || null,
+        downloadUrl: await storage.signGet(source.objectKey, 900)
+    })))
+    res.set('Cache-Control', 'private, no-store')
+    res.json({
+        schemaVersion: 1,
+        expiresAt: new Date(Date.now() + 900_000).toISOString(),
+        sources: descriptors,
+        plan
+    })
+}))
+
+router.get('/community/items/resource-packs/:id/revisions/:revisionId/composition', asyncRoute(async (req, res) => {
+    if(!config.community.packStudioEnabled) {
+        res.status(404).json({ error: 'pack_studio_disabled' })
+        return
+    }
+    const itemId = parseUuid(req.params.id)
+    const revisionId = parseUuid(req.params.revisionId, 'revisionId')
+    const result = await db.query(
+        `select g.enabled,g.terms_version,g.granted_at,g.revoked_at,
+                (select count(*) from community_resource_components c where c.revision_id=r.id) as component_count
+         from community_revisions r left join community_resource_pack_composition_grants g on g.revision_id=r.id
+         where r.id=$1 and r.item_id=$2`,
+        [revisionId, itemId]
+    )
+    if(!result.rows.length) {
+        res.status(404).json({ error: 'community_revision_not_found' })
+        return
+    }
+    const row = result.rows[0]
+    res.set('Cache-Control', 'private, no-store')
+    res.json({ schemaVersion: 1, enabled: row.enabled === true, termsVersion: Number(row.terms_version || 1), componentCount: Number(row.component_count), grantedAt: row.granted_at, revokedAt: row.revoked_at })
+}))
+
+router.put('/community/items/resource-packs/:id/revisions/:revisionId/composition', requireSession, asyncRoute(async (req, res) => {
+    if(!config.community.packStudioEnabled) {
+        res.status(404).json({ error: 'pack_studio_disabled' })
+        return
+    }
+    const itemId = parseUuid(req.params.id)
+    const revisionId = parseUuid(req.params.revisionId, 'revisionId')
+    const row = await getItem(TYPES.RESOURCE_PACKS, itemId, { includeInactive: true })
+    const admin = await userIsAdmin(req.userId)
+    if(!row) {
+        res.status(404).json({ error: 'community_item_not_found' })
+        return
+    }
+    if(Number(row.owner_id) !== Number(req.userId) && !admin) {
+        res.status(403).json({ error: 'not_owner' })
+        return
+    }
+    if(req.body?.enabled === true && req.body?.termsAccepted !== true) {
+        throw new CommunityValidationError('pack_studio_terms_required', 'Accept the Pack Studio composition grant before opting in.')
+    }
+    const revision = await db.query('select id from community_revisions where id=$1 and item_id=$2', [revisionId, itemId])
+    if(!revision.rows.length) {
+        res.status(404).json({ error: 'community_revision_not_found' })
+        return
+    }
+    const indexed = await db.query('select count(*) as count from community_resource_components where revision_id=$1', [revisionId])
+    if(req.body?.enabled === true && Number(indexed.rows[0].count) < 1) {
+        res.status(409).json({ error: 'composition_index_missing' })
+        return
+    }
+    const enabled = req.body?.enabled === true
+    await db.query(
+        `insert into community_resource_pack_composition_grants
+         (revision_id,item_id,enabled,terms_version,granted_by,granted_at,revoked_at,updated_at)
+         values ($1,$2,$3,1,$4,case when $3 then now() else null end,case when $3 then null else now() end,now())
+         on conflict (revision_id) do update set enabled=excluded.enabled,terms_version=1,granted_by=$4,
+           granted_at=case when excluded.enabled then now() else community_resource_pack_composition_grants.granted_at end,
+           revoked_at=case when excluded.enabled then null else now() end,updated_at=now()`,
+        [revisionId, itemId, enabled, req.userId]
+    )
+    audit(req, enabled ? 'pack_studio_grant_enabled' : 'pack_studio_grant_revoked', { itemId, revisionId })
+    res.set('Cache-Control', 'private, no-store')
+    res.json({ schemaVersion: 1, enabled, termsVersion: 1, componentCount: Number(indexed.rows[0].count) })
+}))
+
 router.get('/community/licenses/:id', (req, res) => {
     const licenseId = cleanText(req.params.id, 64)
-    if(!config.community.allowedLicenses.includes(licenseId)) {
+    const compositionGrant = licenseId === 'AG-Pack-Studio-Composition-Grant-1.0'
+    if(!compositionGrant && !config.community.allowedLicenses.includes(licenseId)) {
         res.status(404).json({ error: 'community_license_not_found' })
         return
     }
-    if(licenseId !== 'Community-Use-1.0') {
+    if(!compositionGrant && licenseId !== 'Community-Use-1.0') {
         res.redirect(302, `https://spdx.org/licenses/${encodeURIComponent(licenseId)}.html`)
         return
     }
-    const licensePath = path.resolve(__dirname, '..', '..', 'licenses', 'Community-Use-1.0.txt')
+    const licensePath = path.resolve(__dirname, '..', '..', 'licenses', compositionGrant
+        ? 'AG-Pack-Studio-Composition-Grant-1.0.txt'
+        : 'Community-Use-1.0.txt')
     res.set('Content-Type', 'text/plain; charset=utf-8')
     res.set('Cache-Control', 'public, max-age=86400')
     res.sendFile(licensePath)
@@ -430,7 +584,10 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
             throw new CommunityValidationError('invalid_artifact_size', `Artifact must be between 1 and ${handler.maxBytes} bytes.`)
         }
         await storage.getToFile(upload.artifact_pending_key, artifactPath, { maxBytes: handler.maxBytes })
-        const validated = await handler.validate({ filePath: artifactPath, options: { showcase: metadata.showcase } })
+        const validated = await handler.validate({
+            filePath: artifactPath,
+            options: { showcase: metadata.showcase, indexComponents: handler.id === TYPES.RESOURCE_PACKS }
+        })
         let previewBuffer = validated.previewBuffer || null
         if(upload.preview_pending_key) {
             const previewHead = await storage.head(upload.preview_pending_key)
@@ -550,6 +707,15 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
                              values ($1,$2,$3,$4,$5,$6,$7)`,
                             [revisionId, asset.role, asset.objectKey, asset.sha256, asset.sizeBytes, asset.mimeType, asset.metadata || {}]
                         )
+                    }
+                    if(handler.id === TYPES.RESOURCE_PACKS && validated.compositionIndex) {
+                        await persistCompositionIndex(client, {
+                            revisionId,
+                            itemId,
+                            ownerId: req.userId,
+                            index: validated.compositionIndex,
+                            enabled: config.community.packStudioEnabled && metadata.packStudioOptIn === true
+                        })
                     }
                     await client.query('update community_items set current_revision_id = $2, updated_at = now() where id = $1', [itemId, revisionId])
                 }

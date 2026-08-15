@@ -2,7 +2,8 @@
 
 /* global document */
 
-const { parseBedrockGeometry } = require('../../../../libraries/community-rendering')
+const { loadWorkspaceLibrary } = require('../workspacelibrary')
+const { parseBedrockGeometry } = loadWorkspaceLibrary('community-rendering')
 const { CommunityModelViewer } = require('./model-viewer')
 
 function splitId(value, fallbackNamespace = 'minecraft') {

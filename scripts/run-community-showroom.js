@@ -75,6 +75,20 @@ async function waitForText(locator, pattern, timeoutMs = 20_000) {
     throw new Error(`Timed out waiting for ${pattern}; received ${value || 'empty text'}.`)
 }
 
+async function waitForPackStudioCanvas(page, timeoutMs = 20_000) {
+    const canvas = page.locator('#communityPackStudioPreviewHost canvas')
+    const status = page.locator('#communityPackStudioPreviewHost .communityRichNote')
+    const deadline = Date.now() + timeoutMs
+    while(Date.now() < deadline) {
+        if(await canvas.isVisible().catch(() => false)) return canvas
+        if(await status.getAttribute('data-state').catch(() => null) === 'fallback') {
+            throw new Error(String(await status.textContent() || 'Pack Studio model preview failed.').trim())
+        }
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    throw new Error('Timed out waiting for the Pack Studio model preview canvas.')
+}
+
 async function closeOpenDetail(page, closeSelector, detailSelector) {
     // The custom Windows title bar can overlap the modal's visual close button
     // in automated, maximized windows. Use a clear point on the modal scrim so
@@ -125,7 +139,9 @@ async function verifyResponsiveDetailLayout(application, page, width, height) {
         page.locator('html').boundingBox(), panel.boundingBox(), header.boundingBox(), footer.boundingBox(), media.boundingBox(), copy.boundingBox()
     ])
     if(!viewportBox || !panelBox || !headerBox || !footerBox || !mediaBox || !copyBox) throw new Error(`Unable to measure the ${width}x${height} Community dialog.`)
-    const epsilon = 2
+    // Windows content bounds can round by up to three CSS pixels while the
+    // custom frame transitions between display scales.
+    const epsilon = 4
     if(panelBox.x < -epsilon || panelBox.y < -epsilon || panelBox.x + panelBox.width > viewportBox.width + epsilon || panelBox.y + panelBox.height > viewportBox.height + epsilon) {
         throw new Error(`Community dialog exceeds the ${width}x${height} viewport (viewport ${JSON.stringify(viewportBox)}, panel ${JSON.stringify(panelBox)}).`)
     }
@@ -266,9 +282,18 @@ async function run(argv = process.argv.slice(2)) {
                             await waitForAttribute(page.locator('.communityPackStage canvas'), 'data-texture-source', 'resources')
                             await waitForAttribute(page.locator('.communityPackStage canvas'), 'data-camera-target', '0.5000,0.5000,0.5000')
                         }
+                        if(externalPack) {
+                            await search.fill('aggron')
+                            const aggronResource = page.locator('.communityPackResourceItem').first()
+                            if(await aggronResource.count() !== 1) throw new Error('Partial Aggron override is missing from the Resource Pack resource browser.')
+                            await waitForText(aggronResource.locator('.communityPackResourceScope'), /^Partial$/)
+                            await aggronResource.click()
+                            await page.locator('.communityPackStage canvas').waitFor({ state: 'visible', timeout: 20_000 })
+                        }
                         await search.fill(externalPack ? 'cosmog' : 'pikachu')
-                        if(await page.locator('.communityPackResourceItem').count() !== 1) throw new Error('Resource Pack resource search did not filter the list.')
-                        await page.locator('.communityPackResourceItem').click()
+                        const pokemonMatches = page.locator('.communityPackResourceItem')
+                        if(await pokemonMatches.count() < 1) throw new Error('Resource Pack resource search did not filter the list.')
+                        await pokemonMatches.first().click()
                         await waitForText(page.locator('.communityResourcePackView .communityRichNote'), /^Drag to rotate · wheel to zoom$/)
                         const pokemonCanvas = page.locator('.communityPackStage canvas')
                         await pokemonCanvas.waitFor({ state: 'visible', timeout: 10_000 })
@@ -302,6 +327,100 @@ async function run(argv = process.argv.slice(2)) {
                 }
                 console.log('Verified Trainer and Resource Pack interactive stages against local game resources.')
             }
+            await resetShowroomCatalog(page)
+            const studioButton = page.locator('#communityPackStudioOpen')
+            await studioButton.waitFor({ state: 'visible', timeout: 10_000 })
+            await studioButton.click()
+            const studio = page.locator('#communityPackStudio')
+            await studio.waitFor({ state: 'visible', timeout: 10_000 })
+            const blockComponent = page.locator('.communityPackStudioComponent[data-kind="block"]').first()
+            const resourcePackEntry = runtime.entries.find(entry => entry.type === 'resource-packs')
+            const hasBarbaracle = resourcePackEntry?.compositionIndex?.components?.some(component => component.key === 'pokemon:cobblemon:barbaracle')
+            const hasAggron = resourcePackEntry?.compositionIndex?.components?.some(component => component.key === 'pokemon:cobblemon:aggron')
+            if(runtime.showcasePackPath) {
+                const components = resourcePackEntry?.compositionIndex?.components || []
+                for(const species of ['darumaka', 'darmanitan', 'gliscor', 'unown', 'boltund']) {
+                    const component = components.find(value => value.key === `pokemon:cobblemon:${species}`)
+                    if(!component) throw new Error(`Hydro Pack Studio index is missing ${species}.`)
+                    if(['gliscor', 'unown', 'boltund'].includes(species) && component.metadata?.pokemonOverride?.scope !== 'partial') {
+                        throw new Error(`Hydro ${species} entry is not tagged as a partial PokÃ©mon override.`)
+                    }
+                }
+                for(const species of ['darumaka', 'darmanitan']) {
+                    const component = components.find(value => value.key === `pokemon:cobblemon:${species}`)
+                    if(!component.metadata?.pokemonVariants?.some(variant => variant.aspects?.includes('galarian'))) {
+                        throw new Error(`Hydro ${species} entry is missing its Galarian display variant.`)
+                    }
+                }
+            }
+            const studioSearch = page.locator('#communityPackStudioSearch')
+            if(hasBarbaracle) {
+                await studioSearch.fill('barbaracle')
+                await page.locator('.communityPackStudioComponent[data-kind="pokemon"]').first().waitFor({ state: 'visible', timeout: 10_000 })
+                await waitForText(page.locator('.communityPackStudioComponent[data-kind="pokemon"] strong').first(), /^Barbaracle$/)
+                await waitForText(page.locator('.communityPackStudioComponent[data-kind="pokemon"] .communityPackStudioScopeBadge').first(), /^Full Pokémon$/)
+            }
+            const primaryKind = hasBarbaracle ? 'pokemon' : await blockComponent.count() > 0 ? 'block' : 'pokemon'
+            const component = page.locator(`.communityPackStudioComponent[data-kind="${primaryKind}"]`).first()
+            await component.waitFor({ state: 'visible', timeout: 10_000 })
+            await component.click()
+            await waitForText(page.locator('#communityPackStudioSelectionCount'), /^1$/)
+            await waitForAttribute(page.locator('#communityPackStudioPreviewHost'), 'data-state', 'ready')
+            await waitForPackStudioCanvas(page)
+            if(primaryKind === 'block') await waitForAttribute(page.locator('#communityPackStudioPreviewHost canvas'), 'data-texture-source', 'resources')
+            if(hasBarbaracle) {
+                await waitForAttribute(page.locator('#communityPackStudioPreviewHost canvas'), 'data-animation-id', 'ground_idle')
+                if(hasAggron) {
+                    await studioSearch.fill('aggron')
+                    const aggron = page.locator('.communityPackStudioComponent[data-kind="pokemon"]').first()
+                    await aggron.waitFor({ state: 'visible', timeout: 10_000 })
+                    await waitForText(aggron.locator('strong'), /^Aggron$/)
+                    await waitForText(aggron.locator('.communityPackStudioScopeBadge'), /^Partial override$/)
+                    await aggron.click()
+                    await waitForText(page.locator('#communityPackStudioSelectionCount'), /^2$/)
+                    await waitForAttribute(page.locator('#communityPackStudioPreviewHost'), 'data-state', 'ready')
+                    const aggronCanvas = await waitForPackStudioCanvas(page)
+                    await waitForAttribute(aggronCanvas, 'data-animation-id', 'ground_idle')
+                    const animationSelect = page.locator('#communityPackStudioPreviewHost .communityPackAnimationTools select')
+                    await animationSelect.selectOption('cry')
+                    await waitForAttribute(aggronCanvas, 'data-animation-id', 'cry')
+                    await waitForAttribute(aggronCanvas, 'data-animation-layered', 'true')
+                    await animationSelect.selectOption('ground_idle')
+                    await waitForAttribute(aggronCanvas, 'data-animation-layered', 'false')
+                }
+                await studioSearch.fill('')
+                await waitForText(page.locator('#communityPackStudioStatus'), /^(?!1 composable resources found\.$)\d+ composable resources found\.$/)
+            }
+            const componentPreviewChecks = [
+                ['pokemon', 'canvas'],
+                ['item', '.communityPackStudioItemPreview'],
+                ['texture', '.communityPackStudioTexturePreview'],
+                ['ui', '.communityPackStudioTexturePreview'],
+                ['sound', '.communityPackStudioAudioPreview'],
+                ['language', '.communityPackStudioTranslationList'],
+                ['font', '.communityPackStudioFontPreview']
+            ]
+            for(const [kind, selector] of componentPreviewChecks) {
+                if(kind === primaryKind) continue
+                const result = page.locator(`.communityPackStudioComponent[data-kind="${kind}"]`).first()
+                if(await result.count() === 0) continue
+                await result.click()
+                await waitForAttribute(page.locator('#communityPackStudioPreviewHost'), 'data-state', 'ready')
+                await page.locator(`#communityPackStudioPreviewHost ${selector}`).waitFor({ state: 'visible', timeout: 20_000 })
+            }
+            await waitForText(page.locator('#communityPackStudioConflicts'), /^No unresolved conflicts\.$/)
+            await page.locator('#communityPackStudioInstall').click()
+            await waitForText(page.locator('#communityPackStudioStatus'), /installed, and enabled at highest priority\./, 30_000)
+            await page.locator('#communityPackStudioPreviewCombined').click()
+            await page.locator('#communityPackStudioPreviewHost .communityPackModeControl').waitFor({ state: 'visible', timeout: 30_000 })
+            await page.locator('#communityPackStudioPreviewHost .communityPackModeControl [data-mode="compare"]').click()
+            if(await page.locator('#communityPackStudioPreviewHost .communityPackComparisonPane').count() !== 2) throw new Error('Pack Studio combined comparison did not create separate Base and Pack views.')
+            const installedPacks = fs.readdirSync(path.join(runtime.instanceRoot, 'resourcepacks')).filter(name => /^ag-studio-[a-f0-9-]{36}\.zip$/i.test(name))
+            if(installedPacks.length !== 1) throw new Error('Pack Studio did not install exactly one deterministic project pack.')
+            if(rendererErrors.length > 0) throw new Error(`Renderer error during Pack Studio verification: ${rendererErrors[0]}`)
+            await page.locator('#communityPackStudioBack').click()
+            await studio.waitFor({ state: 'hidden', timeout: 10_000 })
+            console.log('Verified Pack Studio discovery, local projects, combined Base/Pack preview, deterministic build, and highest-priority installation.')
             for(const [width, height] of [[1600, 900], [1180, 680], [980, 600]]) {
                 await verifyResponsiveDetailLayout(application, page, width, height)
             }

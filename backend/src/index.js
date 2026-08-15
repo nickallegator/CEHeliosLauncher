@@ -76,6 +76,10 @@ app.get('/ready', async (_req, res) => {
             }
             await db.query('select 1 from community_revisions limit 1')
             if(config.community.richPreviewsEnabled) await db.query('select 1 from community_revision_assets limit 1')
+            if(config.community.packStudioEnabled) {
+                await db.query('select 1 from community_resource_components limit 1')
+                await db.query('select 1 from community_resource_pack_composition_grants limit 1')
+            }
             await getCommunityObjectStorage().ready()
             checks.community = 'ok'
         } catch(_err) {

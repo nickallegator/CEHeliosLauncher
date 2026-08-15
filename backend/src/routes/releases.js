@@ -29,7 +29,8 @@ function injectSchematicsService(distribution, schematicsConfig = config.schemat
             features: {
                 catalog: true,
                 publishing: communityConfig.writeMode !== 'disabled',
-                richPreviews: communityConfig.richPreviewsEnabled === true
+                richPreviews: communityConfig.richPreviewsEnabled === true,
+                packStudio: communityConfig.packStudioEnabled === true
             },
             supportedTypes: [
                 ...(schematicsConfig.enabled ? ['schematics'] : []),

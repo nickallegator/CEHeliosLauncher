@@ -5,6 +5,11 @@ const crypto = require('crypto')
 const yauzl = require('yauzl')
 const AdmZip = require('adm-zip')
 const { CommunityValidationError, FORMAT_CONTRACTS, TYPES } = require('@allegator-games/community-core')
+const {
+    indexResourcePackStreaming,
+    normalizePokemonAspects,
+    showcaseCandidatesFromComponents
+} = require('@allegator-games/resource-pack-studio')
 
 const MAX_COMPRESSED_BYTES = 100 * 1024 * 1024
 const MAX_EXPANDED_BYTES = 512 * 1024 * 1024
@@ -212,26 +217,6 @@ function parsePackMetadata(buffer) {
     }
 }
 
-function discoverShowcaseCandidate(info, payload) {
-    const blockstate = info.name.match(/^assets\/([^/]+)\/blockstates\/(.+)\.json$/i)
-    if(blockstate) {
-        return { kind: 'block', id: `${blockstate[1].toLowerCase()}:${blockstate[2].toLowerCase()}`, state: {}, sourcePath: info.name }
-    }
-    const resolver = info.name.match(/^assets\/([^/]+)\/bedrock\/pokemon\/resolvers\/(.+)\.json$/i)
-    if(!resolver || !payload) return null
-    try {
-        const document = JSON.parse(payload.toString('utf8'))
-        const variations = Array.isArray(document.variations) ? document.variations : []
-        if(!variations.some(variation => variation?.model) || !variations.some(variation => variation?.texture)) return null
-        const rawSpecies = String(document.species || resolver[2].split('/').at(-1) || '').toLowerCase()
-        const species = rawSpecies.includes(':') ? rawSpecies : `cobblemon:${rawSpecies}`
-        if(!RESOURCE_LOCATION.test(species)) return null
-        return { kind: 'pokemon', species, form: '', gender: 'MALE', resourceNamespace: resolver[1].toLowerCase(), sourcePath: info.name }
-    } catch(_error) {
-        return null
-    }
-}
-
 function normalizeShowcase(raw, candidates) {
     if(raw == null) return null
     if(Number(raw.schemaVersion) !== 1 || !Array.isArray(raw.subjects)) {
@@ -240,10 +225,10 @@ function normalizeShowcase(raw, candidates) {
     if(raw.subjects.length > MAX_SHOWCASE_SUBJECTS) {
         throw validationError('resource_pack_showcase_limit', `Select at most ${MAX_SHOWCASE_SUBJECTS} showcase subjects.`)
     }
-    const candidateMap = new Map(candidates.map(candidate => [
-        candidate.kind === 'block' ? `block:${candidate.id}` : `pokemon:${candidate.species}`,
-        candidate
-    ]))
+    const candidateKey = subject => subject.kind === 'block'
+        ? `block:${subject.id}`
+        : `pokemon:${subject.species}:${normalizePokemonAspects(subject.aspects?.length ? subject.aspects : [subject.form]).filter(value => value !== 'shiny').join('+') || 'default'}`
+    const candidateMap = new Map(candidates.map(candidate => [candidateKey(candidate), candidate]))
     let pokemonCount = 0
     const seen = new Set()
     const subjects = raw.subjects.map((subject, index) => {
@@ -263,16 +248,34 @@ function normalizeShowcase(raw, candidates) {
             if(pokemonCount > MAX_SHOWCASE_POKEMON) throw validationError('resource_pack_showcase_pokemon_limit', `Select at most ${MAX_SHOWCASE_POKEMON} Pokémon showcase subjects.`)
             const species = String(subject.species || '').toLowerCase()
             if(!RESOURCE_LOCATION.test(species)) throw validationError('invalid_showcase_subject', `Showcase Pokémon ${index + 1} has an invalid species.`)
-            const key = `pokemon:${species}`
+            const rawAspects = normalizePokemonAspects(subject.aspects?.length ? subject.aspects : [subject.form])
+            const shiny = subject.shiny === true || rawAspects.includes('shiny')
+            const requestedAspects = rawAspects.filter(value => value !== 'shiny')
+            const key = `pokemon:${species}:${requestedAspects.join('+') || 'default'}`
+            const speciesCandidates = candidates.filter(value => value.kind === 'pokemon' && value.species === species)
             const candidate = candidateMap.get(key)
+                || speciesCandidates.find(value => value.aspects?.length === 0)
+                || speciesCandidates[0]
+            if(shiny && candidate?.shinyVariant?.declared !== true) {
+                throw validationError('unsupported_shiny_showcase', `The selected shiny appearance is not declared by ${species}.`)
+            }
             if(!candidate) throw validationError('unmodified_showcase_subject', `Showcase Pokémon ${species} is not changed by this Resource Pack.`)
-            if(seen.has(key)) throw validationError('duplicate_showcase_subject', `Showcase subject ${species} is selected more than once.`)
-            seen.add(key)
-            const gender = String(subject.gender || 'MALE').toUpperCase()
+            const resolvedKey = candidateKey(candidate)
+            if(seen.has(resolvedKey)) throw validationError('duplicate_showcase_subject', `Showcase subject ${species} is selected more than once.`)
+            seen.add(resolvedKey)
+            const gender = String(subject.gender || candidate.gender || 'MALE').toUpperCase()
             if(!['MALE', 'FEMALE', 'GENDERLESS'].includes(gender)) throw validationError('invalid_showcase_subject', 'Showcase Pokémon gender is invalid.')
             return {
-                kind, species, form: String(subject.form || '').slice(0, 80).toLowerCase(), gender,
-                resourceNamespace: candidate.resourceNamespace || 'cobblemon', sourcePath: candidate.sourcePath
+                kind, species, form: String(candidate.form || subject.form || '').slice(0, 80).toLowerCase(), gender,
+                aspects: candidate.aspects || requestedAspects,
+                shiny,
+                shinyVariant: candidate.shinyVariant,
+                defaultShiny: candidate.defaultShiny === true,
+                resourceNamespace: candidate.resourceNamespace || 'cobblemon',
+                resourceNamespaces: candidate.resourceNamespaces || [candidate.resourceNamespace || 'cobblemon'],
+                pokemonOverride: candidate.pokemonOverride,
+                sourcePath: candidate.sourcePath,
+                sourcePaths: candidate.sourcePaths || [candidate.sourcePath]
             }
         }
         throw validationError('invalid_showcase_subject', `Showcase subject ${index + 1} has an unsupported kind.`)
@@ -329,7 +332,9 @@ function buildRenderOverlay(filePath, showcase) {
         const lower = entry.entryName.toLowerCase()
         if(lower === 'license.txt' || lower.endsWith('/license.txt') || lower.endsWith('/license.md')) selected.add(lower)
     }
-    for(const subject of showcase.subjects) selected.add(String(subject.sourcePath).toLowerCase())
+    for(const subject of showcase.subjects) {
+        for(const sourcePath of subject.sourcePaths || [subject.sourcePath]) selected.add(String(sourcePath).toLowerCase())
+    }
     const pending = [...selected]
     while(pending.length > 0) {
         const name = pending.shift()
@@ -353,7 +358,7 @@ function buildRenderOverlay(filePath, showcase) {
         if(expandedBytes > MAX_RENDER_OVERLAY_EXPANDED_BYTES) throw validationError('render_overlay_expanded_limit', 'Resource Pack render overlay exceeds 64 MiB expanded.')
         output.addFile(name, bytes)
     }
-    const descriptor = { schemaVersion: 1, subjects: showcase.subjects.map(({ sourcePath: _sourcePath, ...subject }) => subject) }
+    const descriptor = { schemaVersion: 1, subjects: showcase.subjects.map(({ sourcePath: _sourcePath, sourcePaths: _sourcePaths, ...subject }) => subject) }
     output.addFile('ag-community-showcase.json', Buffer.from(`${JSON.stringify(descriptor, null, 2)}\n`, 'utf8'))
     const bytes = output.toBuffer()
     if(bytes.length > MAX_RENDER_OVERLAY_BYTES) throw validationError('render_overlay_size_limit', 'Resource Pack render overlay exceeds 16 MiB compressed.')
@@ -370,7 +375,7 @@ async function validateResourcePack(filePath, options = {}) {
         throw validationError('resource_pack_size_limit', 'Resource Pack ZIP must be between 1 byte and 100 MiB.')
     }
     const zip = await openZip(filePath)
-    const state = { entries: 0, expandedBytes: 0, namespaces: new Set(), paths: new Set(), packMetadata: null, packPng: null, showcaseCandidates: [] }
+    const state = { entries: 0, expandedBytes: 0, namespaces: new Set(), paths: new Set(), packMetadata: null, packPng: null }
     try {
         await new Promise((resolve, reject) => {
             zip.on('error', error => reject(validationError('invalid_resource_pack_zip', error.message)))
@@ -388,9 +393,7 @@ async function validateResourcePack(filePath, options = {}) {
                         state.packPng = await readEntry(zip, entry, 5 * 1024 * 1024)
                         validatePngHeader(state.packPng, info.name)
                     } else if(!info.directory) {
-                        const payload = await validateEntryPayload(zip, entry, info)
-                        const candidate = discoverShowcaseCandidate(info, payload)
-                        if(candidate) state.showcaseCandidates.push(candidate)
+                        await validateEntryPayload(zip, entry, info)
                     }
                     zip.readEntry()
                 } catch(error) {
@@ -412,12 +415,14 @@ async function validateResourcePack(filePath, options = {}) {
         stream.on('error', reject)
         stream.on('end', () => resolve(hash.digest('hex')))
     })
-    const candidates = [...new Map(state.showcaseCandidates.map(candidate => [
-        candidate.kind === 'block' ? `block:${candidate.id}` : `pokemon:${candidate.species}`,
-        candidate
-    ])).values()].sort((left, right) => (left.id || left.species).localeCompare(right.id || right.species))
+    // Build showcase identities from the same resolver-first component index used by
+    // Pack Studio. The streaming validation scan remains responsible for payload
+    // safety, while the shared index prevents form poser names becoming fake species.
+    const indexedPack = await indexResourcePackStreaming(filePath)
+    const candidates = showcaseCandidatesFromComponents(indexedPack.components)
     const showcase = normalizeShowcase(options.showcase, candidates)
     const renderOverlay = buildRenderOverlay(filePath, showcase)
+    const compositionIndex = options.indexComponents === false ? null : indexedPack
     return {
         sizeBytes: stat.size,
         sha256,
@@ -428,11 +433,12 @@ async function validateResourcePack(filePath, options = {}) {
             entryCount: state.entries,
             expandedBytes: state.expandedBytes,
             namespaces: Array.from(state.namespaces).sort(),
-            showcaseCandidates: candidates.map(({ sourcePath: _sourcePath, ...candidate }) => candidate),
-            showcase: showcase ? { schemaVersion: 1, subjects: showcase.subjects.map(({ sourcePath: _sourcePath, ...subject }) => subject) } : null
+            showcaseCandidates: candidates.map(({ sourcePath: _sourcePath, sourcePaths: _sourcePaths, ...candidate }) => candidate),
+            showcase: showcase ? { schemaVersion: 1, subjects: showcase.subjects.map(({ sourcePath: _sourcePath, sourcePaths: _sourcePaths, ...subject }) => subject) } : null
         },
         dependencies: [],
         renderAssets: renderOverlay ? [renderOverlay] : [],
+        compositionIndex,
         previewBuffer: state.packPng,
         filePath
     }

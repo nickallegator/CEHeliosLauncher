@@ -133,7 +133,9 @@ function renderGenericCommunityShowcase(){
     if(root.hidden || !genericCommunityShowcase) return
     const selected = genericCommunityShowcase.subjects
     const candidates = genericCommunityShowcase.candidates || selected
-    const keyFor = subject => subject.kind === 'block' ? `block:${subject.id}` : `pokemon:${subject.species}`
+    const keyFor = subject => subject.kind === 'block'
+        ? `block:${subject.id}`
+        : `pokemon:${subject.species}:${[...(subject.aspects || [])].filter(value => value !== 'shiny').sort().join('+') || 'default'}`
     const selectedKeys = new Set(selected.map(keyFor))
     const ordered = [...selected, ...candidates.filter(candidate => !selectedKeys.has(keyFor(candidate)))]
     for(const subject of ordered){
@@ -145,6 +147,7 @@ function renderGenericCommunityShowcase(){
         name.textContent = `${subject.kind === 'block' ? 'Block' : 'Pokémon'} · ${(subject.id || subject.species).split(':').at(-1).replaceAll('_', ' ')}`
         const up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.setAttribute('aria-label', `Move ${name.textContent} earlier`)
         const down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.setAttribute('aria-label', `Move ${name.textContent} later`)
+        if(subject.kind === 'pokemon' && subject.variantLabel && subject.variantLabel !== 'Default') name.append(document.createTextNode(` Â· ${subject.variantLabel}`))
         const move = amount => {
             const index = selected.findIndex(value => keyFor(value) === item.dataset.key)
             const target = index + amount
@@ -161,12 +164,25 @@ function renderGenericCommunityShowcase(){
                     genericCommunityElement('communityContentPublishStatus').textContent = 'The showcase supports eight subjects with at most four Pokémon.'
                     return
                 }
-                if(current < 0) selected.push({ ...subject })
+                if(current < 0) selected.push({ ...subject, ...(subject.defaultShiny === true ? { shiny: true } : {}) })
             } else if(current >= 0) selected.splice(current, 1)
             renderGenericCommunityShowcase()
         })
         up.disabled = !toggle.checked; down.disabled = !toggle.checked
-        item.append(toggle, name, up, down); list.append(item)
+        item.append(toggle, name)
+        if(subject.kind === 'pokemon' && subject.shinyVariant?.declared === true) {
+            const shinyLabel = document.createElement('label'); shinyLabel.className = 'communityResourcePackShowcaseShiny'
+            const shiny = document.createElement('input'); shiny.type = 'checkbox'
+            const selectedSubject = selected.find(value => keyFor(value) === item.dataset.key)
+            shiny.checked = selectedSubject?.shiny === true || (selectedSubject == null && subject.defaultShiny === true)
+            shiny.disabled = !toggle.checked
+            shiny.addEventListener('change', () => {
+                const current = selected.find(value => keyFor(value) === item.dataset.key)
+                if(current) current.shiny = shiny.checked
+            })
+            shinyLabel.append(shiny, document.createTextNode(' Shiny')); item.append(shinyLabel)
+        }
+        item.append(up, down); list.append(item)
     }
 }
 
@@ -379,6 +395,24 @@ async function refreshGenericCommunityDetailState(){
         const userId = getCurrentUserId()
         publishRevision.hidden = !(userId && genericCommunityDetailEntry.ownerId && Number(userId) === Number(genericCommunityDetailEntry.ownerId))
     }
+    const studioGrant = genericCommunityElement('communityContentPackStudioGrant')
+    if(studioGrant){
+        const userId = getCurrentUserId()
+        const owner = userId && genericCommunityDetailEntry.ownerId && Number(userId) === Number(genericCommunityDetailEntry.ownerId)
+        studioGrant.hidden = genericCommunityDetailEntry.type !== 'resource-packs' || !owner || !genericCommunityDetailEntry.revision?.id
+        if(!studioGrant.hidden){
+            try {
+                const client = await getCommunityApiClient()
+                const grant = await client.compositionGrant(genericCommunityDetailEntry.id, genericCommunityDetailEntry.revision.id)
+                studioGrant.dataset.enabled = String(grant.enabled === true)
+                studioGrant.textContent = grant.enabled ? 'Disable Pack Studio' : 'Enable Pack Studio'
+                studioGrant.disabled = !grant.enabled && Number(grant.componentCount || 0) < 1
+            } catch(error) {
+                studioGrant.hidden = error?.code === 'pack_studio_disabled' || error?.status === 404
+                studioGrant.disabled = true
+            }
+        }
+    }
 }
 
 function configureGenericCommunityDetailLayout(type){
@@ -409,6 +443,8 @@ async function openGenericCommunityDetail(entry){
         loggerLanding.warn('Failed to load Community detail.', { code: error?.code, message: error?.message })
     }
     const value = genericCommunityDetailEntry
+    const studioOpen = genericCommunityElement('communityContentOpenPackStudio')
+    if(studioOpen) studioOpen.hidden = value.type !== 'resource-packs' || typeof window.openPackStudio !== 'function'
     configureGenericCommunityDetailLayout(value.type)
     genericCommunityElement('communityContentDetailType').textContent = genericCommunityTypeLabel(value.type)
     genericCommunityElement('communityContentDetailTitle').textContent = value.title || value.name
@@ -559,6 +595,13 @@ function openGenericCommunityPublisher(type, target = null){
     genericCommunityElement('communityContentPublishDescription').value = target?.description || ''
     genericCommunityElement('communityContentPublishTags').value = (target?.tags || []).join(', ')
     if(target?.license) genericCommunityElement('communityContentPublishLicense').value = target.license
+    const studioOptions = genericCommunityElement('communityPackStudioPublishOptions')
+    const studioOptIn = genericCommunityElement('communityPackStudioPublishOptIn')
+    const studioGrant = genericCommunityElement('communityPackStudioPublishGrant')
+    studioOptions.hidden = type !== 'resource-packs'
+    studioOptIn.checked = false
+    studioGrant.checked = false
+    studioGrant.disabled = true
     openModal(root, panel, { onRequestClose: closeGenericCommunityPublisher, initialFocus: '#communityContentPublishClose' })
 }
 
@@ -588,6 +631,11 @@ async function submitGenericCommunityPublisher(){
         status.textContent = communityCopy('previewConfirmationRequired')
         return
     }
+    const packStudioOptIn = type === 'resource-packs' && genericCommunityElement('communityPackStudioPublishOptIn').checked
+    if(packStudioOptIn && !genericCommunityElement('communityPackStudioPublishGrant').checked) {
+        status.textContent = 'Accept the Pack Studio composition grant before publishing this revision.'
+        return
+    }
     const submit = genericCommunityElement('communityContentPublishSubmit')
     submit.disabled = true
     status.textContent = communityCopy('publishingCreation')
@@ -608,6 +656,8 @@ async function submitGenericCommunityPublisher(){
             tags: genericCommunityElement('communityContentPublishTags').value,
             license: genericCommunityElement('communityContentPublishLicense').value,
             rightsAttested: genericCommunityElement('communityContentPublishRights').checked,
+            packStudioOptIn,
+            packStudioTermsAccepted: packStudioOptIn && genericCommunityElement('communityPackStudioPublishGrant').checked,
             visibility: 'public',
             ...(showcase ? { showcase: { schemaVersion: 1, subjects: showcase.subjects } } : {}),
             compatibility: {
@@ -679,6 +729,28 @@ function initGenericCommunityContent(){
     genericCommunityElement('communityContentPublishScrim')?.addEventListener('click', closeGenericCommunityPublisher)
     genericCommunityElement('communityContentArtifactFile')?.addEventListener('change', refreshGenericCommunityPublicationPreview)
     genericCommunityElement('communityContentPreviewFile')?.addEventListener('change', refreshGenericCommunityPublicationPreview)
+    genericCommunityElement('communityPackStudioPublishOptIn')?.addEventListener('change', event => {
+        const grant = genericCommunityElement('communityPackStudioPublishGrant')
+        grant.disabled = !event.target.checked
+        if(!event.target.checked) grant.checked = false
+    })
+    genericCommunityElement('communityContentPackStudioGrant')?.addEventListener('click', async event => {
+        if(!genericCommunityDetailEntry?.revision?.id) return
+        const enabled = event.currentTarget.dataset.enabled !== 'true'
+        if(enabled && !window.confirm('Allow this exact Resource Pack revision to be used in Pack Studio compositions under the AG Pack Studio Composition Grant 1.0?')) return
+        try {
+            const client = await getCommunityApiClient()
+            await ensureSchematicsAuthSession(client.baseUrl)
+            await client.setCompositionGrant(genericCommunityDetailEntry.id, genericCommunityDetailEntry.revision.id, enabled, { headers: getSchematicsAuthHeaders() })
+            await refreshGenericCommunityDetailState()
+        } catch(error) {
+            genericCommunityElement('communityContentDetailStatus').textContent = error?.message || 'Unable to update Pack Studio access.'
+        }
+    })
+    genericCommunityElement('communityContentOpenPackStudio')?.addEventListener('click', () => {
+        closeGenericCommunityDetail()
+        window.openPackStudio?.()
+    })
     genericCommunityElement('communityContentPublishSubmit')?.addEventListener('click', submitGenericCommunityPublisher)
 }
 

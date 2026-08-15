@@ -1871,6 +1871,24 @@ class RemoteJarResourceProvider {
             return null
         }
     }
+
+    async list(prefix = ''){
+        const namespace = extractNamespaceFromResourcePath(prefix)
+        if(!namespace){
+            return []
+        }
+        const provider = await this.getProviderForNamespace(namespace)
+        if(!provider || typeof provider.list !== 'function'){
+            return []
+        }
+        try {
+            return provider.list(prefix)
+        } catch (err) {
+            loggerLanding.warn('[schematics] Failed to list mod assets.', err)
+            this.failedNamespaces.add(namespace)
+            return []
+        }
+    }
 }
 
 function appendResourceProvider(providers, sourceEntries, seenPaths, type, resourcePath){

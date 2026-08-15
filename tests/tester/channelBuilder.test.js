@@ -44,7 +44,7 @@ test('channel output verification requires the authenticated channel and Cobble 
     fs.writeFileSync(path.join(outputRoot, 'win-unpacked', 'AG Launcher.exe'), 'executable fixture')
 
     const verified = verifyOutput('https://api.example.test', build, { outputRoot })
-    assert.equal(path.basename(verified.installerPath), 'AG-Launcher-Test-setup-2.5.0-test.1.exe')
+    assert.equal(path.basename(verified.installerPath), `AG-Launcher-Test-setup-${build.launcherVersion}.exe`)
     assert.equal(path.basename(verified.executablePath), 'AG Launcher.exe')
 
     const channel = JSON.parse(fs.readFileSync(verified.channelPath, 'utf8'))

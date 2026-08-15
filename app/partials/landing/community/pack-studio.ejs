@@ -1,0 +1,67 @@
+<section id="communityPackStudio" class="communityPackStudio" aria-labelledby="communityPackStudioTitle" hidden>
+    <header class="communityPackStudioHeader">
+        <div>
+            <span class="workshopEyebrow"><%- lang('community.packStudio') %></span>
+            <h2 id="communityPackStudioTitle"><%- lang('community.packStudioAction') %></h2>
+            <p><%- lang('community.packStudioSubtitle') %></p>
+        </div>
+        <div class="communityPackStudioProjectTools">
+            <button id="communityPackStudioBack" type="button" class="schematicsMiniButton"><%- lang('community.packStudioBack') %></button>
+            <select id="communityPackStudioProjects" aria-label="Pack Studio project"></select>
+            <button id="communityPackStudioNew" type="button" class="schematicsMiniButton"><%- lang('community.packStudioNew') %></button>
+            <button id="communityPackStudioDuplicate" type="button" class="schematicsMiniButton"><%- lang('community.packStudioDuplicate') %></button>
+            <button id="communityPackStudioDelete" type="button" class="schematicsMiniButton danger"><%- lang('community.packStudioRemoveProject') %></button>
+        </div>
+    </header>
+    <div class="communityPackStudioWorkspace">
+        <section class="communityPackStudioBrowser workshopPanel" aria-labelledby="communityPackStudioBrowseTitle">
+            <header><h3 id="communityPackStudioBrowseTitle"><%- lang('community.packStudioBrowse') %></h3></header>
+            <div class="communityPackStudioFilters">
+                <input id="communityPackStudioSearch" type="search" placeholder="Search blocks, Pokémon, sounds, UI…" aria-label="Search Pack Studio components">
+                <select id="communityPackStudioKind" aria-label="<%- lang('community.packStudioKind') %>">
+                    <option value=""><%- lang('community.packStudioAllKinds') %></option>
+                    <option value="block">Blocks</option><option value="pokemon">Pokémon</option><option value="item">Items</option>
+                    <option value="sound">Sounds</option><option value="font">Fonts</option><option value="language">Languages</option>
+                    <option value="ui">UI</option><option value="texture">Textures</option><option value="generic">Other</option>
+                </select>
+                <input id="communityPackStudioCreator" type="search" placeholder="Creator" aria-label="<%- lang('community.packStudioCreator') %>">
+                <input id="communityPackStudioSource" type="search" placeholder="Source pack" aria-label="<%- lang('community.packStudioSource') %>">
+                <input id="communityPackStudioNamespace" type="search" placeholder="Namespace" aria-label="<%- lang('community.packStudioNamespace') %>">
+                <input id="communityPackStudioLicense" type="search" placeholder="License" aria-label="<%- lang('community.packStudioLicense') %>">
+                <input id="communityPackStudioTags" type="search" placeholder="Tags" aria-label="Tag filter">
+            </div>
+            <div id="communityPackStudioResults" class="communityPackStudioResults" role="list" aria-live="polite"></div>
+            <button id="communityPackStudioLoadMore" type="button" class="schematicsMiniButton" hidden>Load more</button>
+        </section>
+        <section class="communityPackStudioPreview workshopPanel" aria-labelledby="communityPackStudioPreviewTitle">
+            <header><h3 id="communityPackStudioPreviewTitle"><%- lang('community.packStudioPreview') %></h3><button id="communityPackStudioPreviewCombined" type="button" class="schematicsMiniButton"><%- lang('community.packStudioPreviewCombined') %></button></header>
+            <div id="communityPackStudioPreviewHost" class="communityPackStudioPreviewHost">
+                <img id="communityPackStudioPreviewImage" alt="" hidden>
+                <div id="communityPackStudioPreviewFallback" class="communityPackStudioPreviewFallback">Select a component to inspect its source and dependencies.</div>
+            </div>
+            <dl id="communityPackStudioPreviewMeta" class="communityPackStudioPreviewMeta"></dl>
+        </section>
+        <aside class="communityPackStudioSelection workshopPanel" aria-labelledby="communityPackStudioSelectionTitle">
+            <header><h3 id="communityPackStudioSelectionTitle"><%- lang('community.packStudioSelection') %></h3><span id="communityPackStudioSelectionCount">0</span></header>
+            <div id="communityPackStudioSelected" class="communityPackStudioSelected"></div>
+            <section class="communityPackStudioConflictPanel" aria-labelledby="communityPackStudioConflictTitle">
+                <h4 id="communityPackStudioConflictTitle"><%- lang('community.packStudioConflicts') %></h4>
+                <div id="communityPackStudioConflicts"><%- lang('community.packStudioNoConflicts') %></div>
+            </section>
+        </aside>
+    </div>
+    <footer class="communityPackStudioFooter">
+        <label><span>Project name</span><input id="communityPackStudioName" maxlength="80"></label>
+        <div id="communityPackStudioStatus" role="status" aria-live="polite"></div>
+        <div class="communityPackStudioActions">
+            <button id="communityPackStudioSave" type="button" class="schematicsDetailButton"><%- lang('community.packStudioSave') %></button>
+            <button id="communityPackStudioExport" type="button" class="schematicsDetailButton"><%- lang('community.packStudioExport') %></button>
+            <button id="communityPackStudioEnable" type="button" class="schematicsDetailButton" hidden><%- lang('community.packStudioEnable') %></button>
+            <button id="communityPackStudioDisable" type="button" class="schematicsDetailButton" hidden><%- lang('community.packStudioDisable') %></button>
+            <button id="communityPackStudioHigher" type="button" class="schematicsDetailButton" hidden><%- lang('community.packStudioHigher') %></button>
+            <button id="communityPackStudioLower" type="button" class="schematicsDetailButton" hidden><%- lang('community.packStudioLower') %></button>
+            <button id="communityPackStudioRemoveInstalled" type="button" class="schematicsDetailButton danger" hidden><%- lang('community.packStudioRemoveInstalled') %></button>
+            <button id="communityPackStudioInstall" type="button" class="schematicsDetailButton primary"><%- lang('community.packStudioInstall') %></button>
+        </div>
+    </footer>
+</section>

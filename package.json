@@ -1,6 +1,6 @@
 {
   "name": "ag-launcher",
-  "version": "2.5.0-test.1",
+  "version": "2.6.0-test.1",
   "productName": "Allegator Games Launcher",
   "description": "Allegator Games modded Minecraft launcher",
   "author": "Allegator Games",
@@ -64,7 +64,9 @@
     "jquery": "^3.7.1",
     "lodash.merge": "^4.6.2",
     "semver": "^7.7.3",
-    "toml": "^3.0.0"
+    "toml": "^3.0.0",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.749.0",

@@ -1,0 +1,15 @@
+AG Pack Studio Composition Grant 1.0
+
+By enabling Pack Studio composition for a Resource Pack revision, the publisher
+grants recipients permission to copy unchanged resources from that revision and
+to perform the mechanical JSON aggregation required to combine those resources
+with other opted-in Resource Packs for use with Minecraft, Cobblemon, Cobble
+Power, and Allegator Games Community content.
+
+Every generated pack must retain the creator attribution, the original license,
+this composition grant, and included third-party notices. Copyright and all
+rights not expressly granted remain with their respective owners. Disabling the
+grant prevents future Pack Studio builds but does not revoke packs that were
+already lawfully generated.
+
+THE MATERIAL IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

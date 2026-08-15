@@ -27,6 +27,7 @@ const {
     resolveBlockTopTexture
 } = require('../../libraries/minecraft-resources')
 const { validateResourcePack } = require('../../backend/src/services/communityResourcePack')
+const { resolveComposition } = require('../../libraries/resource-pack-studio')
 
 const SHOWROOM_SCHEMA_VERSION = 1
 const SHOWROOM_PROFILE_ID = 'Cobble-Power-1.21.1'
@@ -583,7 +584,8 @@ function createEntry(type, definition, artifact) {
         preview: type === TYPES.AUTOMATION
             ? Buffer.from(renderAutomationSvg(bytes), 'utf8')
             : previewSvg(type, definition.title),
-        renderAssets: result.renderAssets || []
+        renderAssets: result.renderAssets || [],
+        compositionIndex: result.compositionIndex || null
     }
 }
 
@@ -729,6 +731,7 @@ function publicEntry(entry) {
     delete value.preview
     delete value.canonical
     delete value.renderAssets
+    delete value.compositionIndex
     return value
 }
 
@@ -823,8 +826,97 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 defaultCategory: 'all',
                 defaultSort: 'popular',
                 showroom: true,
-                features: { richPreviews: true },
+                features: { richPreviews: true, packStudio: true },
+                composer: {
+                    schemaVersion: 1,
+                    componentKinds: ['block','pokemon','item','sound','font','language','ui','texture','generic'],
+                    maxSelections: 512,
+                    grantTermsUrl: '/v1/community/licenses/AG-Pack-Studio-Composition-Grant-1.0'
+                },
                 categories: SHOWROOM_TYPES.map(id => ({ id, readable: true, writable: false }))
+            })
+            return
+        }
+        if(url.pathname === '/v1/community/composer/components' && request.method === 'GET') {
+            const entry = entries.find(value => value.type === TYPES.RESOURCE_PACKS)
+            const query = String(url.searchParams.get('query') || '').toLowerCase()
+            const kind = String(url.searchParams.get('kind') || '').toLowerCase()
+            const components = (entry?.compositionIndex?.components || []).filter(component => (!kind || component.kind === kind)
+                && (!query || `${component.title} ${component.identifier} ${component.kind}`.toLowerCase().includes(query)))
+            writeJson(response, 200, {
+                schemaVersion: 1,
+                items: components.map(component => ({
+                    key: component.key,
+                    kind: component.kind,
+                    identifier: component.identifier,
+                    title: component.title,
+                    namespace: component.namespace,
+                    contentSha256: component.contentSha256,
+                    metadata: component.metadata || {},
+                    sizeBytes: component.filePaths.reduce((sum, filePath) => sum + Number(entry.compositionIndex.files.find(file => file.path === filePath)?.sizeBytes || 0), 0),
+                    fileCount: component.filePaths.length,
+                    source: {
+                        itemId: entry.id,
+                        title: entry.title,
+                        description: entry.description,
+                        creator: entry.creator.name,
+                        creatorId: entry.creator.id,
+                        tags: entry.tags,
+                        license: entry.license,
+                        revisionId: entry.revision.id,
+                        revisionNumber: entry.revision.number,
+                        revisionSha256: entry.revision.sha256,
+                        revisionSizeBytes: entry.revision.sizeBytes,
+                        compatibility: entry.compatibility
+                    }
+                })),
+                nextCursor: null
+            })
+            return
+        }
+        if(url.pathname === '/v1/community/composer/resolve' && request.method === 'POST') {
+            let bytes = 0
+            const chunks = []
+            request.on('data', chunk => {
+                bytes += chunk.length
+                if(bytes <= 1024 * 1024) chunks.push(chunk)
+                else request.destroy()
+            })
+            request.on('end', () => {
+                try {
+                    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+                    const entry = entries.find(value => value.type === TYPES.RESOURCE_PACKS)
+                    const source = {
+                        revisionId: entry.revision.id,
+                        itemId: entry.id,
+                        title: entry.title,
+                        creator: entry.creator.name,
+                        license: entry.license,
+                        sha256: entry.revision.sha256,
+                        sizeBytes: entry.revision.sizeBytes,
+                        files: entry.compositionIndex.files,
+                        notices: entry.compositionIndex.notices || [],
+                        components: entry.compositionIndex.components
+                    }
+                    const plan = resolveComposition([source], body.selections || [], body.conflictResolutions || {})
+                    writeJson(response, 200, {
+                        schemaVersion: 1,
+                        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+                        sources: [{
+                            itemId: entry.id,
+                            revisionId: entry.revision.id,
+                            title: entry.title,
+                            creator: entry.creator.name,
+                            license: entry.license,
+                            sha256: entry.revision.sha256,
+                            sizeBytes: entry.revision.sizeBytes,
+                            compatibility: entry.compatibility,
+                            updateAvailable: false,
+                            downloadUrl: `${baseUrl}/showroom/artifacts/${entry.type}/${entry.id}`
+                        }],
+                        plan
+                    })
+                } catch(error) { writeJson(response, 400, { error: 'pack_studio_resolution_failed', message: error.message }) }
             })
             return
         }
@@ -1028,7 +1120,7 @@ function injectShowroomDistribution(source, baseUrl) {
         schemaVersion: 1,
         enabled: true,
         apiBaseUrl: baseUrl,
-        features: { catalog: true, publishing: false, richPreviews: true }
+        features: { catalog: true, publishing: false, richPreviews: true, packStudio: true }
     }
     distribution.schematics = {
         schemaVersion: 2,

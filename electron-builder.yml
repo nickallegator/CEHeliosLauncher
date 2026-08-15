@@ -16,6 +16,19 @@ files:
 
 extraResources:
   - 'libraries'
+  # Pack Studio runs its deterministic ZIP builder in an isolated child
+  # process. Keep the small, audited ZIP runtime beside the external shared
+  # library so normal Node resolution works in packaged applications.
+  - from: 'node_modules/adm-zip'
+    to: 'node_modules/adm-zip'
+  - from: 'node_modules/yauzl'
+    to: 'node_modules/yauzl'
+  - from: 'node_modules/yazl'
+    to: 'node_modules/yazl'
+  - from: 'node_modules/pend'
+    to: 'node_modules/pend'
+  - from: 'node_modules/buffer-crc32'
+    to: 'node_modules/buffer-crc32'
 
 # Windows Configuration
 win:

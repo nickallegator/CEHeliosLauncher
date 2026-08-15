@@ -4,8 +4,9 @@
 
 const { Worker } = require('worker_threads')
 const path = require('path')
-const { normalizeGradientDocument, sampleGradient } = require('../../../../libraries/community-rendering')
-const { resolveBlockTopTexture } = require('../../../../libraries/minecraft-resources')
+const { loadWorkspaceLibrary } = require('../workspacelibrary')
+const { normalizeGradientDocument, sampleGradient } = loadWorkspaceLibrary('community-rendering')
+const { resolveBlockTopTexture } = loadWorkspaceLibrary('minecraft-resources')
 const { calculatePreviewSize } = require('./resize-observer')
 
 function loadImage(texture) {

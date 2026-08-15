@@ -56,6 +56,22 @@ function orbitFromDrag(startYaw, startPitch, deltaX, deltaY, sensitivity = 0.005
     }
 }
 
+function cameraDistanceLimits(fitDistance) {
+    const requested = Number(fitDistance)
+    const fitted = Number.isFinite(requested) && requested > 0 ? Math.max(0.1, requested) : 2.5
+    return {
+        minimum: Math.max(0.75, fitted * 0.15),
+        maximum: Math.max(12, fitted * 4)
+    }
+}
+
+function clampCameraDistance(distance, fitDistance) {
+    const limits = cameraDistanceLimits(fitDistance)
+    const requested = Number(distance)
+    const fallback = Number.isFinite(Number(fitDistance)) ? Number(fitDistance) : 2.5
+    return Math.max(limits.minimum, Math.min(limits.maximum, Number.isFinite(requested) ? requested : fallback))
+}
+
 function compile(gl, type, source) {
     const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader)
     if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || 'WebGL shader compilation failed.')
@@ -111,7 +127,8 @@ class CommunityModelViewer {
         this.defaultYaw = Number.isFinite(options.defaultYaw) ? options.defaultYaw : -1.15
         this.defaultPitch = Number.isFinite(options.defaultPitch) ? options.defaultPitch : 0.12
         this.fitPadding = Number.isFinite(options.fitPadding) ? Math.max(1.25, options.fitPadding) : 2.5
-        this.yaw = this.defaultYaw; this.pitch = this.defaultPitch; this.distance = 4.5; this.drag = null; this.destroyed = false
+        this.yaw = this.defaultYaw; this.pitch = this.defaultPitch; this.fitDistance = 4.5; this.distance = this.fitDistance; this.drag = null; this.destroyed = false
+        this.textureGeneration = 0
         this.buffers = []
         this.meshBuffers = []
         this.listeners = []
@@ -128,8 +145,16 @@ class CommunityModelViewer {
         })
         this.listen(this.canvas, 'pointerup', () => { this.drag = null })
         this.listen(this.canvas, 'pointercancel', () => { this.drag = null })
-        this.listen(this.canvas, 'wheel', event => { event.preventDefault(); this.distance = Math.max(1.5, Math.min(12, this.distance * (event.deltaY < 0 ? .9 : 1.1))); this.render() }, { passive: false })
-        this.listen(this.canvas, 'keydown', event => { if(event.key === 'ArrowLeft') this.yaw -= .12; else if(event.key === 'ArrowRight') this.yaw += .12; else if(event.key === '+' || event.key === '=') this.distance *= .9; else if(event.key === '-') this.distance *= 1.1; else if(event.key.toLowerCase() === 'f') this.fit(); else return; event.preventDefault(); this.render() })
+        this.listen(this.canvas, 'wheel', event => { event.preventDefault(); this.distance = clampCameraDistance(this.distance * (event.deltaY < 0 ? .9 : 1.1), this.fitDistance); this.render() }, { passive: false })
+        this.listen(this.canvas, 'keydown', event => {
+            if(event.key === 'ArrowLeft') this.yaw -= .12
+            else if(event.key === 'ArrowRight') this.yaw += .12
+            else if(event.key === '+' || event.key === '=') this.distance = clampCameraDistance(this.distance * .9, this.fitDistance)
+            else if(event.key === '-') this.distance = clampCameraDistance(this.distance * 1.1, this.fitDistance)
+            else if(event.key.toLowerCase() === 'f') this.fit()
+            else return
+            event.preventDefault(); this.render()
+        })
     }
 
     async setModel(mesh, textureBytes) {
@@ -167,9 +192,27 @@ class CommunityModelViewer {
         this.render()
     }
 
+    async setTexture(textureBytes) {
+        if(this.destroyed) return
+        const generation = ++this.textureGeneration
+        const image = await loadTextureImage(textureBytes)
+        if(this.destroyed || generation !== this.textureGeneration) return false
+        const gl = this.gl
+        const next = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, next)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        configureTextureUpload(gl)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+        if(this.texture) gl.deleteTexture(this.texture)
+        this.texture = next
+        this.render()
+        return true
+    }
+
     fit() {
         const size = Math.max(...(this.bounds?.size || [2, 2, 2]))
-        this.distance = Math.max(2.5, size * this.fitPadding)
+        this.fitDistance = Math.max(2.5, size * this.fitPadding)
+        this.distance = this.fitDistance
         this.yaw = this.defaultYaw; this.pitch = this.defaultPitch
     }
 
@@ -184,12 +227,21 @@ class CommunityModelViewer {
         this.canvas.dataset.cameraYaw = this.yaw.toFixed(6)
         this.canvas.dataset.cameraPitch = this.pitch.toFixed(6)
         this.canvas.dataset.cameraDistance = this.distance.toFixed(6)
-        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'uMatrix'), false, multiply(perspective(Math.PI / 4, width / height, .05, 100), view))
+        const farPlane = Math.max(100, this.distance + this.fitDistance * 8)
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'uMatrix'), false, multiply(perspective(Math.PI / 4, width / height, .05, farPlane), view))
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texture); gl.uniform1i(gl.getUniformLocation(this.program, 'uTexture'), 0)
         gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount)
     }
 
     resize() { this.render() }
+    getCamera() { return { yaw: this.yaw, pitch: this.pitch, distance: this.distance, fitDistance: this.fitDistance } }
+    setCamera(camera) {
+        if(!camera) return
+        if(Number.isFinite(camera.yaw)) this.yaw = camera.yaw
+        if(Number.isFinite(camera.pitch)) this.pitch = Math.max(-1.35, Math.min(1.35, camera.pitch))
+        if(Number.isFinite(camera.distance)) this.distance = clampCameraDistance(camera.distance, this.fitDistance)
+        this.render()
+    }
 
     destroy() {
         if(this.destroyed) return
@@ -202,4 +254,4 @@ class CommunityModelViewer {
     }
 }
 
-module.exports = { CommunityModelViewer, configureTextureUpload, lookAt, orbitEye, orbitFromDrag }
+module.exports = { CommunityModelViewer, cameraDistanceLimits, clampCameraDistance, configureTextureUpload, lookAt, orbitEye, orbitFromDrag }
