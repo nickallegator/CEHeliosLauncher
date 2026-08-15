@@ -102,6 +102,7 @@ const config = {
         enabled: parseBoolean(getEnv('COMMUNITY_ENABLED', getEnv('SCHEMATICS_ENABLED', 'false'))),
         richPreviewsEnabled: parseBoolean(getEnv('COMMUNITY_RICH_PREVIEWS_ENABLED', 'false')),
         packStudioEnabled: parseBoolean(getEnv('COMMUNITY_PACK_STUDIO_ENABLED', 'false')),
+        modrinthEnabled: parseBoolean(getEnv('COMMUNITY_MODRINTH_ENABLED', 'false')),
         publicApiUrl: getEnv('COMMUNITY_PUBLIC_API_URL', getEnv('SCHEMATICS_PUBLIC_API_URL', null)),
         writeMode: getEnv('COMMUNITY_WRITE_MODE', getEnv('SCHEMATICS_WRITE_MODE', 'admin')).trim().toLowerCase(),
         uploadRateLimit: parseNumber(getEnv('COMMUNITY_UPLOADS_PER_HOUR', '10'), 10),
@@ -121,6 +122,20 @@ const config = {
             getTtlSeconds: 900,
             putTtlSeconds: 900
         })
+    },
+    modrinth: {
+        enabled: parseBoolean(getEnv('COMMUNITY_MODRINTH_ENABLED', 'false')),
+        clientId: getEnv('MODRINTH_CLIENT_ID', null),
+        clientSecret: getEnv('MODRINTH_CLIENT_SECRET', null),
+        redirectUri: getEnv('MODRINTH_REDIRECT_URI', null),
+        scopes: getEnv('MODRINTH_OAUTH_SCOPES', 'USER_READ PROJECT_READ').split(/\s+/).filter(Boolean),
+        apiBase: getEnv('MODRINTH_API_BASE', 'https://api.modrinth.com'),
+        authorizeUrl: getEnv('MODRINTH_AUTHORIZE_URL', 'https://modrinth.com/auth/authorize'),
+        tokenUrl: getEnv('MODRINTH_TOKEN_URL', 'https://api.modrinth.com/_internal/oauth/token'),
+        userAgent: getEnv('MODRINTH_USER_AGENT', 'AGLauncher/2.6 (contact: support@allegator.games)'),
+        tokenEncryptionKey: getEnv('EXTERNAL_TOKEN_ENCRYPTION_KEY', null),
+        tokenEncryptionKeyId: getEnv('EXTERNAL_TOKEN_ENCRYPTION_KEY_ID', 'v1'),
+        syncConcurrency: parseNumber(getEnv('MODRINTH_SYNC_CONCURRENCY', '4'), 4)
     },
     patreon: {
         clientId: getEnv('PATREON_CLIENT_ID', null),
@@ -159,6 +174,14 @@ if(config.community.enabled && Object.values(config.community.types).some(Boolea
     const missing = ['provider', 'bucket', 'endpoint', 'accessKeyId', 'secretAccessKey'].filter(key => !storage[key])
     if(missing.length > 0) {
         throw new Error(`Community content is enabled in production but storage is missing: ${missing.join(', ')}`)
+    }
+}
+
+if(config.modrinth.enabled) {
+    const missing = ['clientId', 'clientSecret', 'redirectUri', 'userAgent', 'tokenEncryptionKey'].filter(key => !config.modrinth[key])
+    if(missing.length > 0) throw new Error(`Modrinth integration is enabled but configuration is missing: ${missing.join(', ')}`)
+    if(['USER_READ', 'PROJECT_READ'].some(scope => !config.modrinth.scopes.includes(scope))) {
+        throw new Error('MODRINTH_OAUTH_SCOPES must include USER_READ and PROJECT_READ')
     }
 }
 

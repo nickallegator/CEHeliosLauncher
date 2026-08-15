@@ -80,6 +80,13 @@ app.get('/ready', async (_req, res) => {
                 await db.query('select 1 from community_resource_components limit 1')
                 await db.query('select 1 from community_resource_pack_composition_grants limit 1')
             }
+            if(config.modrinth.enabled) {
+                await db.query('select 1 from external_accounts limit 1')
+                await db.query('select 1 from community_revision_sources limit 1')
+                checks.modrinth = 'ok'
+            } else {
+                checks.modrinth = 'disabled'
+            }
             await getCommunityObjectStorage().ready()
             checks.community = 'ok'
         } catch(_err) {
@@ -87,6 +94,7 @@ app.get('/ready', async (_req, res) => {
         }
     } else {
         checks.community = 'disabled'
+        checks.modrinth = config.modrinth.enabled ? 'error' : 'disabled'
     }
     const ready = !Object.values(checks).includes('error')
     res.status(ready ? 200 : 503).json({ ok: ready, checks })
@@ -96,6 +104,10 @@ app.use('/auth/patreon', authRoutes)
 app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
+if(config.modrinth.enabled) {
+    app.use('/v1', require('./routes/modrinthIntegration'))
+    app.use('/v1', require('./routes/modrinthSources'))
+}
 if(config.schematics.enabled || config.community.enabled) {
     const communityRoutes = require('./routes/community')
     app.use('/v1', communityRoutes)
@@ -134,7 +146,7 @@ app.use((err, req, res, _next) => {
         return
     }
     const statusCode = Number(err?.statusCode)
-    if(Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 500) {
+    if(Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 600) {
         res.status(statusCode).json({ error: err.code || 'request_failed', requestId: req.requestId })
         return
     }

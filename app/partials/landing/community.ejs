@@ -6,7 +6,10 @@
                     <div id="schematicsTitle"><%- lang('community.title') %></div>
                     <div id="schematicsSubtitle"><%- lang('community.subtitle') %></div>
                 </div>
-                <button id="communityPackStudioOpen" type="button" class="workshopButton secondary" hidden><%- lang('community.packStudioAction') %></button>
+                <div class="communityHeaderActions">
+                    <button id="communityModrinthImportOpen" type="button" class="workshopButton secondary" hidden><%- lang('community.modrinthImport') %></button>
+                    <button id="communityPackStudioOpen" type="button" class="workshopButton secondary" hidden><%- lang('community.packStudioAction') %></button>
+                </div>
             </div>
             <div id="schematicsActionGroup">
                 <div id="schematicsControlsRow">
@@ -191,6 +194,7 @@
             <%- include('community/modals/detail.ejs') %>
             <%- include('community/modals/content-detail.ejs') %>
             <%- include('community/modals/content-publish.ejs') %>
+            <%- include('community/modals/modrinth-import.ejs') %>
             <div id="communityPublishPicker" class="schematicsModalRoot" aria-hidden="true">
                 <div id="communityPublishPickerScrim" class="schematicsModalScrim"></div>
                 <div id="communityPublishPickerPanel" class="schematicsModalPanel communityPublishPickerPanel" role="dialog" aria-modal="true" aria-labelledby="communityPublishPickerTitle" tabindex="-1">

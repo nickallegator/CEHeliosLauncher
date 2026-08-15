@@ -1,0 +1,34 @@
+<div id="communityModrinthModal" class="schematicsModalRoot" aria-hidden="true">
+    <div id="communityModrinthScrim" class="schematicsModalScrim"></div>
+    <section class="schematicsModalPanel communityModrinthPanel" role="dialog" aria-modal="true" aria-labelledby="communityModrinthTitle" tabindex="-1">
+        <header class="communityDialogHeader">
+            <div><span class="workshopEyebrow">External source</span><h2 id="communityModrinthTitle"><%- lang('community.modrinthImportTitle') %></h2></div>
+            <button id="communityModrinthClose" class="schematicsDetailButton" type="button"><%- lang('community.close') %></button>
+        </header>
+        <main class="communityDialogContent communityModrinthBody">
+            <section class="communityModrinthConnection">
+                <h3><%- lang('community.modrinthAccount') %></h3>
+                <p id="communityModrinthAccountStatus"><%- lang('settings.modrinthNotConnected') %></p>
+                <button id="communityModrinthConnect" class="schematicsDetailButton primary" type="button"><%- lang('settings.modrinthConnect') %></button>
+            </section>
+            <section id="communityModrinthWorkspace" hidden>
+                <div class="communityModrinthGrid">
+                    <label><span><%- lang('community.modrinthProject') %></span><select id="communityModrinthProject"></select></label>
+                    <fieldset><legend><%- lang('community.modrinthChannels') %></legend><label><input type="checkbox" checked disabled> Release</label><label><input id="communityModrinthBeta" type="checkbox"> Beta</label><label><input id="communityModrinthAlpha" type="checkbox"> Alpha</label></fieldset>
+                    <button id="communityModrinthTrack" class="schematicsDetailButton primary" type="button"><%- lang('community.modrinthTrack') %></button>
+                </div>
+                <div class="communityModrinthSourceBar"><label><span><%- lang('community.modrinthTrackedProject') %></span><select id="communityModrinthSource"></select></label><button id="communityModrinthCheck" class="schematicsDetailButton" type="button"><%- lang('community.modrinthCheck') %></button></div>
+                <div class="communityModrinthMetadata">
+                    <label><span>AG Community title</span><input id="communityModrinthTitleInput" maxlength="80"></label>
+                    <label><span>Description</span><textarea id="communityModrinthDescription" maxlength="2000"></textarea></label>
+                    <label><span>Tags</span><input id="communityModrinthTags" placeholder="visuals, pokemon, blocks"></label>
+                    <label><input id="communityModrinthRights" type="checkbox"> I confirm I have the right to distribute this project and its license through AG Community.</label>
+                    <label><input id="communityModrinthLicense" type="checkbox"> I accept that this revision remains governed by the license declared on Modrinth.</label>
+                    <label><input id="communityModrinthComposition" type="checkbox"> Allow this exact revision in Pack Studio under the composition grant.</label>
+                </div>
+                <div id="communityModrinthCandidates" class="communityModrinthCandidates"></div>
+            </section>
+        </main>
+        <footer class="communityDialogFooter"><span id="communityModrinthStatus" aria-live="polite"></span></footer>
+    </section>
+</div>

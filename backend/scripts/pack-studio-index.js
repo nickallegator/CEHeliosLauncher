@@ -9,6 +9,7 @@ const config = require('../src/config')
 const { getCommunityObjectStorage } = require('../src/services/communityObjectStorage')
 const { validateResourcePack } = require('../src/services/communityResourcePack')
 const { persistCompositionIndex } = require('../src/services/communityPackStudio')
+const { downloadCommunityRevisionToFile } = require('../src/services/communityRevisionDownloads')
 
 function argument(flag, fallback = null) {
     const index = process.argv.indexOf(flag)
@@ -25,8 +26,11 @@ async function run() {
     const storage = getCommunityObjectStorage()
     await storage.ready()
     const result = await db.query(
-        `select r.id,r.item_id,r.object_key,r.size_bytes,r.sha256,i.owner_id
+        `select r.id,r.item_id,r.object_key,r.size_bytes,r.sha256,i.owner_id,
+                rs.provider as source_provider,rs.object_key as source_object_key,rs.provider_version_id,
+                rs.provider_file_name,rs.provider_sha512,rs.available as source_available
          from community_revisions r join community_items i on i.id=r.item_id
+         left join community_revision_sources rs on rs.revision_id=r.id
          where i.type='resource-packs'
            and ($1::uuid is null or r.id=$1::uuid)
            and ($2::boolean or not exists (select 1 from community_resource_components c where c.revision_id=r.id))
@@ -38,7 +42,7 @@ async function run() {
     try {
         for(const row of result.rows) {
             const filePath = path.join(tempRoot, `${row.id}.zip`)
-            await storage.getToFile(row.object_key, filePath, { maxBytes: Number(row.size_bytes) })
+            await downloadCommunityRevisionToFile(row, filePath)
             const validation = await validateResourcePack(filePath)
             if(validation.sha256 !== row.sha256) throw new Error(`Revision ${row.id} checksum does not match its immutable database record.`)
             const index = validation.compositionIndex

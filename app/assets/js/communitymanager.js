@@ -214,6 +214,36 @@ class CommunityApiClient extends SchematicApiClient {
         return data
     }
 
+    async modrinthAccount(options = {}) {
+        return (await this.request('/v1/integrations/modrinth', { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data
+    }
+
+    async startModrinthOAuth(options = {}) {
+        return (await this.request('/v1/integrations/modrinth/oauth/start', { method: 'POST', headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data
+    }
+
+    async modrinthOAuthAttempt(attemptId, options = {}) {
+        return (await this.request(`/v1/integrations/modrinth/oauth/attempts/${encodeURIComponent(attemptId)}`, { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data
+    }
+
+    async disconnectModrinth(options = {}) {
+        await this.request('/v1/integrations/modrinth', { method: 'DELETE', headers: { ...(options.headers || {}) }, signal: options.signal })
+    }
+
+    async modrinthProjects(options = {}) { return (await this.request('/v1/community/sources/modrinth/projects', { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
+    async modrinthSources(options = {}) { return (await this.request('/v1/community/sources/modrinth', { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
+    async trackModrinthProject(projectId, channels, options = {}) {
+        return (await this.request('/v1/community/sources/modrinth', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, body: JSON.stringify({ projectId, channels }), signal: options.signal })).data
+    }
+    async checkModrinthSource(sourceId, options = {}) { return (await this.request(`/v1/community/sources/modrinth/${encodeURIComponent(sourceId)}/check`, { method: 'POST', headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
+    async modrinthCandidates(sourceId, options = {}) { return (await this.request(`/v1/community/sources/modrinth/${encodeURIComponent(sourceId)}/candidates`, { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
+    async prepareModrinthCandidate(sourceId, candidateId, fileSha512, options = {}) {
+        return (await this.request(`/v1/community/sources/modrinth/${encodeURIComponent(sourceId)}/candidates/${encodeURIComponent(candidateId)}/prepare`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, body: JSON.stringify({ fileSha512: fileSha512 || undefined }), signal: options.signal })).data
+    }
+    async publishModrinthCandidate(sourceId, candidateId, metadata, options = {}) {
+        return (await this.request(`/v1/community/sources/modrinth/${encodeURIComponent(sourceId)}/candidates/${encodeURIComponent(candidateId)}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, body: JSON.stringify(metadata), signal: options.signal })).data
+    }
+
     async createUpload(metadata, options = {}) {
         const { data } = await this.request('/v1/community/uploads', {
             method: 'POST',

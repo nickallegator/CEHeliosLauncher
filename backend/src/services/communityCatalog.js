@@ -128,6 +128,12 @@ function normalizeCommunityRow(row) {
     const compatibility = typeof row.compatibility === 'string' ? JSON.parse(row.compatibility) : (row.compatibility || {})
     const typeData = typeof row.type_data === 'string' ? JSON.parse(row.type_data) : (row.type_data || {})
     const dependencies = typeof row.dependencies === 'string' ? JSON.parse(row.dependencies) : (row.dependencies || [])
+    const source = row.source_provider === 'modrinth' ? {
+        provider: 'modrinth', projectId: row.provider_project_id, versionId: row.provider_version_id,
+        versionNumber: row.provider_version_number, fileName: row.provider_file_name,
+        projectUrl: row.provider_project_url,
+        creator: typeof row.provider_creator === 'string' ? JSON.parse(row.provider_creator) : (row.provider_creator || null)
+    } : { provider: 'r2' }
     return {
         key: `${row.type}:${row.id}`,
         type: row.type,
@@ -164,7 +170,9 @@ function normalizeCommunityRow(row) {
             formatVersion: Number(row.format_version)
         },
         dependencies,
-        typeData
+        typeData,
+        source,
+        availability: { available: row.source_available !== false, lastVerifiedAt: row.source_last_verified_at || null }
     }
 }
 
@@ -335,6 +343,9 @@ function createCommunityProvider(options) {
                         r.id as revision_id, r.revision_number, r.sha256,
                         r.size_bytes as revision_size_bytes, r.format_id, r.format_version,
                         r.compatibility, r.type_data,
+                        rs.provider as source_provider,rs.provider_project_id,rs.provider_version_id,
+                        rs.provider_file_name,rs.provider_version_number,rs.provider_project_url,
+                        rs.provider_creator,rs.available as source_available,rs.last_verified_at as source_last_verified_at,
                         coalesce((
                             select jsonb_agg(jsonb_build_object(
                                 'type', d.dependency_type,
@@ -347,6 +358,7 @@ function createCommunityProvider(options) {
                         ), '[]'::jsonb) as dependencies
                  from community_items i
                  join community_revisions r on r.id = i.current_revision_id
+                 left join community_revision_sources rs on rs.revision_id=r.id
                  left join users u on u.id = i.owner_id
                  where ${where.join(' and ')}
                  order by ${order}

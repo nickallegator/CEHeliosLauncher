@@ -35,6 +35,7 @@ const {
     persistCompositionIndex,
     resolveComposition
 } = require('../services/communityPackStudio')
+const { resolveCommunityRevisionDownload } = require('../services/communityRevisionDownloads')
 
 const router = express.Router()
 const typeRegistry = createDefaultCommunityTypeRegistry()
@@ -185,6 +186,10 @@ const CURRENT_ITEM_SELECT = `
            r.id as revision_id, r.revision_number, r.sha256,
            r.size_bytes as revision_size_bytes, r.mime_type, r.extension,
            r.format_id, r.format_version, r.compatibility, r.type_data, r.object_key,
+           rs.provider as source_provider, rs.object_key as source_object_key,
+           rs.provider_project_id, rs.provider_version_id, rs.provider_file_name, rs.provider_sha512,
+           rs.provider_version_number, rs.provider_project_url, rs.provider_creator,
+           rs.available as source_available, rs.last_verified_at as source_last_verified_at,
            coalesce((select jsonb_agg(jsonb_build_object(
                'type', d.dependency_type, 'itemId', d.dependency_item_id,
                'revisionId', d.dependency_revision_id, 'required', d.required,
@@ -193,6 +198,7 @@ const CURRENT_ITEM_SELECT = `
            from community_revision_dependencies d where d.revision_id = r.id), '[]'::jsonb) as dependencies
     from community_items i
     join community_revisions r on r.id = i.current_revision_id
+    left join community_revision_sources rs on rs.revision_id = r.id
     left join users u on u.id = i.owner_id`
 
 async function getItem(type, id, { includeInactive = false, client = db } = {}) {
@@ -236,6 +242,18 @@ function itemJson(row, detail = false) {
         dependencies: dependencies || [],
         typeData: typeData || {},
         thumbnailUrl: `/v1/community/items/${row.type}/${row.id}/preview?size=tiny`
+    }
+    if(row.source_provider === 'modrinth') {
+        const creator = typeof row.provider_creator === 'string' ? JSON.parse(row.provider_creator) : row.provider_creator
+        value.source = {
+            provider: 'modrinth', projectId: row.provider_project_id, versionId: row.provider_version_id,
+            versionNumber: row.provider_version_number, fileName: row.provider_file_name,
+            projectUrl: row.provider_project_url, creator: creator || null
+        }
+        value.availability = { available: row.source_available !== false, lastVerifiedAt: row.source_last_verified_at || null }
+    } else {
+        value.source = { provider: 'r2' }
+        value.availability = { available: true, lastVerifiedAt: null }
     }
     if(detail) {
         value.downloadUrl = `/v1/community/items/${row.type}/${row.id}/download`
@@ -303,7 +321,8 @@ router.get('/community/capabilities', (_req, res) => {
         ...catalog.capabilities(),
         features: {
             richPreviews: config.community.richPreviewsEnabled === true,
-            packStudio: config.community.packStudioEnabled === true
+            packStudio: config.community.packStudioEnabled === true,
+            modrinth: config.modrinth.enabled === true
         },
         composer: config.community.packStudioEnabled ? {
             schemaVersion: 1,
@@ -384,7 +403,6 @@ router.post('/community/composer/resolve', asyncRoute(async (req, res) => {
     }
     const plan = resolveComposition(sources, selections, resolutions)
     const updates = await describeCompositionUpdates(db, sources, selections)
-    const storage = getCommunityObjectStorage()
     const descriptors = await Promise.all(sources.map(async source => ({
         itemId: source.itemId,
         revisionId: source.revisionId,
@@ -394,9 +412,13 @@ router.post('/community/composer/resolve', asyncRoute(async (req, res) => {
         sha256: source.sha256,
         sizeBytes: source.sizeBytes,
         compatibility: source.compatibility,
+        source: source.sourceProvider === 'modrinth' ? {
+            provider: 'modrinth', projectId: source.providerProjectId,
+            versionNumber: source.providerVersionNumber, projectUrl: source.providerProjectUrl
+        } : { provider: 'r2' },
         updateAvailable: source.currentRevisionId != null && source.currentRevisionId !== source.revisionId,
         update: updates.get(String(source.revisionId)) || null,
-        downloadUrl: await storage.signGet(source.objectKey, 900)
+        ...(await resolveCommunityRevisionDownload(source))
     })))
     res.set('Cache-Control', 'private, no-store')
     res.json({
@@ -684,6 +706,11 @@ router.post('/community/uploads/:token/finalize', requireSession, asyncRoute(asy
                             handler.format.mime, handler.format.extension, handler.format.id, handler.format.version,
                             metadata.compatibility, validated.typeData || {}, artifactKey, req.userId]
                     )
+                    await client.query(
+                        `insert into community_revision_sources(revision_id,provider,object_key,last_verified_at)
+                         values ($1,'r2',$2,now())`,
+                        [revisionId, artifactKey]
+                    )
                     for(const dependency of dependencies) {
                         await client.query(
                             `insert into community_revision_dependencies
@@ -778,8 +805,7 @@ router.get('/community/items/:type/:id/download', asyncRoute(async (req, res) =>
         res.status(404).json({ error: 'community_item_not_found' })
         return
     }
-    const storage = getCommunityObjectStorage()
-    const downloadUrl = await storage.signGet(row.object_key, 900)
+    const descriptor = await resolveCommunityRevisionDownload(row)
     await db.query('update community_items set downloads = downloads + 1 where id = $1', [row.id])
     res.set('Cache-Control', 'private, no-store')
     res.json({
@@ -787,8 +813,9 @@ router.get('/community/items/:type/:id/download', asyncRoute(async (req, res) =>
         type: row.type,
         itemId: row.id,
         revision: itemJson(row).revision,
-        expiresAt: new Date(Date.now() + 900_000).toISOString(),
-        downloadUrl
+        provider: descriptor.provider,
+        expiresAt: descriptor.expiresAt,
+        downloadUrl: descriptor.downloadUrl
     })
 }))
 

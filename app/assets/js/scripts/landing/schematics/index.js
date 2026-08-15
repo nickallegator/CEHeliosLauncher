@@ -121,6 +121,7 @@ function initSchematics(){
     setCommunitySection('content', { skipFetch: true })
     if(typeof initGenericCommunityContent === 'function') initGenericCommunityContent()
     if(typeof initPackStudio === 'function') initPackStudio().catch(error => loggerLanding.warn('Pack Studio initialization failed.', error))
+    if(typeof initModrinthIntegration === 'function') initModrinthIntegration().catch(error => loggerLanding.warn('Modrinth initialization failed.', error))
     setCommunityCategory(schematicsState.category || 'all', { skipFetch: true })
     communityCategoryFilters?.addEventListener('click', (event) => {
         const button = event.target.closest('[data-community-category]')

@@ -89,6 +89,20 @@
                 </div>
                 <div id="settingsPatreonAccessDesc"><%- lang('settings.patreonAccessDesc') %></div>
             </div>
+            <div class="settingsAuthAccountTypeContainer" id="settingsModrinthContainer" hidden>
+                <div class="settingsAuthAccountTypeHeader">
+                    <div class="settingsAuthAccountTypeHeaderLeft">
+                        <span class="settingsProviderMark" aria-hidden="true">M</span>
+                        <span><%- lang('settings.modrinthTitle') %></span>
+                    </div>
+                    <div class="settingsAuthAccountTypeHeaderRight">
+                        <button class="settingsAddAuthAccount" id="settingsModrinthConnect"><%- lang('settings.modrinthConnect') %></button>
+                        <button class="settingsAddAuthAccount" id="settingsModrinthDisconnect" hidden><%- lang('settings.modrinthDisconnect') %></button>
+                    </div>
+                </div>
+                <div id="settingsModrinthProfile"><img id="settingsModrinthAvatar" alt="" hidden><span id="settingsModrinthStatus"><%- lang('settings.modrinthNotConnected') %></span></div>
+                <div class="settingsFieldDesc"><%- lang('settings.modrinthDescription') %></div>
+            </div>
         </div>
         <div id="settingsTabMinecraft" class="settingsTab" style="display: none;">
             <div class="settingsTabHeader">

@@ -9,6 +9,7 @@ const { finished } = require('stream/promises')
 const db = require('../src/db')
 const config = require('../src/config')
 const { getCommunityObjectStorage } = require('../src/services/communityObjectStorage')
+const { downloadCommunityRevisionToFile, resolveCommunityRevisionDownload } = require('../src/services/communityRevisionDownloads')
 
 function argument(flag, fallback = null) {
     const index = process.argv.indexOf(flag)
@@ -37,8 +38,11 @@ async function run() {
     const storage = getCommunityObjectStorage()
     await storage.ready()
     const revisions = await db.query(
-        `select r.id, r.item_id, i.type, r.sha256, r.size_bytes, r.object_key
+        `select r.id, r.item_id, i.type, r.sha256, r.size_bytes, r.object_key,
+                rs.provider as source_provider,rs.object_key as source_object_key,rs.provider_version_id,
+                rs.provider_file_name,rs.provider_sha512,rs.available as source_available
          from community_revisions r join community_items i on i.id=r.item_id
+         left join community_revision_sources rs on rs.revision_id=r.id
          order by r.created_at, r.id limit $1 offset $2`,
         [limit, offset]
     )
@@ -53,16 +57,21 @@ async function run() {
     try {
         for(const row of revisions.rows) {
             try {
-                const head = await storage.head(row.object_key)
-                if(Number(head.ContentLength) !== Number(row.size_bytes)) throw new Error('size mismatch')
+                const provider = row.source_provider || (row.object_key ? 'r2' : null)
+                if(provider === 'r2') {
+                    const head = await storage.head(row.source_object_key || row.object_key)
+                    if(Number(head.ContentLength) !== Number(row.size_bytes)) throw new Error('size mismatch')
+                } else {
+                    await resolveCommunityRevisionDownload(row)
+                }
                 if(verifyHashes) {
                     const target = path.join(tempRoot, `${row.id}.artifact`)
-                    await storage.getToFile(row.object_key, target, { maxBytes: Number(row.size_bytes) })
+                    await downloadCommunityRevisionToFile(row, target)
                     if(await sha256File(target) !== row.sha256) throw new Error('SHA-256 mismatch')
                     await fs.promises.rm(target, { force: true })
                 }
             } catch(error) {
-                issues.push({ type: 'artifact_invalid', itemId: row.item_id, revisionId: row.id, objectKey: row.object_key, detail: error.message })
+                issues.push({ type: 'artifact_invalid', itemId: row.item_id, revisionId: row.id, provider: row.source_provider || 'r2', objectKey: row.object_key, detail: error.message })
             }
         }
         for(const preview of previews.rows) {

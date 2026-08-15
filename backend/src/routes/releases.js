@@ -30,7 +30,8 @@ function injectSchematicsService(distribution, schematicsConfig = config.schemat
                 catalog: true,
                 publishing: communityConfig.writeMode !== 'disabled',
                 richPreviews: communityConfig.richPreviewsEnabled === true,
-                packStudio: communityConfig.packStudioEnabled === true
+                packStudio: communityConfig.packStudioEnabled === true,
+                modrinth: communityConfig.modrinthEnabled === true
             },
             supportedTypes: [
                 ...(schematicsConfig.enabled ? ['schematics'] : []),

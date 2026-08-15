@@ -127,6 +127,12 @@ function createSchematicCard(entry){
         const definition = communityContentRegistry?.get(entry.communityType)
         typeBadge.textContent = definition ? Lang.query(definition.labelKey) : entry.communityType
         details.appendChild(typeBadge)
+        if(entry.source?.provider === 'modrinth'){
+            const sourceBadge = document.createElement('span')
+            sourceBadge.className = 'communityTypeBadge communityModrinthBadge'
+            sourceBadge.textContent = 'Modrinth'
+            details.appendChild(sourceBadge)
+        }
         const typeSummary = document.createElement('span')
         typeSummary.className = 'communityTypeSummary'
         typeSummary.textContent = communityTypeSummary(entry)

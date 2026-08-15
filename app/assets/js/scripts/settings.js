@@ -1843,8 +1843,26 @@ async function prepareSettings(first = false) {
     }
     await initSettingsValues()
     prepareAccountsTab()
+    await prepareModrinthSettingsShortcut()
     await prepareJavaTab()
     prepareAboutTab()
+}
+
+async function prepareModrinthSettingsShortcut(){
+    const container = document.getElementById('settingsModrinthContainer')
+    if(!container) return
+    const distribution = await DistroAPI.getDistribution().catch(() => null)
+    const enabled = distribution?.rawDistribution?.community?.features?.modrinth === true
+    container.hidden = !enabled
+    if(!enabled) return
+    const connect = document.getElementById('settingsModrinthConnect')
+    if(connect && connect.dataset.modrinthShortcutBound !== 'true'){
+        connect.dataset.modrinthShortcutBound = 'true'
+        connect.onclick = async () => {
+            await window.AppShell?.navigate?.('community')
+            document.getElementById('communityModrinthImportOpen')?.click()
+        }
+    }
 }
 
 // Prepare the settings UI on startup.

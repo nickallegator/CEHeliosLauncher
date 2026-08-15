@@ -778,6 +778,7 @@ let schematicsInitialized = false
 const SCHEMATICS_LAZY_SCRIPT_PATHS = [
     './assets/js/scripts/landing/schematics/core.js',
     './assets/js/scripts/landing/schematics/api.js',
+    './assets/js/scripts/landing/schematics/modrinth.js',
     './assets/js/scripts/landing/schematics/admin.js',
     './assets/js/scripts/landing/schematics/preview.js',
     './assets/js/scripts/landing/schematics/render.js',

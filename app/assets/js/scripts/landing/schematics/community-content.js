@@ -452,6 +452,13 @@ async function openGenericCommunityDetail(entry){
     genericCommunityElement('communityContentDetailCreator').textContent = `by ${creatorName || 'Minecraft Player'}`
     genericCommunityElement('communityContentDetailDescription').textContent = value.description || ''
     genericCommunityElement('communityContentDetailLicense').textContent = value.license || '\u2014'
+    const sourceLink = genericCommunityElement('communityContentDetailSource')
+    if(sourceLink){
+        const external = value.source?.provider === 'modrinth' && /^https:\/\/modrinth\.com\//i.test(value.source.projectUrl || '')
+        sourceLink.hidden = !external
+        sourceLink.textContent = external ? `Modrinth · ${value.source.versionNumber || 'Source'}` : ''
+        sourceLink.href = external ? value.source.projectUrl : '#'
+    }
     genericCommunityElement('communityContentDetailRights').textContent = value.rightsAttestedAt ? communityCopy('rightsConfirmed') : '\u2014'
     genericCommunityElement('communityContentDetailRevision').textContent = value.revision ? `#${value.revision.number}` : '\u2014'
     genericCommunityElement('communityContentDetailCompatibility').textContent = `${value.compatibility?.minecraft || '1.21.1'} / NeoForge`

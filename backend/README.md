@@ -114,3 +114,6 @@ Generic endpoints are:
 - Owner metadata, deletion, engagement, report, and administrator moderation routes under `/v1/community`
 
 Deployment, installation-safety, and staged rollout details are documented in `docs/community-content-platform.md` at the repository root.
+# Modrinth Resource Pack sources
+
+The optional authenticated, read-only Modrinth source integration is documented in [`../docs/modrinth-resource-pack-sources.md`](../docs/modrinth-resource-pack-sources.md). Keep it disabled until migration, OAuth registration, managed secrets, and the 15-minute synchronization job are configured.

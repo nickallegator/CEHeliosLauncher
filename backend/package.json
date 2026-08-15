@@ -14,6 +14,7 @@
     "schematics:scan": "node scripts/schematics-integrity-scan.js",
     "community:scan": "node scripts/community-integrity-scan.js",
     "community:pack-studio:index": "node scripts/pack-studio-index.js",
+    "community:modrinth:sync": "node scripts/modrinth-sync.js",
     "testers:add": "node scripts/testers.js add",
     "testers:disable": "node scripts/testers.js disable",
     "testers:list": "node scripts/testers.js list",

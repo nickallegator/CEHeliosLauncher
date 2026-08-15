@@ -167,10 +167,14 @@ async function loadSourcesForSelections(db, selections) {
     if(revisionIds.some(value => !UUID.test(value))) throw Object.assign(new Error('Pack Studio selection contains an invalid revision.'), { statusCode: 400, code: 'invalid_revision_id' })
     const result = await db.query(
         `select r.id as revision_id,r.sha256,r.size_bytes,r.object_key,r.compatibility,
+                rs.provider as source_provider,rs.object_key as source_object_key,rs.provider_version_id,
+                rs.provider_file_name,rs.provider_sha512,rs.provider_project_id,rs.provider_version_number,
+                rs.provider_project_url,rs.available as source_available,
                 i.id as item_id,i.title,i.license,i.status,i.visibility,i.current_revision_id,u.display_name as creator,
                 g.enabled,g.terms_version
          from community_revisions r join community_items i on i.id=r.item_id
          join community_resource_pack_composition_grants g on g.revision_id=r.id
+         left join community_revision_sources rs on rs.revision_id=r.id
          left join users u on u.id=i.owner_id where r.id=any($1::uuid[])`,
         [revisionIds]
     )
@@ -218,6 +222,15 @@ async function loadSourcesForSelections(db, selections) {
             sha256: row.sha256,
             sizeBytes: Number(row.size_bytes),
             objectKey: row.object_key,
+            sourceProvider: row.source_provider || (row.object_key ? 'r2' : null),
+            sourceObjectKey: row.source_object_key,
+            providerVersionId: row.provider_version_id,
+            providerFileName: row.provider_file_name,
+            providerSha512: row.provider_sha512,
+            providerProjectId: row.provider_project_id,
+            providerVersionNumber: row.provider_version_number,
+            providerProjectUrl: row.provider_project_url,
+            sourceAvailable: row.source_available,
             compatibility: row.compatibility || {},
             currentRevisionId: row.current_revision_id,
             files: [...fileMap.values()],

@@ -1003,3 +1003,58 @@
     top: auto;
     bottom: calc(100% + 8px);
 }
+.communityHeaderActions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.communitySourceBadge { display: inline-flex; width: fit-content; padding: 4px 8px; border: 1px solid #1bd96a; color: #8af0b7; text-decoration: none; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.communityModrinthBadge { border-color: #1bd96a; color: #8af0b7; }
+
+.settingsProviderMark {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    color: #111817;
+    background: #1bd96a;
+    font-weight: 900;
+}
+#settingsModrinthProfile { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+#settingsModrinthAvatar { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
+
+.communityModrinthPanel {
+    width: min(960px, calc(100vw - 48px));
+    height: min(760px, calc(100vh - 64px));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.communityModrinthBody { overflow: auto; padding: 18px 22px; }
+.communityModrinthConnection,
+.communityModrinthGrid,
+.communityModrinthSourceBar,
+.communityModrinthCandidate { border: 1px solid var(--workshop-border, #35504a); background: #172522; padding: 14px; }
+.communityModrinthGrid { display: grid; grid-template-columns: minmax(240px, 1fr) auto auto; gap: 14px; align-items: end; margin-top: 14px; }
+.communityModrinthGrid label,
+.communityModrinthSourceBar label { display: grid; gap: 6px; }
+.communityModrinthGrid fieldset { display: flex; gap: 12px; border: 0; margin: 0; padding: 0; }
+.communityModrinthSourceBar { margin-top: 12px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
+.communityModrinthCandidates { display: grid; gap: 10px; margin-top: 12px; }
+.communityModrinthMetadata { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; padding: 14px; border: 1px solid var(--workshop-border, #35504a); background: #121f1c; }
+.communityModrinthMetadata label { display: grid; gap: 6px; }
+.communityModrinthMetadata label:nth-child(n+4) { display: flex; grid-column: 1 / -1; align-items: flex-start; }
+.communityModrinthMetadata textarea { min-height: 64px; resize: vertical; }
+.communityModrinthCandidate h4,
+.communityModrinthCandidate p { margin: 0 0 8px; }
+.communityModrinthCandidateActions { display: flex; gap: 8px; flex-wrap: wrap; }
+#communityModrinthStatus[error] { color: #ff9e85; }
+
+@media (max-width: 1099px), (max-height: 639px) {
+    .communityModrinthPanel { width: calc(100vw - 20px); height: calc(100vh - 34px); }
+    .communityModrinthGrid { grid-template-columns: 1fr; }
+    .communityModrinthMetadata { grid-template-columns: 1fr; }
+}
