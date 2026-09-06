@@ -31,6 +31,15 @@ function parseBoolean(value, fallback = false) {
     return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase())
 }
 
+function parseJson(value, fallback) {
+    if(value == null || value === '') return fallback
+    try {
+        return JSON.parse(value)
+    } catch(_err) {
+        throw new Error('Environment JSON value is invalid')
+    }
+}
+
 function objectStorageConfig(prefix, defaults = {}) {
     return {
         provider: getEnv(`${prefix}_PROVIDER`, null),
@@ -63,6 +72,20 @@ const config = {
     corsOrigins: parseList(getEnv('CORS_ORIGINS', '')),
     databaseUrl: getEnv('DATABASE_URL', null),
     sessionTtlDays: parseNumber(getEnv('SESSION_TTL_DAYS', '30'), 30),
+    gameServers: {
+        statusEnabled: parseBoolean(getEnv('GAME_SERVER_STATUS_ENABLED', 'false')),
+        publicApiUrl: getEnv('GAME_SERVER_STATUS_PUBLIC_API_URL', getEnv('BASE_URL', 'http://localhost:8080')),
+        timeoutMs: parseNumber(getEnv('GAME_SERVER_STATUS_TIMEOUT_MS', '2500'), 2500),
+        cacheSeconds: parseNumber(getEnv('GAME_SERVER_STATUS_CACHE_SECONDS', '15'), 15),
+        entries: parseJson(getEnv('GAME_SERVERS_JSON', ''), [{
+            profileId: 'Cobble-Power-1.21.1',
+            address: 'play.allegatorgames.com:25565',
+            requiredEntitlement: 'cobblepower:test',
+            statusEnabled: true,
+            directConnectEnabled: true,
+            localOverridesAllowed: true
+        }])
+    },
     releases: {
         enabled: parseBoolean(getEnv('RELEASES_ENABLED', 'false')),
         channel: getEnv('RELEASES_CHANNEL', 'test'),
@@ -185,6 +208,15 @@ if(config.modrinth.enabled) {
     if(missing.length > 0) throw new Error(`Modrinth integration is enabled but configuration is missing: ${missing.join(', ')}`)
     if(['USER_READ', 'PROJECT_READ'].some(scope => !config.modrinth.scopes.includes(scope))) {
         throw new Error('MODRINTH_OAUTH_SCOPES must include USER_READ and PROJECT_READ')
+    }
+}
+
+{
+    const { createGameServerRegistry } = require('./services/gameServerRegistry')
+    createGameServerRegistry(config.gameServers.entries)
+    const statusUrl = new URL(config.gameServers.publicApiUrl)
+    if(process.env.NODE_ENV === 'production' && statusUrl.protocol !== 'https:') {
+        throw new Error('GAME_SERVER_STATUS_PUBLIC_API_URL must use HTTPS in production')
     }
 }
 

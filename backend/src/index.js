@@ -104,6 +104,7 @@ app.use('/auth/patreon', authRoutes)
 app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
+app.use('/v1', require('./routes/gameServers'))
 if(config.modrinth.enabled) {
     app.use('/v1', require('./routes/modrinthIntegration'))
     app.use('/v1', require('./routes/modrinthSources'))

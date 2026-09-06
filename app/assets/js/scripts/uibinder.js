@@ -593,5 +593,6 @@ async function devModeToggle() {
     const data = await DistroAPI.refreshDistributionOrFallback()
     ensureJavaSettings(data)
     updateSelectedServer(data.servers[0])
+    refreshServerStatus()
     syncModConfigurations(data)
 }

@@ -6,6 +6,7 @@ const { createRateLimit } = require('../middleware/rateLimit')
 const { asyncRoute } = require('../middleware/asyncRoute')
 const store = require('../services/store')
 const { createReleaseStorage } = require('../services/releaseStorage')
+const { createGameServerRegistry } = require('../services/gameServerRegistry')
 
 const router = express.Router()
 const distributionLimit = createRateLimit({ windowMs: 60_000, limit: 30 })
@@ -42,6 +43,28 @@ function injectSchematicsService(distribution, schematicsConfig = config.schemat
     return distribution
 }
 
+function injectGameServerServices(distribution, settings = config.gameServers) {
+    const registry = createGameServerRegistry(settings.entries)
+    const apiBase = new URL(settings.publicApiUrl)
+    apiBase.pathname = apiBase.pathname.replace(/\/+$/, '') + '/'
+    for(const server of distribution.servers || []) {
+        const entry = registry.get(server.id)
+        if(!entry) continue
+        server.address = entry.address
+        server.connection = {
+            schemaVersion: 1,
+            enabled: entry.directConnectEnabled,
+            publicAddress: entry.address,
+            statusUrl: settings.statusEnabled && entry.statusEnabled
+                ? new URL(`v1/game-servers/${encodeURIComponent(entry.profileId)}/status`, apiBase).toString()
+                : null,
+            statusRefreshSeconds: 30,
+            localOverridesAllowed: entry.localOverridesAllowed
+        }
+    }
+    return distribution
+}
+
 router.get('/releases/channels/:channel/distribution', distributionLimit, requireSession, asyncRoute(async (req, res) => {
     if(!config.releases.enabled) {
         res.status(404).json({ error: 'not_found' })
@@ -62,6 +85,7 @@ router.get('/releases/channels/:channel/distribution', distributionLimit, requir
     const releaseStorage = createReleaseStorage()
     const result = await releaseStorage.getAuthorizedDistribution(req.params.channel)
     injectSchematicsService(result.distribution)
+    injectGameServerServices(result.distribution)
     console.info('[audit] channel distribution issued', { requestId: req.requestId, userId: req.userId, channel: req.params.channel, releaseId: result.releaseId })
     res.set('Cache-Control', 'private, no-store')
     res.set('X-CobblePower-Release', result.releaseId)
@@ -70,3 +94,4 @@ router.get('/releases/channels/:channel/distribution', distributionLimit, requir
 
 module.exports = router
 module.exports.injectSchematicsService = injectSchematicsService
+module.exports.injectGameServerServices = injectGameServerServices
