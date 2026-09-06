@@ -189,7 +189,7 @@ test('generic Community types migrate, publish, browse, engage, and download thr
     assert.equal(components.schemaVersion, 1)
     assert.equal(components.items.length, 1)
     assert.equal(components.items[0].key, 'block:cobblepower:pilot')
-    const resolution = await responseJson(await fetch(`${BASE}/v1/community/composer/resolve`, {
+    const resolveResponse = await fetch(`${BASE}/v1/community/composer/resolve`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             schemaVersion: 1,
@@ -200,7 +200,10 @@ test('generic Community types migrate, publish, browse, engage, and download thr
             }],
             conflictResolutions: {}
         })
-    }), 200)
+    })
+    const resolveText = await resolveResponse.text()
+    assert.equal(resolveResponse.status, 200, `${resolveText}\nBackend output:\n${output}`)
+    const resolution = JSON.parse(resolveText)
     assert.equal(resolution.plan.conflicts.length, 0)
     assert.equal(resolution.sources.length, 1)
     assert.equal((await fetch(resolution.sources[0].downloadUrl)).ok, true)
