@@ -53,9 +53,33 @@ test('Pack Studio persistence normalizes revision files, components, mappings, a
     const staleRemoval = statements.find(value => value.sql.includes('delete from community_resource_components'))
     assert.deepEqual(staleRemoval.params, [REVISION, ['texture:cobblepower:test']])
     assert.ok(statements.some(value => value.sql.includes('community_resource_components')))
+    const componentInsert = statements.find(value => value.sql.includes('insert into community_resource_components'))
+    assert.equal(componentInsert.params[9], '[]')
     assert.ok(statements.some(value => value.sql.includes('community_resource_component_files')))
     const grant = statements.find(value => value.sql.includes('community_resource_pack_composition_grants'))
     assert.equal(grant.params[2], false)
+})
+
+test('Pack Studio source loading treats legacy non-array JSON fragments as empty', async () => {
+    const db = {
+        async query(sql) {
+            if(sql.includes('from community_revisions r')) return { rows: [{
+                revision_id: REVISION, sha256: 'e'.repeat(64), size_bytes: 40, object_key: 'private/source.zip', compatibility: {},
+                item_id: ITEM, title: 'Source', license: 'Community-Use-1.0', status: 'active', visibility: 'public',
+                current_revision_id: REVISION, creator: 'Builder', enabled: true, terms_version: 1
+            }] }
+            if(sql.includes('metadata @>')) return { rows: [] }
+            return { rows: [{
+                component_key: 'texture:cobblepower:test', kind: 'texture', identifier: 'cobblepower:test', title: 'Texture',
+                namespace: 'cobblepower', content_sha256: 'f'.repeat(64), metadata: {}, merge_fragments: {},
+                files: [{ path: 'assets/cobblepower/test.png', sha256: 'f'.repeat(64), sizeBytes: 4 }]
+            }] }
+        }
+    }
+    const selections = [{ sourceItemId: ITEM, sourceRevisionId: REVISION, componentKey: 'texture:cobblepower:test' }]
+    const sources = await loadSourcesForSelections(db, selections)
+    assert.deepEqual(sources[0].components[0].mergeFragments, [])
+    assert.equal(resolveComposition(sources, selections).conflicts.length, 0)
 })
 
 test('Pack Studio component catalog exposes bounded normalized source metadata', async () => {
