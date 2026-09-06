@@ -7,8 +7,13 @@ artifactName: 'AG-Launcher-Test-setup-${version}.${ext}'
 copyright: 'Copyright (c) 2026 Allegator Games'
 
 extraMetadata:
-  version: '2.7.0-test.1'
   productName: 'Allegator Games Launcher'
+
+publish:
+  provider: 'github'
+  owner: 'nickallegator'
+  repo: 'CEHeliosLauncher'
+  releaseType: 'prerelease'
 
 extraResources:
   - from: 'libraries'

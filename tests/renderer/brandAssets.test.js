@@ -26,7 +26,8 @@ test('package and Electron Builder identities match the runtime brand contract',
     assert.match(baseBuilder, /executableName: 'AG Launcher'/)
     assert.match(baseBuilder, /icon: 'build\/icon\.ico'/)
     assert.match(channelBuilder, /artifactName: 'AG-Launcher-Test-setup-\$\{version\}\.\$\{ext\}'/)
-    assert.ok(channelBuilder.includes(`version: '${packageJson.version}'`))
+    assert.doesNotMatch(channelBuilder, /^\s*version:/m)
+    assert.match(fs.readFileSync(path.join(root, 'scripts', 'build-channel-launcher.js'), 'utf8'), /packageMetadata\.version/)
 })
 
 test('generated logo assets are optimized, consistent, and retain legacy binary aliases', () => {

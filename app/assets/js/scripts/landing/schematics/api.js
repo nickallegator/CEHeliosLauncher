@@ -108,7 +108,10 @@ function getSchematicsAuthHeaders(){
     if(!token){
         return {}
     }
-    return { Authorization: `Bearer ${token}` }
+    return {
+        ...require('./assets/js/launcheridentity').getLauncherRequestHeaders(),
+        Authorization: `Bearer ${token}`
+    }
 }
 
 function getCurrentUserId(){

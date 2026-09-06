@@ -1,0 +1,76 @@
+.launcherUpdateModal {
+    position: fixed;
+    inset: var(--workshop-frame-height) 0 0;
+    z-index: 1800;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--workshop-transition) ease;
+}
+
+.launcherUpdateModal[data-open="true"] { opacity: 1; visibility: visible; pointer-events: auto; }
+.launcherUpdateScrim { position: absolute; inset: 0; background: rgba(5, 9, 8, .88); }
+.launcherUpdatePanel {
+    position: relative;
+    width: min(620px, calc(100vw - 36px));
+    max-height: calc(100vh - var(--workshop-frame-height) - 36px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    color: var(--workshop-text);
+    background: linear-gradient(145deg, rgba(31, 42, 39, .99), rgba(16, 24, 22, .99));
+    border: 1px solid var(--workshop-copper);
+    border-radius: var(--workshop-radius);
+    box-shadow: var(--workshop-shadow);
+    transform: translateY(10px);
+    transition: transform var(--workshop-transition) ease;
+}
+.launcherUpdateModal[data-open="true"] .launcherUpdatePanel { transform: translateY(0); }
+.launcherUpdateHeader, .launcherUpdateFooter { padding: 18px 20px; display: flex; align-items: center; gap: 14px; }
+.launcherUpdateHeader { border-bottom: 1px solid var(--workshop-line); }
+.launcherUpdateHeader img { width: 56px; height: 56px; object-fit: contain; }
+.launcherUpdateHeader h2 { margin: 2px 0 0; font: 600 27px/1 'Pixelify Sans', sans-serif; }
+.launcherUpdateBody { overflow: auto; padding: 18px 20px; }
+.launcherUpdateVersionRow { display: flex; justify-content: space-between; gap: 14px; color: var(--workshop-mint); font-weight: 700; }
+.launcherUpdateBody p { line-height: 1.5; }
+#launcherUpdateNotesSection { margin-top: 16px; padding: 14px; border: 1px solid var(--workshop-line); background: rgba(7, 13, 12, .62); }
+#launcherUpdateNotesSection h3 { margin: 0 0 8px; font-size: 14px; color: var(--workshop-copper-light); }
+#launcherUpdateNotes { margin: 0; max-height: 190px; overflow: auto; white-space: pre-wrap; color: var(--workshop-text-soft); font: inherit; user-select: text; }
+.launcherUpdateProgressTrack { height: 9px; overflow: hidden; border: 1px solid var(--workshop-line); background: var(--workshop-surface); }
+#launcherUpdateProgressBar { height: 100%; width: 0; background: linear-gradient(90deg, var(--workshop-copper), var(--workshop-mint)); transition: width 120ms linear; }
+#launcherUpdateProgressText { display: block; margin-top: 7px; color: var(--workshop-text-soft); }
+#launcherUpdateError { color: var(--workshop-danger, #ff8c7a); }
+.launcherUpdateFooter { justify-content: flex-end; border-top: 1px solid var(--workshop-line); }
+.launcherUpdateFooter button, #launcherUpdateNotice { min-height: 40px; border: 1px solid var(--workshop-line-strong); border-radius: 3px; background: var(--workshop-surface-soft); color: var(--workshop-text); }
+.launcherUpdateFooter button { min-width: 126px; padding: 0 16px; }
+.launcherUpdateFooter button.primary { border-color: var(--workshop-copper-light); background: var(--workshop-copper); color: var(--workshop-ink); font-weight: 800; }
+.launcherUpdateFooter button:focus-visible, #launcherUpdateNotice:focus-visible { outline: 2px solid var(--workshop-mint); outline-offset: 3px; }
+#launcherUpdateNotice {
+    position: fixed;
+    z-index: 1250;
+    top: calc(var(--workshop-frame-height) + 14px);
+    right: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 310px;
+    padding: 10px 13px;
+    text-align: left;
+    box-shadow: var(--workshop-shadow);
+}
+#launcherUpdateNotice[hidden] { display: none; }
+.launcherUpdateNoticeMark { display: grid; place-items: center; width: 30px; height: 30px; color: var(--workshop-ink); background: var(--workshop-mint); font-weight: 900; }
+#launcherUpdateNotice span:last-child { display: grid; gap: 2px; }
+#launcherUpdateNotice small { color: var(--workshop-text-soft); }
+
+@media (max-height: 640px) {
+    .launcherUpdateModal { padding: 10px; }
+    .launcherUpdatePanel { max-height: calc(100vh - var(--workshop-frame-height) - 20px); }
+    #launcherUpdateNotes { max-height: 110px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .launcherUpdateModal, .launcherUpdatePanel, #launcherUpdateProgressBar { transition: none; }
+}

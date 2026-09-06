@@ -1,0 +1,11 @@
+extends: './electron-builder.channel.yml'
+
+# Stable releases must use this configuration and the Azure credentials described
+# in docs/launcher-self-updates.md. Test prereleases intentionally use the unsigned
+# channel configuration until Public Trust signing has been provisioned.
+win:
+  azureSignOptions:
+    endpoint: '${env.AZURE_ARTIFACT_SIGNING_ENDPOINT}'
+    codeSigningAccountName: '${env.AZURE_ARTIFACT_SIGNING_ACCOUNT}'
+    certificateProfileName: '${env.AZURE_ARTIFACT_SIGNING_PROFILE}'
+    publisherName: '${env.AZURE_ARTIFACT_SIGNING_PUBLISHER}'

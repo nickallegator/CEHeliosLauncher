@@ -8,14 +8,19 @@ const ejse                              = require('ejs-electron')
 const http                              = require('http')
 const isDev                             = require('./app/assets/js/isdev')
 const path                              = require('path')
-const semver                            = require('semver')
 const { pathToFileURL }                 = require('url')
 const { AZURE_CLIENT_ID, MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR, SHELL_OPCODE } = require('./app/assets/js/ipcconstants')
 const LangLoader                        = require('./app/assets/js/langloader')
 const { MICROSOFT_AUTH_REDIRECT_URI, parseMicrosoftAuthRedirect } = require('./app/assets/js/microsoftauthredirect')
-const { isTesterBuild }                 = require('./app/assets/js/testerchannel')
+const { loadTesterChannel }             = require('./app/assets/js/testerchannel')
+const { getLauncherChannel }            = require('./app/assets/js/launcheridentity')
 const Brand                             = require('./app/assets/js/brand')
 const { migrateBrandUserData }          = require('./app/assets/js/brandmigration')
+const { LauncherUpdateManager }         = require('./app/assets/js/launcherupdater')
+
+// Keep a global reference of the primary window object. Authentication
+// windows must never be able to invoke privileged launcher update actions.
+let win
 
 app.setName(Brand.productName)
 app.setAppUserModelId(Brand.appId)
@@ -43,79 +48,64 @@ try {
 // Setup Lang
 LangLoader.setupLanguage()
 
-// Setup auto updater.
-function initAutoUpdater(event, data) {
-
-    if(data){
-        autoUpdater.allowPrerelease = true
-    } else {
-        // Defaults to true if application version contains prerelease components (e.g. 0.12.1-alpha.1)
-        // autoUpdater.allowPrerelease = true
-    }
-    
-    if(isDev){
-        autoUpdater.autoInstallOnAppQuit = false
-        autoUpdater.updateConfigPath = path.join(__dirname, 'dev-app-update.yml')
-    }
-    if(process.platform === 'darwin'){
-        autoUpdater.autoDownload = false
-    }
-    autoUpdater.on('update-available', (info) => {
-        event.sender.send('autoUpdateNotification', 'update-available', info)
-    })
-    autoUpdater.on('update-downloaded', (info) => {
-        event.sender.send('autoUpdateNotification', 'update-downloaded', info)
-    })
-    autoUpdater.on('update-not-available', (info) => {
-        event.sender.send('autoUpdateNotification', 'update-not-available', info)
-    })
-    autoUpdater.on('checking-for-update', () => {
-        event.sender.send('autoUpdateNotification', 'checking-for-update')
-    })
-    autoUpdater.on('error', (err) => {
-        event.sender.send('autoUpdateNotification', 'realerror', err)
-    }) 
+let packagedChannel = null
+try {
+    packagedChannel = loadTesterChannel()
+} catch(error) {
+    console.error('[Updater] Unable to load packaged channel metadata.', error.message)
 }
 
-// Open channel to listen for update actions.
-ipcMain.on('autoUpdateAction', (event, arg, data) => {
-    if(isTesterBuild()){
-        if(arg === 'initAutoUpdater'){
-            event.sender.send('autoUpdateNotification', 'update-not-available')
-        }
-        return
+const updaterEnabled = app.isPackaged
+    && !isDev
+    && process.platform === 'win32'
+    && process.env.AG_COMMUNITY_SHOWROOM !== '1'
+    && (packagedChannel == null || packagedChannel.schemaVersion === 2)
+const updateChannel = getLauncherChannel(app.getVersion())
+const launcherUpdateManager = new LauncherUpdateManager({
+    updater: autoUpdater,
+    currentVersion: app.getVersion(),
+    channel: updateChannel,
+    enabled: updaterEnabled,
+    broadcast(state) {
+        if(win && !win.isDestroyed()) win.webContents.send('launcher-update:state-changed', state)
     }
-    switch(arg){
-        case 'initAutoUpdater':
-            console.log('Initializing auto updater.')
-            initAutoUpdater(event, data)
-            event.sender.send('autoUpdateNotification', 'ready')
-            break
-        case 'checkForUpdate':
-            autoUpdater.checkForUpdates()
-                .catch(err => {
-                    event.sender.send('autoUpdateNotification', 'realerror', err)
-                })
-            break
-        case 'allowPrereleaseChange':
-            if(!data){
-                const preRelComp = semver.prerelease(app.getVersion())
-                if(preRelComp != null && preRelComp.length > 0){
-                    autoUpdater.allowPrerelease = true
-                } else {
-                    autoUpdater.allowPrerelease = data
-                }
-            } else {
-                autoUpdater.allowPrerelease = data
-            }
-            break
-        case 'installUpdateNow':
-            autoUpdater.quitAndInstall()
-            break
-        default:
-            console.log('Unknown argument', arg)
-            break
+})
+
+function requirePrimaryRenderer(event) {
+    if(!win || win.isDestroyed() || event.sender.id !== win.webContents.id) {
+        throw Object.assign(new Error('Launcher update actions are restricted to the primary window.'), { code: 'forbidden_sender' })
     }
+}
+
+ipcMain.handle('launcher-update:get-state', event => {
+    requirePrimaryRenderer(event)
+    return launcherUpdateManager.snapshot()
+})
+ipcMain.handle('launcher-update:initialize', async (event, options = {}) => {
+    requirePrimaryRenderer(event)
+    launcherUpdateManager.initialize()
+    await launcherUpdateManager.check({ allowPrerelease: options?.allowPrerelease === true })
+    return launcherUpdateManager.snapshot()
+})
+ipcMain.handle('launcher-update:check', async (event, options = {}) => {
+    requirePrimaryRenderer(event)
+    return launcherUpdateManager.check({ allowPrerelease: options?.allowPrerelease === true })
+})
+ipcMain.handle('launcher-update:download', async event => {
+    requirePrimaryRenderer(event)
+    return launcherUpdateManager.download()
+})
+ipcMain.handle('launcher-update:defer', event => {
+    requirePrimaryRenderer(event)
+    return launcherUpdateManager.defer()
+})
+ipcMain.handle('launcher-update:set-game-running', (event, running) => {
+    requirePrimaryRenderer(event)
+    return launcherUpdateManager.setGameRunning(running)
+})
+ipcMain.handle('launcher-update:install', event => {
+    requirePrimaryRenderer(event)
+    return launcherUpdateManager.install()
 })
 // Cache distribution results by renderer so a fast local preload cannot race
 // the page listener. The renderer explicitly announces when its listener is
@@ -327,10 +317,6 @@ ipcMain.on(MSFT_OPCODE.OPEN_LOGOUT, (ipcEvent, uuid, isLastAccount) => {
     msftLogoutWindow.loadURL('https://login.microsoftonline.com/common/oauth2/v2.0/logout')
 })
 
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-let win
-
 function createWindow() {
 
     win = new BrowserWindow({
@@ -447,6 +433,8 @@ app.on('window-all-closed', () => {
         app.quit()
     }
 })
+
+app.on('before-quit', () => launcherUpdateManager.dispose())
 
 app.on('activate', () => {
     // On macOS it's common to re-create a window in the app when the

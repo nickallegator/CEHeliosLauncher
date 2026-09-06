@@ -15,6 +15,7 @@ const { getSchematicsObjectStorage } = require('./services/schematicsObjectStora
 const { getCommunityObjectStorage } = require('./services/communityObjectStorage')
 const { createDefaultCommunityTypeRegistry } = require('./services/communityTypes')
 const { safeError } = require('./services/logSafety')
+const { createLauncherVersionMiddleware } = require('./services/launcherVersionPolicy')
 
 const app = express()
 
@@ -111,6 +112,8 @@ app.get('/ready', async (_req, res) => {
 })
 
 app.use('/auth/patreon', authRoutes)
+app.use('/v1', createLauncherVersionMiddleware(config.launcherUpdates.policies))
+app.use('/v1', require('./routes/launcherUpdates'))
 app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)

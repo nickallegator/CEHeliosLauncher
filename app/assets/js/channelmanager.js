@@ -7,6 +7,7 @@ const ConfigManager = require('./configmanager')
 const AccessManager = require('./accessmanager')
 const { loadTesterChannel } = require('./testerchannel')
 const { calculateOfflineGrant } = require('./channelpolicy')
+const { getLauncherRequestHeaders } = require('./launcheridentity')
 
 const logger = LoggerUtil.getLogger('ChannelManager')
 const channel = loadTesterChannel()
@@ -19,6 +20,18 @@ class ChannelAccessError extends Error {
         this.statusCode = options.statusCode || null
         this.offline = Boolean(options.offline)
     }
+}
+
+function launcherUpdateRequired(error) {
+    if(error?.response?.statusCode !== 426) return null
+    const policy = error.response.body && typeof error.response.body === 'object'
+        ? error.response.body
+        : {}
+    return new ChannelAccessError(
+        'launcher_update_required',
+        'Update AG Launcher before using online launcher services.',
+        { statusCode: 426, policy }
+    )
 }
 
 function isRemoteChannel() {
@@ -85,6 +98,7 @@ async function exchangeMinecraftToken() {
         response = await got.post(deriveAuthUrl(), {
             responseType: 'json',
             json: { accessToken: selected.accessToken },
+            headers: getLauncherRequestHeaders(),
             timeout: { request: 8_000 },
             retry: { limit: 1 }
         })
@@ -118,7 +132,7 @@ async function fetchAuthorizedDistribution(sessionToken) {
     try {
         const response = await got.get(channel.remoteDistributionUrl, {
             responseType: 'json',
-            headers: { Authorization: `Bearer ${sessionToken}` },
+            headers: { ...getLauncherRequestHeaders(), Authorization: `Bearer ${sessionToken}` },
             timeout: { request: 10_000 },
             retry: { limit: 1 }
         })
@@ -127,6 +141,8 @@ async function fetchAuthorizedDistribution(sessionToken) {
         return { rawDistribution: response.body, releaseId }
     } catch(err) {
         const statusCode = err.response?.statusCode || null
+        const updateError = launcherUpdateRequired(err)
+        if(updateError) throw updateError
         if(statusCode === 403) {
             clearChannelAuthorization({ resetDistribution: true })
             throw new ChannelAccessError('access_denied', 'This Minecraft account is no longer enabled for the Cobble Power test channel.', { statusCode })
@@ -141,7 +157,7 @@ async function authorizedGetJson(url, options = {}) {
     if(!isSessionFresh()) token = await exchangeMinecraftToken()
     const request = async currentToken => got.get(target, {
         responseType: 'json',
-        headers: { Authorization: `Bearer ${currentToken}` },
+        headers: { ...getLauncherRequestHeaders(), Authorization: `Bearer ${currentToken}` },
         timeout: { request: Number(options.timeoutMs) || 5000 },
         retry: { limit: 0 },
         signal: options.signal
@@ -149,9 +165,17 @@ async function authorizedGetJson(url, options = {}) {
     try {
         return (await request(token)).body
     } catch(err) {
+        const updateError = launcherUpdateRequired(err)
+        if(updateError) throw updateError
         if(err.response?.statusCode !== 401) throw err
         token = await exchangeMinecraftToken()
-        return (await request(token)).body
+        try {
+            return (await request(token)).body
+        } catch(retryError) {
+            const retryUpdateError = launcherUpdateRequired(retryError)
+            if(retryUpdateError) throw retryUpdateError
+            throw retryError
+        }
     }
 }
 
@@ -180,6 +204,19 @@ async function refreshAuthorizedDistribution(options = {}) {
         ConfigManager.save({ immediate: true })
         return { distribution, offline: false, releaseId: result.releaseId }
     } catch(err) {
+        if(err instanceof ChannelAccessError && err.code === 'launcher_update_required') {
+            const offlineGrant = getOfflineGrant()
+            if(options.allowOffline !== false && offlineGrant.valid) {
+                logger.warn('Online services require a newer launcher; using the validated offline grant.')
+                return {
+                    distribution: await require('./distromanager').DistroAPI.getDistribution(),
+                    offline: true,
+                    releaseId: offlineGrant.grant.releaseId,
+                    updateRequired: true
+                }
+            }
+            throw err
+        }
         if(err instanceof ChannelAccessError) throw err
         const offlineGrant = getOfflineGrant()
         if(options.allowOffline !== false && offlineGrant.valid) {
@@ -221,5 +258,6 @@ module.exports = {
     isRemoteChannel,
     isSessionFresh,
     validateAccessApiUrl,
+    launcherUpdateRequired,
     refreshAuthorizedDistribution
 }

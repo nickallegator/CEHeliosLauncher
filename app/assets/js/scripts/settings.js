@@ -211,10 +211,6 @@ function saveSettingsValues(){
                 } else if(v.type === 'checkbox'){
                     sFnOpts.push(v.checked)
                     sFn.apply(null, sFnOpts)
-                    // Special Conditions
-                    if(cVal === 'AllowPrerelease'){
-                        changeAllowPrerelease(v.checked)
-                    }
                 }
             } else if(v.tagName === 'DIV'){
                 if(v.classList.contains('rangeSlider')){
@@ -333,6 +329,7 @@ async function fullSettingsSave() {
     saveSettingsValues()
     saveModConfiguration()
     ConfigManager.save()
+    window.LauncherUpdates?.syncPreferences()
     window.dispatchEvent(new CustomEvent('helios:connection-override-change'))
     saveDropinModConfiguration()
     try {
@@ -1700,13 +1697,13 @@ function isPrerelease(version){
  * @param {Element} checkElement The check mark element.
  */
 function populateVersionInformation(version, valueElement, titleElement, checkElement){
-    valueElement.innerHTML = version
+    valueElement.textContent = version
     if(isPrerelease(version)){
-        titleElement.innerHTML = Lang.queryJS('settings.about.preReleaseTitle')
+        titleElement.textContent = Lang.queryJS('settings.about.preReleaseTitle')
         titleElement.style.color = '#ff886d'
         checkElement.style.background = '#ff886d'
     } else {
-        titleElement.innerHTML = Lang.queryJS('settings.about.stableReleaseTitle')
+        titleElement.textContent = Lang.queryJS('settings.about.stableReleaseTitle')
         titleElement.style.color = null
         checkElement.style.background = null
     }
@@ -1736,16 +1733,19 @@ function populateReleaseNotes(){
                 id = id.substring(id.lastIndexOf('/')+1)
 
                 if(id === version){
-                    settingsAboutChangelogTitle.innerHTML = entry.find('title').text()
-                    settingsAboutChangelogText.innerHTML = entry.find('content').text()
-                    settingsAboutChangelogButton.href = entry.find('link').attr('href')
+                    settingsAboutChangelogTitle.textContent = entry.find('title').text().slice(0, 300)
+                    settingsAboutChangelogText.textContent = entry.find('content').text().slice(0, 20000)
+                    const releaseUrl = new URL(entry.find('link').attr('href'), 'https://github.com')
+                    if(releaseUrl.protocol === 'https:' && releaseUrl.hostname === 'github.com'){
+                        settingsAboutChangelogButton.href = releaseUrl.toString()
+                    }
                 }
             }
 
         },
         timeout: 2500
     }).catch(err => {
-        settingsAboutChangelogText.innerHTML = Lang.queryJS('settings.about.releaseNotesFailed')
+        settingsAboutChangelogText.textContent = Lang.queryJS('settings.about.releaseNotesFailed')
     })
 }
 
@@ -1761,71 +1761,11 @@ function prepareAboutTab(){
  * Update Tab
  */
 
-const settingsTabUpdate            = document.getElementById('settingsTabUpdate')
-const settingsUpdateTitle          = document.getElementById('settingsUpdateTitle')
-const settingsUpdateVersionCheck   = document.getElementById('settingsUpdateVersionCheck')
-const settingsUpdateVersionTitle   = document.getElementById('settingsUpdateVersionTitle')
-const settingsUpdateVersionValue   = document.getElementById('settingsUpdateVersionValue')
-const settingsUpdateChangelogTitle = settingsTabUpdate.getElementsByClassName('settingsChangelogTitle')[0]
-const settingsUpdateChangelogText  = settingsTabUpdate.getElementsByClassName('settingsChangelogText')[0]
-const settingsUpdateChangelogCont  = settingsTabUpdate.getElementsByClassName('settingsChangelogContainer')[0]
-const settingsUpdateActionButton   = document.getElementById('settingsUpdateActionButton')
-
-/**
- * Update the properties of the update action button.
- * 
- * @param {string} text The new button text.
- * @param {boolean} disabled Optional. Disable or enable the button
- * @param {function} handler Optional. New button event handler.
- */
-function settingsUpdateButtonStatus(text, disabled = false, handler = null){
-    settingsUpdateActionButton.innerHTML = text
-    settingsUpdateActionButton.disabled = disabled
-    if(handler != null){
-        settingsUpdateActionButton.onclick = handler
-    }
-}
-
-/**
- * Populate the update tab with relevant information.
- * 
- * @param {Object} data The update data.
- */
-function populateSettingsUpdateInformation(data){
-    if(data != null){
-        settingsUpdateTitle.innerHTML = isPrerelease(data.version) ? Lang.queryJS('settings.updates.newPreReleaseTitle') : Lang.queryJS('settings.updates.newReleaseTitle')
-        settingsUpdateChangelogCont.style.display = null
-        settingsUpdateChangelogTitle.innerHTML = data.releaseName
-        settingsUpdateChangelogText.innerHTML = data.releaseNotes
-        populateVersionInformation(data.version, settingsUpdateVersionValue, settingsUpdateVersionTitle, settingsUpdateVersionCheck)
-        
-        if(process.platform === 'darwin'){
-            settingsUpdateButtonStatus(Lang.queryJS('settings.updates.downloadButton'), false, () => {
-                shell.openExternal(data.darwindownload)
-            })
-        } else {
-            settingsUpdateButtonStatus(Lang.queryJS('settings.updates.downloadingButton'), true)
-        }
-    } else {
-        settingsUpdateTitle.innerHTML = Lang.queryJS('settings.updates.latestVersionTitle')
-        settingsUpdateChangelogCont.style.display = 'none'
-        populateVersionInformation(remote.app.getVersion(), settingsUpdateVersionValue, settingsUpdateVersionTitle, settingsUpdateVersionCheck)
-        settingsUpdateButtonStatus(Lang.queryJS('settings.updates.checkForUpdatesButton'), false, () => {
-            if(!isDev){
-                ipcRenderer.send('autoUpdateAction', 'checkForUpdate')
-                settingsUpdateButtonStatus(Lang.queryJS('settings.updates.checkingForUpdatesButton'), true)
-            }
-        })
-    }
-}
-
 /**
  * Prepare update tab for display.
- * 
- * @param {Object} data The update data.
  */
-function prepareUpdateTab(data = null){
-    populateSettingsUpdateInformation(data)
+function prepareUpdateTab(){
+    window.LauncherUpdates?.attachSettings()
 }
 
 /**
