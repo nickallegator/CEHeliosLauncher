@@ -198,6 +198,10 @@ test('renderer template contains the brand sequence and persistent navigation', 
     assert.doesNotMatch(html, /updateAvailableTooltip/)
     assert.match(html, /id="shellNavCommunity"/)
     assert.match(html, /id="appShellViewport"/)
+    assert.match(html, /id="launch_button"/)
+    assert.match(html, /id="launch_join_button"/)
+    assert.match(html, /id="homeServerAddress"/)
+    assert.match(html, /id="serverOfflineModal"/)
 })
 
 test('profile selectors resolve launcher-managed artwork locally', () => {

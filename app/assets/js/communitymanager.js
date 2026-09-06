@@ -233,7 +233,7 @@ class CommunityApiClient extends SchematicApiClient {
     async modrinthProjects(options = {}) { return (await this.request('/v1/community/sources/modrinth/projects', { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
     async modrinthSources(options = {}) { return (await this.request('/v1/community/sources/modrinth', { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
     async trackModrinthProject(projectId, channels, options = {}) {
-        return (await this.request('/v1/community/sources/modrinth', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, body: JSON.stringify({ projectId, channels }), signal: options.signal })).data
+        return (await this.request('/v1/community/sources/modrinth', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(options.headers || {}) }, body: JSON.stringify({ projectId, channels, unlistedAcknowledged: options.unlistedAcknowledged === true }), signal: options.signal })).data
     }
     async checkModrinthSource(sourceId, options = {}) { return (await this.request(`/v1/community/sources/modrinth/${encodeURIComponent(sourceId)}/check`, { method: 'POST', headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }
     async modrinthCandidates(sourceId, options = {}) { return (await this.request(`/v1/community/sources/modrinth/${encodeURIComponent(sourceId)}/candidates`, { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: options.signal })).data }

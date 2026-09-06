@@ -125,6 +125,18 @@
     color: var(--workshop-text) !important;
 }
 
+.settingsServerConnectionCopy { max-width: 48%; }
+.settingsServerConnectionControls { display: grid; width: min(360px, 48%); gap: 7px; }
+.settingsServerConnectionControls input { width: 100%; box-sizing: border-box; }
+.settingsServerConnectionActions { display: flex; gap: 7px; justify-content: flex-end; }
+.settingsServerConnectionActions button {
+    padding: 6px 10px;
+    border: 1px solid var(--workshop-line-strong);
+    border-radius: 3px;
+    background: var(--workshop-surface-soft);
+    color: var(--workshop-text);
+}
+
 .settingsSwitchServerButton,
 .settingsAddAuthAccount,
 .settingsFileSelButton,

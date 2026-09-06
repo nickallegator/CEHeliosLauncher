@@ -160,6 +160,21 @@
 .homeStatsGrid dd { overflow: hidden; margin: 3px 0 0; color: var(--workshop-text); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 
 .homeActivityCard .homeStatusLine { margin-top: 19px; }
+.homeStatusLine[data-state="offline"] .statusRune { border-color: var(--workshop-danger); background: rgba(224, 96, 73, .16); }
+.homeStatusLine[data-state="unknown"] .statusRune,
+.homeStatusLine[data-state="checking"] .statusRune { border-color: var(--workshop-text-muted); background: rgba(255, 255, 255, .05); }
+.homeServerFacts {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(68px, .7fr));
+    gap: 7px;
+    margin: 14px 0 0;
+}
+.homeServerFacts[hidden] { display: none; }
+.homeServerFacts div { min-width: 0; padding: 7px 8px; border: 1px solid rgba(82, 115, 108, .35); background: rgba(7, 12, 11, .22); }
+.homeServerFacts dt { color: var(--workshop-text-muted); font-size: 8px; letter-spacing: .08em; }
+.homeServerFacts dd { overflow: hidden; margin: 2px 0 0; color: var(--workshop-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.homeServerActions { display: flex; gap: 7px; margin-top: 8px; }
+.workshopButton.compact { width: auto; min-height: 26px; margin: 0; padding: 4px 9px; font-size: 10px; }
 .homeSidePanel { align-items: flex-start; }
 .homeSidePanel h2 { margin: 8px 0 12px; font-size: 25px; }
 .homeSidePanel .workshopButton { width: 100%; margin-top: 20px; }
@@ -175,7 +190,7 @@
     display: grid !important;
     width: auto !important;
     height: var(--workshop-launch-height) !important;
-    grid-template-columns: minmax(210px, 0.9fr) minmax(190px, 1fr) minmax(235px, 0.78fr);
+    grid-template-columns: minmax(190px, 0.75fr) minmax(140px, 1fr) minmax(330px, 1.12fr);
     align-items: center;
     gap: 14px;
     padding: 11px 12px 11px 16px;
@@ -233,8 +248,26 @@
 #launch_content {
     display: flex;
     width: 100%;
+    gap: 8px;
     justify-content: flex-end;
 }
+
+#launch_join_button {
+    min-width: 138px;
+    min-height: 52px;
+    padding: 8px 14px;
+    border: 1px solid var(--workshop-teal);
+    border-radius: var(--workshop-radius-small);
+    background: linear-gradient(180deg, rgba(55, 200, 171, .19), rgba(18, 73, 64, .65));
+    color: var(--workshop-mint);
+    cursor: pointer;
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: 16px;
+    letter-spacing: .035em;
+}
+#launch_join_button:hover:not(:disabled) { background: linear-gradient(180deg, rgba(55, 200, 171, .31), rgba(18, 73, 64, .76)); transform: translateY(-1px); }
+#launch_join_button:disabled,
+#launch_button:disabled { cursor: default; filter: saturate(.35); opacity: .58; }
 
 #launch_button {
     position: relative;
@@ -267,6 +300,10 @@
 }
 
 #launch_button:hover:not(:disabled) { background: linear-gradient(180deg, #ff914d, #ff7418) !important; transform: translateY(-1px); }
+
+.serverOfflinePanel { width: min(560px, calc(100vw - 48px)); }
+.serverOfflinePanel .communityDialogContent { min-height: 0; padding: 24px; color: var(--workshop-text-muted); }
+.serverOfflineActions { justify-content: flex-end; }
 
 #launch_details {
     display: none;

@@ -10,6 +10,7 @@ const path                  = require('path')
 
 const ConfigManager            = require('./configmanager')
 const AccessManager            = require('./accessmanager')
+const { directConnectArguments, parseServerAddress } = require('./serverconnection')
 
 const logger = LoggerUtil.getLogger('ProcessBuilder')
 
@@ -24,7 +25,7 @@ const logger = LoggerUtil.getLogger('ProcessBuilder')
  */
 class ProcessBuilder {
 
-    constructor(distroServer, vanillaManifest, modManifest, authUser, launcherVersion){
+    constructor(distroServer, vanillaManifest, modManifest, authUser, launcherVersion, launchOptions = {}){
         this.gameDir = path.join(ConfigManager.getInstanceDirectory(), distroServer.rawServer.id)
         this.commonDir = ConfigManager.getCommonDirectory()
         this.server = distroServer
@@ -32,6 +33,7 @@ class ProcessBuilder {
         this.modManifest = modManifest
         this.authUser = authUser
         this.launcherVersion = launcherVersion
+        this.launchOptions = Object.freeze({ ...launchOptions })
         this.forgeModListFile = path.join(this.gameDir, 'forgeMods.list') // 1.13+
         this.fmlDir = path.join(this.gameDir, 'forgeModList.json')
         this.llDir = path.join(this.gameDir, 'liteloaderModList.json')
@@ -341,6 +343,11 @@ class ProcessBuilder {
     }
 
     _processAutoConnectArg(args){
+        if(this.launchOptions.intent === 'direct'){
+            const endpoint = parseServerAddress(this.launchOptions.serverAddress)
+            args.push(...directConnectArguments(this.server.rawServer.minecraftVersion, endpoint))
+            return
+        }
         if(ConfigManager.getAutoConnect() && this.server.rawServer.autoconnect){
             if(mcVersionAtLeast('1.20', this.server.rawServer.minecraftVersion)){
                 args.push('--quickPlayMultiplayer')

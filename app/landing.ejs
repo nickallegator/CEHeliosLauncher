@@ -48,13 +48,22 @@
                     <span class="panelChip"><%- lang('home.java21') %></span>
                 </header>
                 <div id="server_status_wrapper" class="homeStatusLine">
-                    <span class="statusRune" aria-hidden="true"></span>
+                    <span id="serverStatusRune" class="statusRune" aria-hidden="true"></span>
                     <div>
                         <small id="landingPlayerLabel"><%- lang('landing.serverStatus') %></small>
                         <strong id="player_count"><%- lang('landing.serverStatusPlaceholder') %></strong>
                     </div>
                 </div>
-                <p><%- lang('home.manualConnection') %></p>
+                <dl id="homeServerFacts" class="homeServerFacts" hidden>
+                    <div><dt><%- lang('home.serverAddress') %></dt><dd id="homeServerAddress">—</dd></div>
+                    <div><dt><%- lang('home.serverLatency') %></dt><dd id="homeServerLatency">—</dd></div>
+                    <div><dt><%- lang('home.serverChecked') %></dt><dd id="homeServerChecked">—</dd></div>
+                </dl>
+                <div class="homeServerActions">
+                    <button id="homeServerRefresh" class="workshopButton compact" type="button" hidden><%- lang('home.refreshServer') %></button>
+                    <button id="homeServerCopy" class="workshopButton compact" type="button" hidden><%- lang('home.copyAddress') %></button>
+                </div>
+                <p id="homeServerMessage"><%- lang('home.serverStatusUnavailable') %></p>
             </article>
         </div>
 
@@ -79,6 +88,7 @@
         </div>
         <div id="right" class="launchDockAction">
             <div id="launch_content">
+                <button id="launch_join_button" type="button" hidden><span><%- lang('landing.launchJoinButton') %></span></button>
                 <button id="launch_button" type="button"><span><%- lang('landing.launchButton') %></span></button>
             </div>
             <div id="launch_details">
@@ -89,6 +99,21 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="serverOfflineModal" class="schematicsModalRoot" aria-hidden="true">
+        <div id="serverOfflineScrim" class="schematicsModalScrim"></div>
+        <section class="schematicsModalPanel serverOfflinePanel" role="dialog" aria-modal="true" aria-labelledby="serverOfflineTitle" tabindex="-1">
+            <header class="communityDialogHeader">
+                <div><span class="workshopEyebrow"><%- lang('home.serverStatus') %></span><h2 id="serverOfflineTitle"><%- lang('home.serverOfflineTitle') %></h2></div>
+            </header>
+            <main class="communityDialogContent"><p><%- lang('home.serverOfflineBody') %></p></main>
+            <footer class="communityDialogFooter serverOfflineActions">
+                <button id="serverOfflineCancel" class="schematicsDetailButton" type="button"><%- lang('home.cancel') %></button>
+                <button id="serverOfflineNormal" class="schematicsDetailButton" type="button"><%- lang('home.launchNormally') %></button>
+                <button id="serverOfflineTry" class="schematicsDetailButton primary" type="button"><%- lang('home.tryAnyway') %></button>
+            </footer>
+        </section>
     </div>
 
     <%- include('partials/landing/news.ejs') %>

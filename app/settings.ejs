@@ -139,6 +139,21 @@
                     </label>
                 </div>
             </div>
+            <div id="settingsServerConnectionContainer" class="settingsFieldContainer" hidden>
+                <div class="settingsFieldLeft settingsServerConnectionCopy">
+                    <span class="settingsFieldTitle"><%- lang('settings.serverConnectionTitle') %></span>
+                    <span id="settingsServerConnectionDefault" class="settingsFieldDesc"></span>
+                    <span class="settingsFieldDesc"><%- lang('settings.serverConnectionDesc') %></span>
+                </div>
+                <div class="settingsFieldRight settingsServerConnectionControls">
+                    <input id="settingsServerConnectionInput" type="text" spellcheck="false" autocomplete="off" placeholder="192.168.1.81:25565" cValue="ServerConnectionOverride" serverDependent>
+                    <div class="settingsServerConnectionActions">
+                        <button id="settingsServerConnectionTest" type="button"><%- lang('settings.serverConnectionTest') %></button>
+                        <button id="settingsServerConnectionReset" type="button"><%- lang('settings.serverConnectionReset') %></button>
+                    </div>
+                    <span id="settingsServerConnectionStatus" class="settingsFieldDesc" role="status" aria-live="polite"></span>
+                </div>
+            </div>
             <div class="settingsFieldContainer">
                 <div class="settingsFieldLeft">
                     <span class="settingsFieldTitle"><%- lang('settings.launchDetachedTitle') %></span>

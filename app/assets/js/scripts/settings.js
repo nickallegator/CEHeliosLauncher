@@ -1,10 +1,15 @@
 // Requirements
 const os     = require('os')
 const semver = require('semver')
+const net    = require('net')
 
 const DropinModUtil  = require('./assets/js/dropinmodutil')
 const AccessManager  = require('./assets/js/accessmanager')
 const ServerBranding = require('./assets/js/serverbranding')
+const {
+    getConnectionContract: SettingsGetConnectionContract,
+    parseServerAddress: SettingsParseServerAddress
+} = require('./assets/js/serverconnection')
 const { MSFT_OPCODE, MSFT_REPLY_TYPE, MSFT_ERROR } = require('./assets/js/ipcconstants')
 
 const settingsState = {
@@ -328,6 +333,7 @@ async function fullSettingsSave() {
     saveSettingsValues()
     saveModConfiguration()
     ConfigManager.save()
+    window.dispatchEvent(new CustomEvent('helios:connection-override-change'))
     saveDropinModConfiguration()
     try {
         await saveShaderpackSettings()
@@ -1844,8 +1850,76 @@ async function prepareSettings(first = false) {
     await initSettingsValues()
     prepareAccountsTab()
     await prepareModrinthSettingsShortcut()
+    await prepareServerConnectionSettings()
     await prepareJavaTab()
     prepareAboutTab()
+}
+
+async function prepareServerConnectionSettings(){
+    const container = document.getElementById('settingsServerConnectionContainer')
+    if(!container) return
+    const distribution = await DistroAPI.getDistribution().catch(() => null)
+    const server = distribution?.getServerById(ConfigManager.getSelectedServer())
+    const contract = SettingsGetConnectionContract(server)
+    container.hidden = !contract?.localOverridesAllowed
+    if(!contract?.localOverridesAllowed) return
+
+    const input = document.getElementById('settingsServerConnectionInput')
+    const status = document.getElementById('settingsServerConnectionStatus')
+    document.getElementById('settingsServerConnectionDefault').textContent = Lang.queryJS('settings.serverConnectionDefault', { address: contract.publicAddress })
+    input.value = ConfigManager.getServerConnectionOverride(server.rawServer.id) || ''
+    status.textContent = input.value
+        ? Lang.queryJS('settings.serverConnectionActive', { address: input.value })
+        : Lang.queryJS('settings.serverConnectionUsingDefault')
+
+    const reset = document.getElementById('settingsServerConnectionReset')
+    if(reset.dataset.bound !== 'true') {
+        reset.dataset.bound = 'true'
+        reset.addEventListener('click', () => {
+            input.value = ''
+            input.removeAttribute('error')
+            settingsState.invalid.delete(input.id)
+            settingsSaveDisabled(settingsState.invalid.size > 0)
+            ConfigManager.setServerConnectionOverride(ConfigManager.getSelectedServer(), null)
+            ConfigManager.save()
+            status.textContent = Lang.queryJS('settings.serverConnectionUsingDefault')
+            window.dispatchEvent(new CustomEvent('helios:connection-override-change'))
+        })
+    }
+
+    const test = document.getElementById('settingsServerConnectionTest')
+    if(test.dataset.bound !== 'true') {
+        test.dataset.bound = 'true'
+        test.addEventListener('click', async () => {
+            test.disabled = true
+            status.textContent = Lang.queryJS('settings.serverConnectionTesting')
+            try {
+                const currentDistribution = await DistroAPI.getDistribution()
+                const currentServer = currentDistribution.getServerById(ConfigManager.getSelectedServer())
+                const currentContract = SettingsGetConnectionContract(currentServer)
+                const endpoint = SettingsParseServerAddress(input.value.trim() || currentContract.publicAddress)
+                await new Promise((resolve, reject) => {
+                    const socket = net.createConnection({ host: endpoint.host, port: endpoint.port })
+                    let settled = false
+                    const done = err => {
+                        if(settled) return
+                        settled = true
+                        socket.destroy()
+                        if(err) reject(err)
+                        else resolve()
+                    }
+                    socket.setTimeout(2500, () => done(new Error('timeout')))
+                    socket.once('connect', () => done())
+                    socket.once('error', done)
+                })
+                status.textContent = Lang.queryJS('settings.serverConnectionSucceeded', { address: endpoint.address })
+            } catch(_err) {
+                status.textContent = Lang.queryJS('settings.serverConnectionFailed')
+            } finally {
+                test.disabled = false
+            }
+        })
+    }
 }
 
 async function prepareModrinthSettingsShortcut(){
@@ -1860,7 +1934,8 @@ async function prepareModrinthSettingsShortcut(){
         connect.dataset.modrinthShortcutBound = 'true'
         connect.onclick = async () => {
             await window.AppShell?.navigate?.('community')
-            document.getElementById('communityModrinthImportOpen')?.click()
+            if(typeof window.openModrinthImport === 'function') await window.openModrinthImport()
+            else document.getElementById('communityModrinthImportOpen')?.click()
         }
     }
 }

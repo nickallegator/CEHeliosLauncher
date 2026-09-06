@@ -44,6 +44,25 @@ npm run testers:list
 
 `GET /v1/releases/channels/test/distribution` requires an authenticated backend session and `cobblepower:test`.
 
+### Direct server connection and status
+
+`GAME_SERVERS_JSON` is the fixed, validated registry used to inject launcher connection contracts and to select status-probe targets. Clients cannot supply a host or port to the status API. Enable monitoring separately with `GAME_SERVER_STATUS_ENABLED=true` and set `GAME_SERVER_STATUS_PUBLIC_API_URL` to this service's public HTTPS origin.
+
+```json
+[
+  {
+    "profileId": "Cobble-Power-1.21.1",
+    "address": "play.allegatorgames.com:25565",
+    "requiredEntitlement": "cobblepower:test",
+    "statusEnabled": true,
+    "directConnectEnabled": true,
+    "localOverridesAllowed": true
+  }
+]
+```
+
+`GET /v1/game-servers/:profileId/status` requires an authenticated, active tester with the configured entitlement. It returns bounded aggregate Server List Ping data only. The launcher can use a validated profile-scoped LAN override for direct connection while status monitoring continues to check the public address.
+
 ### Dedicated-server whitelist synchronization
 
 `minecraft_testers` is also the source of truth for dedicated-server access. When

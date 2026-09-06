@@ -5,8 +5,7 @@
 const { URL }                 = require('url')
 const crypto = require('crypto')
 const {
-    MojangRestAPI,
-    getServerStatus
+    MojangRestAPI
 }                             = require('helios-core/mojang')
 const {
     RestResponseStatus,
@@ -37,6 +36,8 @@ const { completeJavaSelection } = require('./assets/js/javalaunchworkflow')
 const { seedBundledArtifacts } = require('./assets/js/testerchannel')
 const { quarantineManagedDropins } = require('./assets/js/managedmodcleanup')
 const { isArtifactAuthorizationError } = require('./assets/js/channelpolicy')
+const { getConnectionContract, getEffectiveConnection } = require('./assets/js/serverconnection')
+const { ServerStatusManager } = require('./assets/js/serverstatusmanager')
 
 // Launch Elements
 const launch_content          = document.getElementById('launch_content')
@@ -45,11 +46,19 @@ const launch_progress         = document.getElementById('launch_progress')
 const launch_progress_label   = document.getElementById('launch_progress_label')
 const launch_details_text     = document.getElementById('launch_details_text')
 const server_selection_button = document.getElementById('server_selection_button')
+const launch_join_button      = document.getElementById('launch_join_button')
 const user_text               = document.getElementById('user_text')
 
 const loggerLanding = LoggerUtil.getLogger('Landing')
 let settingsReadyPromise = null
 const communityShowroomMode = process.env.AG_COMMUNITY_SHOWROOM === '1'
+let launchInProgress = false
+let launchSelectionAvailable = false
+let latestServerStatus = { state: 'unknown', stale: false }
+// Keep the process reference available before distribution initialization can
+// call updateSelectedServer and update the launch controls.
+let proc
+let serverStatusManager = null
 
 async function ensureSettingsScriptLoaded(){
     if(typeof prepareSettings === 'function'){
@@ -126,7 +135,10 @@ function setDownloadPercentage(percent){
  * @param {boolean} val True to enable, false to disable.
  */
 function setLaunchEnabled(val){
-    document.getElementById('launch_button').disabled = communityShowroomMode || !val
+    launchSelectionAvailable = Boolean(val)
+    const busy = launchInProgress || proc != null
+    document.getElementById('launch_button').disabled = communityShowroomMode || !launchSelectionAvailable || busy
+    launch_join_button.disabled = communityShowroomMode || !launchSelectionAvailable || busy
 }
 
 if(communityShowroomMode){
@@ -136,19 +148,30 @@ if(communityShowroomMode){
     launchButton.querySelector('span').textContent = Lang.queryJS('landing.launch.showroomMode')
 }
 
-// Bind launch button
-document.getElementById('launch_button').addEventListener('click', async e => {
+async function requestGameLaunch(options = {}){
     if(communityShowroomMode) return
-    loggerLanding.info('Launching game..')
+    if(launchInProgress || proc != null) return
+    const intent = options.intent === 'direct' ? 'direct' : 'normal'
+    launchInProgress = true
+    setLaunchEnabled(launchSelectionAvailable)
+    loggerLanding.info(`Launching game with ${intent} intent.`)
     try {
         if(ChannelManager.isRemoteChannel()) {
             const authorized = await ChannelManager.refreshAuthorizedDistribution({ allowOffline: true })
             if(authorized?.distribution) onDistroRefresh(authorized.distribution)
         }
         const server = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
+        const contract = getConnectionContract(server)
+        let launchOptions = { intent }
+        if(intent === 'direct') {
+            if(!contract) throw new Error(Lang.queryJS('landing.launch.directUnavailable'))
+            const override = ConfigManager.getServerConnectionOverride(server.rawServer.id)
+            const endpoint = getEffectiveConnection(server, override)
+            launchOptions = { intent, serverAddress: endpoint.address }
+        }
         const jExe = ConfigManager.getJavaExecutable(ConfigManager.getSelectedServer())
         if(jExe == null){
-            await asyncSystemScan(server.effectiveJavaOptions)
+            await asyncSystemScan(server.effectiveJavaOptions, true, launchOptions)
         } else {
 
             setLaunchDetails(Lang.queryJS('landing.launch.pleaseWait'))
@@ -158,16 +181,47 @@ document.getElementById('launch_button').addEventListener('click', async e => {
             const details = await validateSelectedJvm(ensureJavaDirIsRoot(jExe), server.effectiveJavaOptions.supported)
             if(details != null){
                 loggerLanding.info('Jvm Details', details)
-                await dlAsync()
+                await dlAsync(true, launchOptions)
 
             } else {
-                await asyncSystemScan(server.effectiveJavaOptions)
+                await asyncSystemScan(server.effectiveJavaOptions, true, launchOptions)
             }
         }
     } catch(err) {
         loggerLanding.error('Unhandled error during launch process.', { code: err?.code, statusCode: err?.statusCode, message: err?.message })
         showLaunchFailure(Lang.queryJS('landing.launch.failureTitle'), err?.message || Lang.queryJS('landing.launch.failureText'))
+    } finally {
+        launchInProgress = false
+        setLaunchEnabled(launchSelectionAvailable)
     }
+}
+
+document.getElementById('launch_button').addEventListener('click', () => requestGameLaunch({ intent: 'normal' }))
+
+function closeServerOfflineModal(){
+    window.closeModal(document.getElementById('serverOfflineModal'))
+}
+
+launch_join_button.addEventListener('click', () => {
+    const checkedAge = latestServerStatus.checkedAt ? Date.now() - Date.parse(latestServerStatus.checkedAt) : Infinity
+    if(latestServerStatus.state === 'offline' && latestServerStatus.stale !== true && checkedAge <= 60_000) {
+        const root = document.getElementById('serverOfflineModal')
+        const panel = root.querySelector('.serverOfflinePanel')
+        window.openModal(root, panel, { onRequestClose: closeServerOfflineModal, initialFocus: '#serverOfflineNormal' })
+        return
+    }
+    requestGameLaunch({ intent: 'direct' })
+})
+
+document.getElementById('serverOfflineCancel').addEventListener('click', closeServerOfflineModal)
+document.getElementById('serverOfflineScrim').addEventListener('click', closeServerOfflineModal)
+document.getElementById('serverOfflineNormal').addEventListener('click', () => {
+    closeServerOfflineModal()
+    requestGameLaunch({ intent: 'normal' })
+})
+document.getElementById('serverOfflineTry').addEventListener('click', () => {
+    closeServerOfflineModal()
+    requestGameLaunch({ intent: 'direct' })
 })
 
 // Bind settings button
@@ -286,35 +340,88 @@ const refreshMojangStatuses = async function(){
     document.getElementById('mojang_status_icon').style.color = MojangRestAPI.statusToHex(status)
 }
 
-const refreshServerStatus = async (fade = false) => {
-    loggerLanding.info('Refreshing Server Status')
-    const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
-
-    let pLabel = Lang.queryJS('landing.serverStatus.server')
-    let pVal = Lang.queryJS('landing.serverStatus.offline')
-
-    try {
-
-        const servStat = await getServerStatus(47, serv.hostname, serv.port)
-        console.log(servStat)
-        pLabel = Lang.queryJS('landing.serverStatus.players')
-        pVal = servStat.players.online + '/' + servStat.players.max
-
-    } catch (err) {
-        loggerLanding.warn('Unable to refresh server status, assuming offline.')
-        loggerLanding.debug(err)
-    }
-    if(fade){
-        $('#server_status_wrapper').fadeOut(250, () => {
-            document.getElementById('landingPlayerLabel').innerHTML = pLabel
-            document.getElementById('player_count').innerHTML = pVal
-            $('#server_status_wrapper').fadeIn(500)
-        })
+function renderServerStatus(status = {}) {
+    latestServerStatus = status
+    const label = document.getElementById('landingPlayerLabel')
+    const value = document.getElementById('player_count')
+    const wrapper = document.getElementById('server_status_wrapper')
+    const message = document.getElementById('homeServerMessage')
+    const latency = document.getElementById('homeServerLatency')
+    const checked = document.getElementById('homeServerChecked')
+    wrapper.dataset.state = status.state || 'unknown'
+    if(status.state === 'online') {
+        label.textContent = Lang.queryJS('landing.serverStatus.players')
+        value.textContent = `${status.players.online}/${status.players.maximum}`
+        message.textContent = status.stale ? Lang.queryJS('landing.serverStatus.stale') : Lang.queryJS('landing.serverStatus.online')
+    } else if(status.state === 'offline') {
+        label.textContent = Lang.queryJS('landing.serverStatus.server')
+        value.textContent = Lang.queryJS('landing.serverStatus.offline')
+        message.textContent = Lang.queryJS('landing.serverStatus.offlineMessage')
+    } else if(status.state === 'checking') {
+        label.textContent = Lang.queryJS('landing.serverStatus.server')
+        value.textContent = Lang.queryJS('landing.serverStatus.checking')
+        message.textContent = Lang.queryJS('landing.serverStatus.checkingMessage')
     } else {
-        document.getElementById('landingPlayerLabel').innerHTML = pLabel
-        document.getElementById('player_count').innerHTML = pVal
+        label.textContent = Lang.queryJS('landing.serverStatus.server')
+        value.textContent = Lang.queryJS('landing.serverStatus.unavailable')
+        message.textContent = Lang.queryJS('landing.serverStatus.unavailableMessage')
     }
-    
+    latency.textContent = Number.isFinite(status.latencyMs) ? `${status.latencyMs} ms` : '—'
+    checked.textContent = status.checkedAt ? new Date(status.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
+}
+
+async function fetchAuthorizedServerStatus(server, signal) {
+    const response = await ChannelManager.authorizedGetJson(server.statusUrl, { signal, timeoutMs: 5000 })
+    if(response?.schemaVersion !== 1 || response.profileId !== server.id || !['online', 'offline', 'unknown'].includes(response.state)) {
+        throw new Error('Server status response is incompatible.')
+    }
+    if(response.state === 'online' && (!Number.isInteger(response.players?.online) || !Number.isInteger(response.players?.maximum))) {
+        throw new Error('Server status response has invalid player counts.')
+    }
+    return response
+}
+
+serverStatusManager = new ServerStatusManager({
+    fetchStatus: fetchAuthorizedServerStatus,
+    onUpdate: renderServerStatus
+})
+
+function setServerStatusActive(){
+    const homeActive = !document.hidden && (window.AppShell?.getRoute?.() || 'home') === 'home' && getCurrentView() === VIEWS.landing
+    serverStatusManager?.setActive(homeActive)
+}
+
+async function refreshServerStatus() {
+    const serv = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
+    const facts = document.getElementById('homeServerFacts')
+    const refresh = document.getElementById('homeServerRefresh')
+    const copy = document.getElementById('homeServerCopy')
+    if(!serv) {
+        launch_join_button.hidden = true
+        facts.hidden = true
+        refresh.hidden = true
+        copy.hidden = true
+        serverStatusManager?.select(null)
+        renderServerStatus({ state: 'unknown' })
+        return
+    }
+    const contract = getConnectionContract(serv)
+    launch_join_button.hidden = !contract
+    facts.hidden = !contract
+    refresh.hidden = !contract?.statusUrl
+    copy.hidden = !contract
+    document.getElementById('homeServerAddress').textContent = contract?.publicAddress || '—'
+    if(!contract?.statusUrl) {
+        serverStatusManager?.select(null)
+        renderServerStatus({ state: 'unknown' })
+        return
+    }
+    serverStatusManager?.select({
+        id: serv.rawServer.id,
+        statusUrl: contract.statusUrl,
+        refreshSeconds: contract.statusRefreshSeconds
+    })
+    setServerStatusActive()
 }
 
 refreshMojangStatuses()
@@ -322,8 +429,17 @@ refreshMojangStatuses()
 
 // Refresh statuses every hour. The status page itself refreshes every day so...
 let mojangStatusListener = setInterval(() => refreshMojangStatuses(true), 60*60*1000)
-// Set refresh rate to once every 5 minutes.
-let serverStatusListener = setInterval(() => refreshServerStatus(true), 300000)
+
+window.addEventListener('helios:shell-route-change', setServerStatusActive)
+window.addEventListener('helios:connection-override-change', refreshServerStatus)
+document.addEventListener('visibilitychange', setServerStatusActive)
+window.addEventListener('beforeunload', () => serverStatusManager.destroy())
+document.getElementById('homeServerRefresh')?.addEventListener('click', () => serverStatusManager.refresh())
+document.getElementById('homeServerCopy')?.addEventListener('click', async () => {
+    const server = (await DistroAPI.getDistribution()).getServerById(ConfigManager.getSelectedServer())
+    const contract = getConnectionContract(server)
+    if(contract) await navigator.clipboard.writeText(contract.publicAddress)
+})
 
 /**
  * Shows an error overlay, toggles off the launch area.
@@ -349,7 +465,7 @@ function showLaunchFailure(title, desc){
  * when its lazily loaded controller is already available. The launch path
  * must not depend on opening Settings first.
  */
-async function useJavaInstallation(jvmDetails, launchAfter){
+async function useJavaInstallation(jvmDetails, launchAfter, launchOptions = {}){
     await completeJavaSelection({
         jvmDetails,
         javaExecFromRoot,
@@ -359,7 +475,7 @@ async function useJavaInstallation(jvmDetails, launchAfter){
         settingsInput: document.getElementById('settingsJavaExecVal'),
         populateJavaDetails: typeof populateJavaExecDetails === 'function' ? populateJavaExecDetails : null,
         launchAfter,
-        launch: dlAsync
+        launch: () => dlAsync(true, launchOptions)
     })
 }
 
@@ -376,7 +492,7 @@ function showJavaDownloadFailure(err){
  * 
  * @param {boolean} launchAfter Whether we should begin to launch after scanning. 
  */
-async function asyncSystemScan(effectiveJavaOptions, launchAfter = true){
+async function asyncSystemScan(effectiveJavaOptions, launchAfter = true, launchOptions = {}){
 
     setLaunchDetails(Lang.queryJS('landing.systemScan.checking'))
     toggleLaunchArea(true)
@@ -401,7 +517,7 @@ async function asyncSystemScan(effectiveJavaOptions, launchAfter = true){
             toggleOverlay(false)
 
             try {
-                await downloadJava(effectiveJavaOptions, launchAfter)
+                await downloadJava(effectiveJavaOptions, launchAfter, launchOptions)
             } catch(err) {
                 showJavaDownloadFailure(err)
             }
@@ -422,7 +538,7 @@ async function asyncSystemScan(effectiveJavaOptions, launchAfter = true){
                 setDismissHandler(async () => {
                     toggleOverlay(false, true)
                     try {
-                        await asyncSystemScan(effectiveJavaOptions, launchAfter)
+                        await asyncSystemScan(effectiveJavaOptions, launchAfter, launchOptions)
                     } catch(err) {
                         showJavaDownloadFailure(err)
                     }
@@ -432,12 +548,12 @@ async function asyncSystemScan(effectiveJavaOptions, launchAfter = true){
         })
         toggleOverlay(true, true)
     } else {
-        await useJavaInstallation(jvmDetails, launchAfter)
+        await useJavaInstallation(jvmDetails, launchAfter, launchOptions)
     }
 
 }
 
-async function downloadJava(effectiveJavaOptions, launchAfter = true) {
+async function downloadJava(effectiveJavaOptions, launchAfter = true, launchOptions = {}) {
     let extractListener = null
 
     try {
@@ -491,7 +607,7 @@ async function downloadJava(effectiveJavaOptions, launchAfter = true) {
         clearInterval(extractListener)
         extractListener = null
         setLaunchDetails(Lang.queryJS('landing.downloadJava.javaInstalled'))
-        await useJavaInstallation(jvmDetails, launchAfter)
+        await useJavaInstallation(jvmDetails, launchAfter, launchOptions)
     } finally {
         if(extractListener != null){
             clearInterval(extractListener)
@@ -501,8 +617,6 @@ async function downloadJava(effectiveJavaOptions, launchAfter = true) {
 
 }
 
-// Keep reference to Minecraft Process
-let proc
 // Is DiscordRPC enabled
 let hasRPC = false
 // Joined server regex
@@ -511,7 +625,7 @@ const GAME_JOINED_REGEX = /\[.+\]: Sound engine started/
 const GAME_LAUNCH_REGEX = /^\[.+\]: (?:MinecraftForge .+ Initialized|NeoForge .+ Initialized|ModLauncher .+ starting: .+|Loading Minecraft .+ with Fabric Loader .+)$/
 const MIN_LINGER = 5000
 
-async function dlAsync(login = true) {
+async function dlAsync(login = true, launchOptions = {}) {
 
     // Login parameter is temporary for debug purposes. Allows testing the validation/downloads without
     // launching the game.
@@ -666,7 +780,7 @@ async function dlAsync(login = true) {
     if(login) {
         const authUser = ConfigManager.getSelectedAccount()
         loggerLaunchSuite.info(`Sending selected account (${authUser.displayName}) to ProcessBuilder.`)
-        let pb = new ProcessBuilder(serv, versionData, modLoaderData, authUser, remote.app.getVersion())
+        let pb = new ProcessBuilder(serv, versionData, modLoaderData, authUser, remote.app.getVersion(), launchOptions)
         setLaunchDetails(Lang.queryJS('landing.dlAsync.launchingGame'))
 
         // const SERVER_JOINED_REGEX = /\[.+\]: \[CHAT\] [a-zA-Z0-9_]{1,16} joined the game/
@@ -719,10 +833,15 @@ async function dlAsync(login = true) {
         try {
             // Build Minecraft process.
             proc = pb.build()
+            setLaunchEnabled(launchSelectionAvailable)
 
             // Bind listeners to stdout.
             proc.stdout.on('data', tempListener)
             proc.stderr.on('data', gameErrorListener)
+            proc.once('close', () => {
+                proc = null
+                setLaunchEnabled(launchSelectionAvailable)
+            })
 
             setLaunchDetails(Lang.queryJS('landing.dlAsync.doneEnjoyServer'))
 
@@ -734,7 +853,6 @@ async function dlAsync(login = true) {
                     loggerLaunchSuite.info('Shutting down Discord Rich Presence..')
                     DiscordWrapper.shutdownRPC()
                     hasRPC = false
-                    proc = null
                 })
             }
 

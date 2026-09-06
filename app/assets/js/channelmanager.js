@@ -37,6 +37,19 @@ function deriveAuthUrl() {
     return url.toString()
 }
 
+function validateAccessApiUrl(value) {
+    if(!isRemoteChannel()) throw new ChannelAccessError('channel_unavailable', 'The authenticated channel is not configured.')
+    const target = new URL(value)
+    const distributionUrl = new URL(channel.remoteDistributionUrl)
+    if(target.protocol !== distributionUrl.protocol || target.origin !== distributionUrl.origin) {
+        throw new ChannelAccessError('invalid_service_url', 'The channel supplied an invalid service address.')
+    }
+    target.username = ''
+    target.password = ''
+    target.hash = ''
+    return target.toString()
+}
+
 function isSessionFresh(now = Date.now()) {
     const expiresAt = Date.parse(ConfigManager.getAccessSessionExpiresAt() || '')
     return Boolean(AccessManager.getSessionToken()) && Number.isFinite(expiresAt) && expiresAt > now + 30_000
@@ -122,6 +135,26 @@ async function fetchAuthorizedDistribution(sessionToken) {
     }
 }
 
+async function authorizedGetJson(url, options = {}) {
+    const target = validateAccessApiUrl(url)
+    let token = AccessManager.getSessionToken()
+    if(!isSessionFresh()) token = await exchangeMinecraftToken()
+    const request = async currentToken => got.get(target, {
+        responseType: 'json',
+        headers: { Authorization: `Bearer ${currentToken}` },
+        timeout: { request: Number(options.timeoutMs) || 5000 },
+        retry: { limit: 0 },
+        signal: options.signal
+    })
+    try {
+        return (await request(token)).body
+    } catch(err) {
+        if(err.response?.statusCode !== 401) throw err
+        token = await exchangeMinecraftToken()
+        return (await request(token)).body
+    }
+}
+
 async function refreshAuthorizedDistribution(options = {}) {
     if(!isRemoteChannel()) {
         return { distribution: await require('./distromanager').DistroAPI.getDistribution(), offline: false }
@@ -178,6 +211,7 @@ async function bootstrap() {
 
 module.exports = {
     ChannelAccessError,
+    authorizedGetJson,
     bootstrap,
     channel,
     clearChannelAuthorization,
@@ -186,5 +220,6 @@ module.exports = {
     getOfflineGrant,
     isRemoteChannel,
     isSessionFresh,
+    validateAccessApiUrl,
     refreshAuthorizedDistribution
 }

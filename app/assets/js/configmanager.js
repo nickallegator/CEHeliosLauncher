@@ -87,7 +87,8 @@ const DEFAULT_CONFIG = {
             resHeight: 720,
             fullscreen: false,
             autoConnect: true,
-            launchDetached: true
+            launchDetached: true,
+            serverConnectionOverrides: {}
         },
         launcher: {
             allowPrerelease: false,
@@ -907,6 +908,26 @@ exports.getAutoConnect = function(def = false){
  */
 exports.setAutoConnect = function(autoConnect){
     config.settings.game.autoConnect = autoConnect
+}
+
+exports.getServerConnectionOverride = function(serverId){
+    return config.settings.game.serverConnectionOverrides?.[serverId] || null
+}
+
+exports.setServerConnectionOverride = function(serverId, address){
+    if(!config.settings.game.serverConnectionOverrides) config.settings.game.serverConnectionOverrides = {}
+    if(address == null || String(address).trim() === '') delete config.settings.game.serverConnectionOverrides[serverId]
+    else config.settings.game.serverConnectionOverrides[serverId] = String(address).trim()
+}
+
+exports.validateServerConnectionOverride = function(address){
+    if(address == null || String(address).trim() === '') return true
+    try {
+        require('./serverconnection').parseServerAddress(address)
+        return true
+    } catch(_err) {
+        return false
+    }
 }
 
 /**

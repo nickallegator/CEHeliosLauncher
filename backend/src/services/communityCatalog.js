@@ -132,6 +132,8 @@ function normalizeCommunityRow(row) {
         provider: 'modrinth', projectId: row.provider_project_id, versionId: row.provider_version_id,
         versionNumber: row.provider_version_number, fileName: row.provider_file_name,
         projectUrl: row.provider_project_url,
+        projectStatus: row.provider_project_status || null,
+        unlisted: row.provider_project_status === 'unlisted',
         creator: typeof row.provider_creator === 'string' ? JSON.parse(row.provider_creator) : (row.provider_creator || null)
     } : { provider: 'r2' }
     return {
@@ -345,7 +347,7 @@ function createCommunityProvider(options) {
                         r.compatibility, r.type_data,
                         rs.provider as source_provider,rs.provider_project_id,rs.provider_version_id,
                         rs.provider_file_name,rs.provider_version_number,rs.provider_project_url,
-                        rs.provider_creator,rs.available as source_available,rs.last_verified_at as source_last_verified_at,
+                        rs.provider_creator,rs.provider_project_status,rs.available as source_available,rs.last_verified_at as source_last_verified_at,
                         coalesce((
                             select jsonb_agg(jsonb_build_object(
                                 'type', d.dependency_type,
