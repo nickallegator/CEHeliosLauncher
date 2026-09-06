@@ -63,6 +63,23 @@ npm run testers:list
 
 `GET /v1/game-servers/:profileId/status` requires an authenticated, active tester with the configured entitlement. It returns bounded aggregate Server List Ping data only. The launcher can use a validated profile-scoped LAN override for direct connection while status monitoring continues to check the public address.
 
+### Dedicated-server whitelist synchronization
+
+`minecraft_testers` is also the source of truth for dedicated-server access. When
+`SERVER_ACCESS_SYNC_ENABLED=true`, a server may fetch the current resolved whitelist from:
+
+```text
+GET /v1/internal/server-access/whitelist
+Authorization: Bearer <raw-server-token>
+X-AG-Server-ID: ag-prod-01
+```
+
+Create a random token on an administrator workstation, store the raw value only in the server's
+root-readable configuration, and configure Render with `<server-id>=<sha256-of-token>` in
+`SERVER_ACCESS_SYNC_CREDENTIALS`. Multiple comma-separated server credentials are supported for
+future hosts. Disabled testers disappear from the next authoritative response. A tester without a
+verified profile name remains pending until their first successful launcher sign-in.
+
 ## Schematic community
 
 The schematic service uses a separate private R2 bucket and `SCHEMATICS_*` credentials. Production startup fails if schematics are enabled without object storage. Upload finalization validates and canonicalizes v2 content, strips community block-entity NBT, and creates immutable 128px and 512px PNG/WebP thumbnails.

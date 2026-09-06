@@ -57,6 +57,16 @@ app.get('/ready', async (_req, res) => {
     } else {
         checks.releases = 'disabled'
     }
+    if(config.serverAccess.enabled) {
+        try {
+            await db.query('select 1 from minecraft_testers limit 1')
+            checks.serverAccess = 'ok'
+        } catch(_err) {
+            checks.serverAccess = 'error'
+        }
+    } else {
+        checks.serverAccess = 'disabled'
+    }
     if(config.schematics.enabled) {
         try {
             await db.query('select 1 from schematic_revisions limit 1')
@@ -105,6 +115,9 @@ app.use('/v1', minecraftAuthRoutes)
 app.use('/v1', entitlementRoutes)
 app.use('/v1', releaseRoutes)
 app.use('/v1', require('./routes/gameServers'))
+if(config.serverAccess.enabled) {
+    app.use('/v1', require('./routes/serverAccess'))
+}
 if(config.modrinth.enabled) {
     app.use('/v1', require('./routes/modrinthIntegration'))
     app.use('/v1', require('./routes/modrinthSources'))

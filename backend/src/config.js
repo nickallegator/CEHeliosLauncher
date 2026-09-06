@@ -92,6 +92,11 @@ const config = {
         requiredEntitlement: getEnv('RELEASES_REQUIRED_ENTITLEMENT', 'cobblepower:test').toLowerCase(),
         objectStorage: objectStorageConfig('RELEASES_STORAGE', { getTtlSeconds: 3600 })
     },
+    serverAccess: {
+        enabled: parseBoolean(getEnv('SERVER_ACCESS_SYNC_ENABLED', 'false')),
+        credentials: getEnv('SERVER_ACCESS_SYNC_CREDENTIALS', ''),
+        rateLimitPerMinute: parseNumber(getEnv('SERVER_ACCESS_SYNC_RATE_LIMIT_PER_MINUTE', '30'), 30)
+    },
     schematics: {
         enabled: parseBoolean(getEnv('SCHEMATICS_ENABLED', 'false')),
         publicApiUrl: getEnv('SCHEMATICS_PUBLIC_API_URL', null),
@@ -217,6 +222,15 @@ if(config.modrinth.enabled) {
     const statusUrl = new URL(config.gameServers.publicApiUrl)
     if(process.env.NODE_ENV === 'production' && statusUrl.protocol !== 'https:') {
         throw new Error('GAME_SERVER_STATUS_PUBLIC_API_URL must use HTTPS in production')
+    }
+}
+
+if(config.serverAccess.enabled) {
+    const { parseCredentials } = require('./services/serverAccess')
+    const credentials = parseCredentials(config.serverAccess.credentials)
+    if(credentials.size === 0) throw new Error('Server access synchronization is enabled but no hashed credentials are configured')
+    if(config.serverAccess.rateLimitPerMinute < 1 || config.serverAccess.rateLimitPerMinute > 600) {
+        throw new Error('SERVER_ACCESS_SYNC_RATE_LIMIT_PER_MINUTE must be between 1 and 600')
     }
 }
 
