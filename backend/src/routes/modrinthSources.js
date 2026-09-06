@@ -12,7 +12,7 @@ const { createPreviewVariants, fallbackPreview } = require('../services/communit
 const { persistCompositionIndex } = require('../services/communityPackStudio')
 const { compatibilityManifest } = require('../services/communityTypes')
 const {
-    checkSource, claimProject, listOwnedProjects, normalizeChannels, prepareCandidate, withDownloadedCandidate
+    checkSource, claimProject, listOwnedProjects, normalizeChannels, prepareCandidate, requireUnlistedAcknowledgement, withDownloadedCandidate
 } = require('../services/modrinthSources')
 
 const router = express.Router()
@@ -50,14 +50,14 @@ router.get('/community/sources/modrinth', enabled, requireSession, asyncRoute(as
         `select s.*,(select count(*) from community_external_candidates c where c.source_id=s.id and c.state in ('detected','prepared')) as pending_count
          from community_external_sources s where s.owner_id=$1 and s.provider='modrinth' order by s.project_title,s.id`, [req.userId])
     res.set('Cache-Control', 'private, no-store')
-    res.json({ schemaVersion: 1, items: rows.map(row => ({ id: row.id, itemId: row.item_id, projectId: row.provider_project_id, slug: row.project_slug, title: row.project_title, channels: row.channels, status: row.status, lastCheckedAt: row.last_checked_at, lastError: row.last_error, pendingCount: Number(row.pending_count) })) })
+    res.json({ schemaVersion: 1, items: rows.map(row => ({ id: row.id, itemId: row.item_id, projectId: row.provider_project_id, slug: row.project_slug, title: row.project_title, channels: row.channels, status: row.status, projectStatus: row.provider_project_status, unlisted: row.provider_project_status === 'unlisted', lastCheckedAt: row.last_checked_at, lastError: row.last_error, pendingCount: Number(row.pending_count) })) })
 }))
 
 router.post('/community/sources/modrinth', enabled, requireSession, asyncRoute(async (req, res) => {
     await publishingIdentity(req.userId)
     const projectId = clean(req.body?.projectId || req.body?.slug, 100)
     if(!projectId) return res.status(400).json({ error: 'modrinth_project_required' })
-    const row = await claimProject(req.userId, projectId, req.body?.channels)
+    const row = await claimProject(req.userId, projectId, req.body?.channels, { unlistedAcknowledged: req.body?.unlistedAcknowledged === true })
     const result = await checkSource(req.userId, row.id)
     res.status(201).json({ schemaVersion: 1, id: row.id, projectId: row.provider_project_id, title: row.project_title, channels: row.channels, ...result })
 }))
@@ -108,6 +108,7 @@ router.post('/community/sources/modrinth/:sourceId/candidates/:candidateId/publi
     const writtenKeys = []
     try {
         const published = await withDownloadedCandidate(req.userId, sourceId, candidateId, null, async ({ row, context, project, version, file, hashes, validated }) => {
+            requireUnlistedAcknowledgement(project, req.body?.unlistedAcknowledged === true)
             if(row.state !== 'prepared' || row.prepared_sha256 !== expectedSha256 || hashes.sha256 !== expectedSha256) {
                 throw Object.assign(new Error('The Modrinth candidate changed after review. Prepare it again.'), { code: 'modrinth_candidate_changed', statusCode: 409 })
             }
@@ -160,11 +161,11 @@ router.post('/community/sources/modrinth/:sourceId/candidates/:candidateId/publi
                         [revisionId, itemId, Number(latest.rows[0].number), hashes.sha256, hashes.sizeBytes, compatibilityManifest.compatibility, validated.typeData || {}, req.userId])
                     await client.query(
                         `insert into community_revision_sources
-                         (revision_id,provider,provider_project_id,provider_version_id,provider_file_name,provider_sha512,provider_version_number,provider_project_url,provider_creator,available,last_verified_at)
-                         values ($1,'modrinth',$2,$3,$4,$5,$6,$7,$8,true,now())`,
+                         (revision_id,provider,provider_project_id,provider_version_id,provider_file_name,provider_sha512,provider_version_number,provider_project_url,provider_creator,provider_project_status,available,last_verified_at)
+                         values ($1,'modrinth',$2,$3,$4,$5,$6,$7,$8,$9,true,now())`,
                         [revisionId, project.id, version.id, file.filename, hashes.sha512, version.version_number,
                             `https://modrinth.com/resourcepack/${encodeURIComponent(project.slug || project.id)}`,
-                            { id: context.account.providerUserId, username: context.account.username }])
+                            { id: context.account.providerUserId, username: context.account.username }, project.status])
                     for(const variant of variants) await client.query(
                         `insert into community_revision_previews(revision_id,size_label,mime_type,object_key,width,height,size_bytes)
                          values ($1,$2,$3,$4,$5,$6,$7)`, [revisionId, variant.label, variant.mime, variant.objectKey, variant.width, variant.height, variant.buffer.length])
@@ -176,7 +177,7 @@ router.post('/community/sources/modrinth/:sourceId/candidates/:candidateId/publi
                     return { itemId, revisionId, alreadyCurrent: false }
                 } catch(error) { await client.query('rollback'); throw error }
             })
-            return { ...result, source: { provider: 'modrinth', projectId: project.id, versionId: version.id, versionNumber: version.version_number, fileName: file.filename, projectUrl: `https://modrinth.com/resourcepack/${encodeURIComponent(project.slug || project.id)}` } }
+            return { ...result, source: { provider: 'modrinth', projectId: project.id, versionId: version.id, versionNumber: version.version_number, fileName: file.filename, projectUrl: `https://modrinth.com/resourcepack/${encodeURIComponent(project.slug || project.id)}`, projectStatus: project.status, unlisted: project.status === 'unlisted' } }
         })
         res.status(published.alreadyCurrent ? 200 : 201).json({ schemaVersion: 1, ...published })
     } catch(error) {

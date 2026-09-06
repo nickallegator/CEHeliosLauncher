@@ -10,6 +10,8 @@ const accounts = require('./modrinthAccounts')
 const { getExternalProviderRegistry } = require('./externalProviders')
 const { validateResourcePack } = require('./communityResourcePack')
 
+const ELIGIBLE_PROJECT_STATUSES = new Set(['approved', 'unlisted'])
+
 function provider() {
     const value = getExternalProviderRegistry().get('modrinth')
     if(!value) throw Object.assign(new Error('Modrinth integration is disabled.'), { code: 'modrinth_integration_disabled', statusCode: 404 })
@@ -27,8 +29,8 @@ async function authenticatedContext(userId) {
 }
 
 function validateProject(project) {
-    if(project?.project_type !== 'resourcepack' || project?.status !== 'approved') {
-        throw Object.assign(new Error('Only approved public Modrinth Resource Pack projects can be imported.'), { code: 'modrinth_project_ineligible', statusCode: 400 })
+    if(project?.project_type !== 'resourcepack' || !ELIGIBLE_PROJECT_STATUSES.has(String(project?.status || '').toLowerCase())) {
+        throw Object.assign(new Error('Only reviewed public or unlisted Modrinth Resource Pack projects can be imported.'), { code: 'modrinth_project_ineligible', statusCode: 400 })
     }
     if(!Array.isArray(project.game_versions) || !project.game_versions.includes('1.21.1')) {
         throw Object.assign(new Error('The Modrinth project must support Minecraft 1.21.1.'), { code: 'modrinth_project_incompatible', statusCode: 400 })
@@ -38,6 +40,12 @@ function validateProject(project) {
         throw Object.assign(new Error(`The Modrinth project license ${license || '<unknown>'} is not enabled in AG Community.`), { code: 'modrinth_license_unsupported', statusCode: 400 })
     }
     return license
+}
+
+function requireUnlistedAcknowledgement(project, acknowledged) {
+    if(String(project?.status || '').toLowerCase() === 'unlisted' && acknowledged !== true) {
+        throw Object.assign(new Error('Confirm that publishing this unlisted Modrinth project will make it discoverable in AG Community.'), { code: 'modrinth_unlisted_acknowledgement_required', statusCode: 400 })
+    }
 }
 
 function normalizeChannels(value) {
@@ -55,29 +63,31 @@ async function listOwnedProjects(userId) {
         try {
             validateProject(project)
             await context.provider.verifyOwnership(project, context.account.providerUserId, context.token)
-            result.push({ id: project.id, slug: project.slug, title: project.title, description: project.description || '', iconUrl: project.icon_url || null, license: project.license?.id, teamId: project.team, gameVersions: project.game_versions || [] })
+            result.push({ id: project.id, slug: project.slug, title: project.title, description: project.description || '', iconUrl: project.icon_url || null, license: project.license?.id, teamId: project.team, gameVersions: project.game_versions || [], status: project.status, unlisted: project.status === 'unlisted' })
         } catch (_error) { /* omit projects that cannot be safely claimed */ }
     }
     return result.sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
 }
 
-async function claimProject(userId, projectIdOrSlug, channels) {
+async function claimProject(userId, projectIdOrSlug, channels, { unlistedAcknowledged = false } = {}) {
     const context = await authenticatedContext(userId)
     const project = await context.provider.project(projectIdOrSlug, context.token)
     validateProject(project)
+    requireUnlistedAcknowledgement(project, unlistedAcknowledged)
     await context.provider.verifyOwnership(project, context.account.providerUserId, context.token)
     const id = crypto.randomUUID()
     const { rows } = await db.query(
         `insert into community_external_sources
-         (id,provider,owner_id,provider_project_id,project_slug,project_title,team_id,channels,status)
-         values ($1,'modrinth',$2,$3,$4,$5,$6,$7,'active')
+         (id,provider,owner_id,provider_project_id,project_slug,project_title,team_id,channels,status,provider_project_status)
+         values ($1,'modrinth',$2,$3,$4,$5,$6,$7,'active',$8)
          on conflict (provider,provider_project_id) do update set
            project_slug=excluded.project_slug,project_title=excluded.project_title,team_id=excluded.team_id,
+           provider_project_status=excluded.provider_project_status,
            channels=case when community_external_sources.owner_id=excluded.owner_id then excluded.channels else community_external_sources.channels end,
            status=case when community_external_sources.owner_id=excluded.owner_id then 'active' else community_external_sources.status end,
            updated_at=now()
          returning *`,
-        [id, userId, project.id, project.slug || null, project.title, project.team, normalizeChannels(channels)])
+        [id, userId, project.id, project.slug || null, project.title, project.team, normalizeChannels(channels), project.status])
     if(Number(rows[0].owner_id) !== Number(userId)) throw Object.assign(new Error('This Modrinth project is already claimed by another AG Community owner.'), { code: 'modrinth_project_already_claimed', statusCode: 409 })
     return rows[0]
 }
@@ -109,7 +119,7 @@ async function detectSource(source, suppliedContext = null) {
                 { versionName: version.name, publishedAt: version.date_published, files, changelog: String(version.changelog || '').slice(0, 20_000) }])
         detected += result.rowCount
     }
-    await db.query('update community_external_sources set status=\'active\',last_checked_at=now(),last_error=null,updated_at=now() where id=$1', [source.id])
+    await db.query('update community_external_sources set status=\'active\',provider_project_status=$2,last_checked_at=now(),last_error=null,updated_at=now() where id=$1', [source.id, project.status])
     return detected
 }
 
@@ -210,4 +220,4 @@ async function syncAllSources({ concurrency = config.modrinth.syncConcurrency } 
     return results
 }
 
-module.exports = { authenticatedContext, checkSource, claimProject, compareIndex, compositionDiff, detectSource, listOwnedProjects, normalizeChannels, prepareCandidate, syncAllSources, validateProject, withDownloadedCandidate }
+module.exports = { ELIGIBLE_PROJECT_STATUSES, authenticatedContext, checkSource, claimProject, compareIndex, compositionDiff, detectSource, listOwnedProjects, normalizeChannels, prepareCandidate, requireUnlistedAcknowledgement, syncAllSources, validateProject, withDownloadedCandidate }

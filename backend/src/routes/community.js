@@ -188,7 +188,7 @@ const CURRENT_ITEM_SELECT = `
            r.format_id, r.format_version, r.compatibility, r.type_data, r.object_key,
            rs.provider as source_provider, rs.object_key as source_object_key,
            rs.provider_project_id, rs.provider_version_id, rs.provider_file_name, rs.provider_sha512,
-           rs.provider_version_number, rs.provider_project_url, rs.provider_creator,
+           rs.provider_version_number, rs.provider_project_url, rs.provider_creator, rs.provider_project_status,
            rs.available as source_available, rs.last_verified_at as source_last_verified_at,
            coalesce((select jsonb_agg(jsonb_build_object(
                'type', d.dependency_type, 'itemId', d.dependency_item_id,
@@ -248,7 +248,8 @@ function itemJson(row, detail = false) {
         value.source = {
             provider: 'modrinth', projectId: row.provider_project_id, versionId: row.provider_version_id,
             versionNumber: row.provider_version_number, fileName: row.provider_file_name,
-            projectUrl: row.provider_project_url, creator: creator || null
+            projectUrl: row.provider_project_url, projectStatus: row.provider_project_status || null,
+            unlisted: row.provider_project_status === 'unlisted', creator: creator || null
         }
         value.availability = { available: row.source_available !== false, lastVerifiedAt: row.source_last_verified_at || null }
     } else {

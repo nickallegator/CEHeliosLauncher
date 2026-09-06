@@ -1860,7 +1860,8 @@ async function prepareModrinthSettingsShortcut(){
         connect.dataset.modrinthShortcutBound = 'true'
         connect.onclick = async () => {
             await window.AppShell?.navigate?.('community')
-            document.getElementById('communityModrinthImportOpen')?.click()
+            if(typeof window.openModrinthImport === 'function') await window.openModrinthImport()
+            else document.getElementById('communityModrinthImportOpen')?.click()
         }
     }
 }

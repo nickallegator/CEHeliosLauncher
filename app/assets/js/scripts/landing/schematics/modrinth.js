@@ -8,12 +8,49 @@ function setModrinthStatus(message, error = false){
     const element = modrinthElement('communityModrinthStatus')
     if(element){ element.textContent = message || ''; element.toggleAttribute('error', error) }
 }
+
+function modrinthProjectForTracking(){
+    const projectId = modrinthElement('communityModrinthProject')?.value
+    return modrinthProjectsCache.find(project => project.id === projectId) || null
+}
+
+function modrinthProjectForPublishing(){
+    const sourceId = modrinthElement('communityModrinthSource')?.value
+    const source = modrinthSourcesCache.find(value => value.id === sourceId)
+    const project = modrinthProjectsCache.find(value => value.id === source?.projectId)
+    return project || (source ? { id: source.projectId, title: source.title, status: source.projectStatus, unlisted: source.unlisted === true } : null)
+}
+
+function refreshModrinthVisibilityConsent(){
+    const unlisted = modrinthProjectForTracking()?.unlisted === true || modrinthProjectForPublishing()?.unlisted === true
+    const row = modrinthElement('communityModrinthUnlistedConsentRow')
+    const checkbox = modrinthElement('communityModrinthUnlistedConsent')
+    if(row) row.hidden = !unlisted
+    if(checkbox && !unlisted) checkbox.checked = false
+}
 function showModrinthModal(open){
     const modal = modrinthElement('communityModrinthModal')
     if(!modal) return
-    modal.setAttribute('aria-hidden', open ? 'false' : 'true')
-    if(open) modrinthElement('communityModrinthClose')?.focus()
-    else modrinthPollController?.abort()
+    if(open){
+        const panel = modal.querySelector('[role="dialog"]')
+        openModal(modal, panel, { onRequestClose: () => showModrinthModal(false), initialFocus: '#communityModrinthClose' })
+    } else {
+        modrinthPollController?.abort()
+        closeModal(modal)
+    }
+}
+
+function setModrinthImportAvailability({ connected = false, reconnectRequired = false, projects = [], sources = [], loading = false } = {}){
+    const workspace = modrinthElement('communityModrinthWorkspace')
+    const empty = modrinthElement('communityModrinthEmpty')
+    const ready = connected && !reconnectRequired
+    const noEligibleProjects = ready && !loading && projects.length === 0 && sources.length === 0
+    if(workspace) workspace.hidden = !ready || noEligibleProjects || loading
+    if(empty) empty.hidden = !noEligibleProjects
+    const projectSelect = modrinthElement('communityModrinthProject')
+    const track = modrinthElement('communityModrinthTrack')
+    if(projectSelect) projectSelect.disabled = projects.length === 0
+    if(track) track.disabled = projects.length === 0
 }
 
 async function modrinthClient(){
@@ -36,7 +73,7 @@ async function refreshModrinthAccount(){
     for(const id of ['communityModrinthAccountStatus','settingsModrinthStatus']){
         const element = modrinthElement(id); if(element) element.textContent = status
     }
-    modrinthElement('communityModrinthWorkspace').hidden = !connected || account.reconnectRequired
+    setModrinthImportAvailability({ connected, reconnectRequired: account.reconnectRequired, loading: connected && !account.reconnectRequired })
     modrinthElement('communityModrinthConnect').textContent = connected ? 'Reconnect Modrinth' : 'Connect Modrinth'
     if(modrinthElement('settingsModrinthConnect')) modrinthElement('settingsModrinthConnect').textContent = connected ? 'Reconnect' : 'Connect'
     if(modrinthElement('settingsModrinthDisconnect')) modrinthElement('settingsModrinthDisconnect').hidden = !connected
@@ -69,12 +106,14 @@ async function beginModrinthOAuth(){
 async function refreshModrinthSources(){
     const client = await modrinthClient()
     const headers = getSchematicsAuthHeaders()
+    setModrinthImportAvailability({ connected: true, loading: true })
+    setModrinthStatus(communityCopy('modrinthCheckingProjects'))
     const [projects, sources] = await Promise.all([client.modrinthProjects({ headers }), client.modrinthSources({ headers })])
     modrinthProjectsCache = projects.items || []
     modrinthSourcesCache = sources.items || []
     const projectSelect = modrinthElement('communityModrinthProject')
     if(projectSelect){
-        projectSelect.replaceChildren(...modrinthProjectsCache.map(project => Object.assign(document.createElement('option'), { value: project.id, textContent: `${project.title} · ${project.license}` })))
+        projectSelect.replaceChildren(...modrinthProjectsCache.map(project => Object.assign(document.createElement('option'), { value: project.id, textContent: `${project.title} · ${project.license}${project.unlisted ? ' · Unlisted' : ''}` })))
     }
     const sourceSelect = modrinthElement('communityModrinthSource')
     if(sourceSelect){
@@ -82,7 +121,17 @@ async function refreshModrinthSources(){
         sourceSelect.replaceChildren(...modrinthSourcesCache.map(source => Object.assign(document.createElement('option'), { value: source.id, textContent: `${source.title}${source.pendingCount ? ` · ${source.pendingCount} pending` : ''}` })))
         if([...sourceSelect.options].some(option => option.value === selected)) sourceSelect.value = selected
     }
+    setModrinthImportAvailability({ connected: true, projects: modrinthProjectsCache, sources: modrinthSourcesCache })
+    refreshModrinthVisibilityConsent()
+    if(modrinthProjectsCache.length === 0 && modrinthSourcesCache.length === 0) setModrinthStatus(communityCopy('modrinthNoEligibleStatus'))
+    else setModrinthStatus('')
     await refreshModrinthCandidates()
+}
+
+async function openModrinthImport(){
+    showModrinthModal(true)
+    try { await refreshModrinthAccount() }
+    catch(error) { setModrinthStatus(error.message, true) }
 }
 
 async function refreshModrinthCandidates(){
@@ -95,6 +144,8 @@ async function refreshModrinthCandidates(){
     const result = await client.modrinthCandidates(sourceId, { headers: getSchematicsAuthHeaders() })
     const source = modrinthSourcesCache.find(value => value.id === sourceId)
     const project = modrinthProjectsCache.find(value => value.id === source?.projectId)
+        || (source ? { id: source.projectId, title: source.title, status: source.projectStatus, unlisted: source.unlisted === true } : null)
+    refreshModrinthVisibilityConsent()
     if(project){
         const titleInput = modrinthElement('communityModrinthTitleInput')
         const descriptionInput = modrinthElement('communityModrinthDescription')
@@ -132,6 +183,7 @@ function renderModrinthCandidate(sourceId, candidate, project){
             const titleValue = modrinthElement('communityModrinthTitleInput')?.value.trim() || sourceTitle(project, candidate)
             if(!modrinthElement('communityModrinthRights')?.checked){ setModrinthStatus('Confirm your distribution rights before publishing.', true); return }
             if(!modrinthElement('communityModrinthLicense')?.checked){ setModrinthStatus('Accept the Modrinth project license before publishing.', true); return }
+            if(project?.unlisted === true && !modrinthElement('communityModrinthUnlistedConsent')?.checked){ setModrinthStatus('Confirm that this unlisted project may be discoverable in AG Community.', true); return }
             const confirmed = window.confirm(`Publish ${candidate.versionNumber} from Modrinth? The ZIP remains hosted by Modrinth and will be verified again.`)
             if(!confirmed) return
             await runModrinthAction(publish, async client => {
@@ -140,6 +192,7 @@ function renderModrinthCandidate(sourceId, candidate, project){
                     description: modrinthElement('communityModrinthDescription')?.value.trim() || project?.description || '',
                     tags: modrinthElement('communityModrinthTags')?.value || 'Modrinth',
                     license: project?.license, rightsAttested: true, licenseAccepted: true,
+                    unlistedAcknowledged: project?.unlisted !== true || modrinthElement('communityModrinthUnlistedConsent')?.checked === true,
                     packStudioOptIn: modrinthElement('communityModrinthComposition')?.checked === true,
                     packStudioTermsAccepted: modrinthElement('communityModrinthComposition')?.checked === true
                 }, { headers: getSchematicsAuthHeaders() })
@@ -169,7 +222,7 @@ async function initModrinthIntegration(){
     if(settings) settings.hidden = !enabled
     if(!enabled || modrinthUiBound) return
     modrinthUiBound = true
-    open?.addEventListener('click', () => { showModrinthModal(true); refreshModrinthAccount().catch(error => setModrinthStatus(error.message, true)) })
+    open?.addEventListener('click', openModrinthImport)
     modrinthElement('communityModrinthClose')?.addEventListener('click', () => showModrinthModal(false))
     modrinthElement('communityModrinthScrim')?.addEventListener('click', () => showModrinthModal(false))
     for(const buttonId of ['communityModrinthConnect','settingsModrinthConnect']){
@@ -177,9 +230,13 @@ async function initModrinthIntegration(){
         if(button) button.onclick = () => beginModrinthOAuth().catch(error => setModrinthStatus(error.message, true))
     }
     if(modrinthElement('settingsModrinthDisconnect')) modrinthElement('settingsModrinthDisconnect').onclick = async () => { const client = await modrinthClient(); await client.disconnectModrinth({ headers: getSchematicsAuthHeaders() }); await refreshModrinthAccount() }
+    modrinthElement('communityModrinthRefresh')?.addEventListener('click', () => refreshModrinthAccount().catch(error => setModrinthStatus(error.message, true)))
     modrinthElement('communityModrinthTrack')?.addEventListener('click', () => runModrinthAction(modrinthElement('communityModrinthTrack'), async client => {
+        const project = modrinthProjectForTracking()
+        if(!project) throw new Error('Select an eligible Modrinth Resource Pack project.')
+        if(project.unlisted === true && !modrinthElement('communityModrinthUnlistedConsent')?.checked) throw new Error('Confirm that this unlisted project may be discoverable in AG Community.')
         const channels = ['release', ...(modrinthElement('communityModrinthBeta').checked ? ['beta'] : []), ...(modrinthElement('communityModrinthAlpha').checked ? ['alpha'] : [])]
-        await client.trackModrinthProject(modrinthElement('communityModrinthProject').value, channels, { headers: getSchematicsAuthHeaders() }); await refreshModrinthSources()
+        await client.trackModrinthProject(project.id, channels, { headers: getSchematicsAuthHeaders(), unlistedAcknowledged: project.unlisted !== true || modrinthElement('communityModrinthUnlistedConsent')?.checked === true }); await refreshModrinthSources()
     }, 'Claiming and checking the project…'))
     modrinthElement('communityModrinthCheck')?.addEventListener('click', () => runModrinthAction(modrinthElement('communityModrinthCheck'), async client => { await client.checkModrinthSource(modrinthElement('communityModrinthSource').value, { headers: getSchematicsAuthHeaders() }); await refreshModrinthSources() }, 'Checking Modrinth for releases…'))
     modrinthElement('communityModrinthSource')?.addEventListener('change', () => {
@@ -189,8 +246,10 @@ async function initModrinthIntegration(){
         }
         refreshModrinthCandidates().catch(error => setModrinthStatus(error.message, true))
     })
+    modrinthElement('communityModrinthProject')?.addEventListener('change', refreshModrinthVisibilityConsent)
     for(const fieldId of ['communityModrinthTitleInput','communityModrinthDescription']) modrinthElement(fieldId)?.addEventListener('input', event => { event.currentTarget.dataset.edited = 'true' })
     await refreshModrinthAccount().catch(() => {})
 }
 
 window.initModrinthIntegration = initModrinthIntegration
+window.openModrinthImport = openModrinthImport

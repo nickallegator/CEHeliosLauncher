@@ -28,8 +28,28 @@ test('launcher exposes account management and reviewed Modrinth import surfaces'
     assert.match(settings, /settingsModrinthConnect/)
     assert.match(settings, /settingsModrinthDisconnect/)
     assert.match(community, /communityModrinthImportOpen/)
+    assert.match(modal, /communityModrinthEmpty/)
+    assert.match(modal, /modrinthNoEligibleReviewTip/)
+    assert.match(modal, /communityModrinthUnlistedConsent/)
     assert.match(modal, /communityModrinthRights/)
     assert.match(modal, /communityModrinthComposition/)
     assert.match(client, /prepareModrinthCandidate/)
     assert.match(client, /publishModrinthCandidate/)
+})
+
+test('Modrinth importer uses the shared accessible modal lifecycle', () => {
+    const controller = fs.readFileSync(path.join(root, 'app/assets/js/scripts/landing/schematics/modrinth.js'), 'utf8')
+    assert.match(controller, /openModal\(modal, panel/)
+    assert.match(controller, /closeModal\(modal\)/)
+    assert.match(controller, /setModrinthImportAvailability/)
+    assert.match(controller, /modrinthNoEligibleStatus/)
+    assert.match(controller, /refreshModrinthVisibilityConsent/)
+    assert.match(controller, /unlistedAcknowledged/)
+})
+
+test('Modrinth source presentation labels unlisted projects without changing catalog compatibility', () => {
+    const controller = fs.readFileSync(path.join(root, 'app/assets/js/scripts/landing/schematics/community-content.js'), 'utf8')
+    const client = fs.readFileSync(path.join(root, 'app/assets/js/communitymanager.js'), 'utf8')
+    assert.match(controller, /value\.source\.unlisted/)
+    assert.match(client, /unlistedAcknowledged/)
 })

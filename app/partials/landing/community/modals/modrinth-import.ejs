@@ -11,12 +11,28 @@
                 <p id="communityModrinthAccountStatus"><%- lang('settings.modrinthNotConnected') %></p>
                 <button id="communityModrinthConnect" class="schematicsDetailButton primary" type="button"><%- lang('settings.modrinthConnect') %></button>
             </section>
+            <section id="communityModrinthEmpty" class="communityModrinthEmpty" role="status" hidden>
+                <span class="workshopEyebrow"><%- lang('community.modrinthNoEligibleEyebrow') %></span>
+                <h3><%- lang('community.modrinthNoEligibleTitle') %></h3>
+                <p><%- lang('community.modrinthNoEligibleBody') %></p>
+                <ul>
+                    <li><%- lang('community.modrinthNoEligibleLinkedTip') %></li>
+                    <li><%- lang('community.modrinthNoEligibleReviewTip') %></li>
+                    <li><%- lang('community.modrinthNoEligibleTypeTip') %></li>
+                    <li><%- lang('community.modrinthNoEligiblePermissionTip') %></li>
+                </ul>
+                <button id="communityModrinthRefresh" class="schematicsDetailButton" type="button"><%- lang('community.modrinthRefreshProjects') %></button>
+            </section>
             <section id="communityModrinthWorkspace" hidden>
                 <div class="communityModrinthGrid">
                     <label><span><%- lang('community.modrinthProject') %></span><select id="communityModrinthProject"></select></label>
                     <fieldset><legend><%- lang('community.modrinthChannels') %></legend><label><input type="checkbox" checked disabled> Release</label><label><input id="communityModrinthBeta" type="checkbox"> Beta</label><label><input id="communityModrinthAlpha" type="checkbox"> Alpha</label></fieldset>
                     <button id="communityModrinthTrack" class="schematicsDetailButton primary" type="button"><%- lang('community.modrinthTrack') %></button>
                 </div>
+                <label id="communityModrinthUnlistedConsentRow" class="communityModrinthUnlistedConsent" hidden>
+                    <input id="communityModrinthUnlistedConsent" type="checkbox">
+                    <span><%- lang('community.modrinthUnlistedConsent') %></span>
+                </label>
                 <div class="communityModrinthSourceBar"><label><span><%- lang('community.modrinthTrackedProject') %></span><select id="communityModrinthSource"></select></label><button id="communityModrinthCheck" class="schematicsDetailButton" type="button"><%- lang('community.modrinthCheck') %></button></div>
                 <div class="communityModrinthMetadata">
                     <label><span>AG Community title</span><input id="communityModrinthTitleInput" maxlength="80"></label>

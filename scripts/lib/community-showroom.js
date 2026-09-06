@@ -826,7 +826,7 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 defaultCategory: 'all',
                 defaultSort: 'popular',
                 showroom: true,
-                features: { richPreviews: true, packStudio: true },
+                features: { richPreviews: true, packStudio: true, modrinth: true },
                 composer: {
                     schemaVersion: 1,
                     componentKinds: ['block','pokemon','item','sound','font','language','ui','texture','generic'],
@@ -835,6 +835,31 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 },
                 categories: SHOWROOM_TYPES.map(id => ({ id, readable: true, writable: false }))
             })
+            return
+        }
+        if(url.pathname === '/v1/integrations/modrinth' && request.method === 'GET') {
+            writeJson(response, 200, {
+                schemaVersion: 1,
+                account: {
+                    connected: true,
+                    provider: 'modrinth',
+                    providerUserId: 'showroom-modrinth-user',
+                    username: 'WorkshopCreator',
+                    displayName: 'Workshop Creator',
+                    avatarUrl: null,
+                    scopes: ['USER_READ', 'PROJECT_READ'],
+                    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                    reconnectRequired: false
+                }
+            })
+            return
+        }
+        if(url.pathname === '/v1/community/sources/modrinth/projects' && request.method === 'GET') {
+            writeJson(response, 200, { schemaVersion: 1, items: [] })
+            return
+        }
+        if(url.pathname === '/v1/community/sources/modrinth' && request.method === 'GET') {
+            writeJson(response, 200, { schemaVersion: 1, items: [] })
             return
         }
         if(url.pathname === '/v1/community/composer/components' && request.method === 'GET') {
@@ -1120,7 +1145,7 @@ function injectShowroomDistribution(source, baseUrl) {
         schemaVersion: 1,
         enabled: true,
         apiBaseUrl: baseUrl,
-        features: { catalog: true, publishing: false, richPreviews: true, packStudio: true }
+        features: { catalog: true, publishing: false, richPreviews: true, packStudio: true, modrinth: true }
     }
     distribution.schematics = {
         schemaVersion: 2,

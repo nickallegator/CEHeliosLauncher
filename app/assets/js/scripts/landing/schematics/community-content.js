@@ -456,7 +456,7 @@ async function openGenericCommunityDetail(entry){
     if(sourceLink){
         const external = value.source?.provider === 'modrinth' && /^https:\/\/modrinth\.com\//i.test(value.source.projectUrl || '')
         sourceLink.hidden = !external
-        sourceLink.textContent = external ? `Modrinth · ${value.source.versionNumber || 'Source'}` : ''
+        sourceLink.textContent = external ? `Modrinth${value.source.unlisted ? ' · Unlisted' : ''} · ${value.source.versionNumber || 'Source'}` : ''
         sourceLink.href = external ? value.source.projectUrl : '#'
     }
     genericCommunityElement('communityContentDetailRights').textContent = value.rightsAttestedAt ? communityCopy('rightsConfirmed') : '\u2014'

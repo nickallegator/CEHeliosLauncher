@@ -9,7 +9,7 @@ const test = require('node:test')
 
 const { createExternalTokenEncryption } = require('../../backend/src/services/externalTokenEncryption')
 const { createModrinthProvider, isPrivateAddress, validateDownloadUrl } = require('../../backend/src/services/modrinth')
-const { compareIndex, normalizeChannels } = require('../../backend/src/services/modrinthSources')
+const { compareIndex, normalizeChannels, requireUnlistedAcknowledgement, validateProject } = require('../../backend/src/services/modrinthSources')
 
 const root = path.resolve(__dirname, '..', '..')
 
@@ -96,4 +96,29 @@ test('release channels and review diffs are deterministic and release-safe', () 
         [{ path: 'a', sha256: '1' }, { path: 'b', sha256: '2' }],
         [{ path: 'b', sha256: '3' }, { path: 'c', sha256: '4' }], 'path', 'sha256'
     ), { added: ['c'], removed: ['a'], changed: ['b'] })
+})
+
+test('Modrinth eligibility accepts reviewed public and unlisted Resource Packs only', () => {
+    const project = { project_type: 'resourcepack', status: 'approved', game_versions: ['1.21.1'], license: { id: 'MIT' } }
+    assert.equal(validateProject(project), 'MIT')
+    assert.equal(validateProject({ ...project, status: 'unlisted' }), 'MIT')
+    for(const status of ['withheld', 'processing', 'draft', 'private', 'rejected', 'scheduled', 'unknown']) {
+        assert.throws(() => validateProject({ ...project, status }), error => error.code === 'modrinth_project_ineligible')
+    }
+})
+
+test('unlisted Modrinth projects require an explicit Community discoverability acknowledgement', () => {
+    assert.doesNotThrow(() => requireUnlistedAcknowledgement({ status: 'approved' }, false))
+    assert.doesNotThrow(() => requireUnlistedAcknowledgement({ status: 'unlisted' }, true))
+    assert.throws(
+        () => requireUnlistedAcknowledgement({ status: 'unlisted' }, false),
+        error => error.code === 'modrinth_unlisted_acknowledgement_required'
+    )
+})
+
+test('Modrinth unlisted-source migration records visibility without rewriting immutable archives', () => {
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../backend/migrations/2026-09-01_modrinth_unlisted_sources.sql'), 'utf8')
+    assert.match(sql, /community_external_sources[\s\S]*provider_project_status/i)
+    assert.match(sql, /community_revision_sources[\s\S]*provider_project_status/i)
+    assert.match(sql, /in \('approved', 'unlisted'\)/i)
 })
