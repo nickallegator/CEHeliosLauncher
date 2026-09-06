@@ -97,6 +97,11 @@ jobs:
         run: npm ci
         shell: bash
 
+      - name: Restore electron-builder helper permissions
+        if: runner.os != 'Windows'
+        run: chmod +x node_modules/app-builder-bin/linux/*/app-builder node_modules/app-builder-bin/mac/app-builder_*
+        shell: bash
+
       - name: Build
         run: npm run dist
         shell: bash
