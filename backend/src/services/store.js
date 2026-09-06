@@ -151,6 +151,25 @@ async function listMinecraftTesters() {
     return rows
 }
 
+async function listActiveMinecraftServerPlayers() {
+    const { rows } = await db.query(
+        `with minecraft_profiles as (
+           select distinct on (replace(lower(provider_user_id), '-', ''))
+             replace(lower(provider_user_id), '-', '') as minecraft_uuid,
+             display_name
+           from users
+           where provider = 'minecraft'
+           order by replace(lower(provider_user_id), '-', ''), created_at desc
+         )
+         select mt.minecraft_uuid, mp.display_name
+         from minecraft_testers mt
+         left join minecraft_profiles mp on mp.minecraft_uuid = mt.minecraft_uuid
+         where mt.enabled = true
+         order by mt.minecraft_uuid`
+    )
+    return rows.map(row => ({ minecraftUuid: row.minecraft_uuid, displayName: row.display_name || null }))
+}
+
 function normalizeEntitlement(value) {
     const normalized = String(value || '').trim().toLowerCase()
     if(!/^[a-z0-9][a-z0-9:_-]{1,127}$/.test(normalized)) {
@@ -245,6 +264,7 @@ module.exports = {
     upsertMinecraftTester,
     disableMinecraftTester,
     listMinecraftTesters,
+    listActiveMinecraftServerPlayers,
     normalizeEntitlement,
     getMinecraftEntitlementGrants,
     grantMinecraftEntitlement,
