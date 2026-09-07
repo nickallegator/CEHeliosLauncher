@@ -11,6 +11,7 @@ const {
     CommunityApiClient,
     createCommunitySessionState,
     deduplicateCommunityEntries,
+    getSharedCommunityApiClient,
     normalizeCommunityEntry,
     normalizeCommunityParams
 } = require('../../app/assets/js/communitymanager')
@@ -38,6 +39,17 @@ test('Community cache keys normalize filter order and omit empty values', () => 
     const first = normalizeCommunityParams({ sort: 'popular', query: '', category: 'all' }).toString()
     const second = normalizeCommunityParams({ category: 'all', sort: 'popular' }).toString()
     assert.equal(first, second)
+})
+
+test('Home and Community routes reuse the same catalog repository for one service', () => {
+    const options = {
+        baseUrl: 'https://shared-community.example.test/',
+        cachePath: 'C:\\cache\\community-v1.json',
+        fetch: async () => new Response('{}', { status: 200 })
+    }
+    const home = getSharedCommunityApiClient(options)
+    const fullCatalog = getSharedCommunityApiClient({ ...options, baseUrl: 'https://shared-community.example.test' })
+    assert.equal(home, fullCatalog)
 })
 
 test('Community session state restores category, filters, entries, and scroll safely', () => {

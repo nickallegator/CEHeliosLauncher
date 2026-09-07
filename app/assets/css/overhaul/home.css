@@ -13,7 +13,7 @@
     display: grid !important;
     width: auto !important;
     height: auto !important;
-    grid-template-columns: minmax(210px, 0.9fr) minmax(330px, 1.5fr) minmax(205px, 0.78fr);
+    grid-template-columns: minmax(236px, 0.92fr) minmax(350px, 1.42fr) minmax(268px, 1fr);
     gap: 16px;
     padding: 20px 20px 4px;
     box-sizing: border-box;
@@ -37,38 +37,38 @@
     box-sizing: border-box;
 }
 
-.homeHeroPanel,
+.homeNewsPanel,
 .homeSidePanel {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    justify-content: center;
-    padding: 28px 24px;
-    overflow: hidden;
+    justify-content: flex-start;
+    padding: 20px 18px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
-.homeHeroPanel::after {
-    right: -36px;
-    bottom: -42px;
-    width: 160px;
-    height: 160px;
-    border: 28px solid rgba(55, 200, 171, 0.055);
-    border-radius: 50%;
-    background: transparent;
-    box-shadow: none;
+.homeFeedHeader {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
 }
 
-.homeHeroPanel h1 {
-    max-width: 300px;
-    margin: 8px 0 14px;
+.homeFeedHeader.compact { align-items: center; }
+
+.homeFeedHeader h1,
+.homeFeedHeader h2 {
+    margin: 4px 0 0;
     color: var(--workshop-text);
     font-family: 'Pixelify Sans', sans-serif;
-    font-size: clamp(32px, 3.4vw, 49px);
+    font-size: clamp(20px, 1.8vw, 25px);
     font-weight: 650;
-    line-height: 0.9;
+    line-height: 1;
 }
 
-.homeHeroPanel > p,
 .homeSidePanel > p {
     margin: 0;
     color: var(--workshop-text-muted);
@@ -76,19 +76,6 @@
     line-height: 1.45;
 }
 
-.homeBrandRule {
-    display: grid;
-    height: 9px;
-    grid-template-columns: 1fr 16px 7px;
-    gap: 5px;
-    margin: 24px 0;
-}
-
-.homeBrandRule span { background: var(--workshop-teal-deep); }
-.homeBrandRule span:nth-child(2) { background: var(--workshop-copper); }
-.homeBrandRule span:nth-child(3) { background: var(--workshop-mint); }
-
-.homeHeroStatus,
 .homeStatusLine {
     display: flex;
     align-items: center;
@@ -106,12 +93,119 @@
     transform: rotate(45deg);
 }
 
-.homeHeroStatus div,
 .homeStatusLine div { display: flex; flex-direction: column; }
-.homeHeroStatus small,
 .homeStatusLine small { color: var(--workshop-text-muted); font-size: 10px; letter-spacing: 0.08em; }
-.homeHeroStatus strong,
 .homeStatusLine strong { color: var(--workshop-mint); font-size: 13px; }
+
+.homeFeedStatus {
+    width: 100%;
+    margin: 16px 0 0;
+    color: var(--workshop-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.homeFeedStatus[hidden] { display: none; }
+
+.homeFeedList {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex-direction: column;
+    gap: 7px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.homeFeedEntryButton {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    padding: 10px 11px;
+    border: 1px solid rgba(82, 115, 108, .36);
+    border-radius: var(--workshop-radius-small);
+    background: linear-gradient(135deg, rgba(8, 14, 13, .48), rgba(31, 47, 43, .35));
+    color: var(--workshop-text);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color var(--workshop-transition), background var(--workshop-transition), transform var(--workshop-transition);
+}
+
+.homeFeedEntryButton:hover {
+    border-color: rgba(55, 200, 171, .58);
+    background: linear-gradient(135deg, rgba(18, 31, 28, .82), rgba(38, 58, 53, .55));
+    transform: translateY(-1px);
+}
+
+.homeFeedEntryButton:focus-visible {
+    outline: 2px solid var(--workshop-mint);
+    outline-offset: 2px;
+}
+
+.homeFeedSkeleton {
+    display: grid;
+    min-height: 43px;
+    gap: 7px;
+    padding: 10px 11px;
+    border: 1px solid rgba(82, 115, 108, .22);
+    border-radius: var(--workshop-radius-small);
+    background: rgba(7, 12, 11, .28);
+    box-sizing: border-box;
+}
+.homeFeedSkeleton.featured { min-height: 116px; }
+.homeFeedSkeleton.trending { min-height: 47px; grid-template-columns: 38px 1fr; align-items: center; }
+.homeFeedSkeleton span { display: block; height: 8px; background: rgba(139, 167, 160, .13); }
+.homeFeedSkeleton span:last-child { width: 68%; }
+.homeFeedSkeleton.trending span:first-child { width: 38px; height: 38px; }
+
+.homeNewsItem.featured .homeFeedEntryButton { padding: 13px; border-color: rgba(208, 121, 58, .48); }
+.homeNewsItem h2,
+.homeNewsItem h3 {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    color: var(--workshop-text);
+    font-size: 13px;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+.homeNewsItem.featured h2 { font-family: 'Pixelify Sans', sans-serif; font-size: 17px; }
+.homeNewsItem .homeFeedEntryButton { flex-direction: column; }
+.homeNewsItem .homeFeedEntryButton[data-unread="true"]::before {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--workshop-copper-light);
+    box-shadow: 0 0 0 3px rgba(255, 122, 32, .12);
+    content: '';
+}
+.homeFeedMeta {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 3px 8px;
+    margin-top: 5px;
+    color: var(--workshop-text-muted);
+    font-size: 9px;
+    letter-spacing: .025em;
+}
+.homeNewsItem p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 9px 0 0;
+    color: var(--workshop-text-muted);
+    font-size: 11px;
+    line-height: 1.42;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+}
+.homeNewsPanel > .workshopButton { width: 100%; margin-top: auto; padding-top: 7px; padding-bottom: 7px; }
 
 #landingContainer > #upper > #content.homeDashboard {
     display: grid !important;
@@ -124,6 +218,7 @@
 .homeActivityCard { padding: 22px; }
 .panelHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .panelHeader.compact { align-items: center; }
+.homePackIdentity { display: flex; align-items: center; gap: 9px; }
 .panelHeader h2,
 .homeSidePanel h2 {
     margin: 5px 0 0;
@@ -176,10 +271,44 @@
 .homeServerActions { display: flex; gap: 7px; margin-top: 8px; }
 .workshopButton.compact { width: auto; min-height: 26px; margin: 0; padding: 4px 9px; font-size: 10px; }
 .homeSidePanel { align-items: flex-start; }
-.homeSidePanel h2 { margin: 8px 0 12px; font-size: 25px; }
-.homeSidePanel .workshopButton { width: 100%; margin-top: 20px; }
-.engravedDivider { width: 100%; height: 1px; margin: 24px 0 18px; background: linear-gradient(90deg, transparent, var(--workshop-line-strong), transparent); }
+.homeSidePanel > h2 { margin: 8px 0 12px; font-size: 25px; }
+.homeSidePanel .workshopButton { width: 100%; margin-top: 12px; }
+.engravedDivider { width: 100%; height: 1px; margin: 15px 0 12px; background: linear-gradient(90deg, transparent, var(--workshop-line-strong), transparent); }
 .homeSidePanel .smallCopy { margin-top: 8px; font-size: 12px; }
+
+.homeTrendingSection { width: 100%; }
+.homeTrendingSection .homeFeedList { margin-top: 10px; gap: 5px; }
+.homeTrendingButton { min-height: 47px; align-items: center; gap: 8px; padding: 6px 7px; }
+.homeTrendingRank {
+    flex: 0 0 20px;
+    color: var(--workshop-copper-light);
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: 12px;
+    text-align: center;
+}
+.homeTrendingMedia {
+    position: relative;
+    display: grid;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    overflow: hidden;
+    place-items: center;
+    border: 1px solid rgba(82, 115, 108, .42);
+    background: rgba(5, 9, 8, .52);
+}
+.homeTrendingMedia img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: auto; }
+.homeTrendingFallback { display: grid; width: 100%; height: 100%; place-items: center; color: var(--workshop-mint); }
+.homeTrendingFallback[hidden] { display: none; }
+.homeTrendingFallback svg { width: 21px; height: 21px; fill: currentColor; }
+.homeTrendingCopy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.homeTrendingCopy strong,
+.homeTrendingCopy span,
+.homeTrendingCopy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.homeTrendingCopy strong { color: var(--workshop-text); font-size: 11px; }
+.homeTrendingCopy span { color: var(--workshop-text-muted); font-size: 9px; }
+.homeTrendingCopy small { color: var(--workshop-mint); font-size: 9px; }
+.homeTrendingDivider { margin-top: 13px; }
 
 #landingContainer > #lower.globalLaunchDock {
     position: absolute !important;

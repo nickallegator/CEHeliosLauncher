@@ -122,6 +122,27 @@ async function setShowroomWindowSize(application, width, height) {
     await new Promise(resolve => setTimeout(resolve, 180))
 }
 
+async function verifyResponsiveHomeLayout(application, page, width, height) {
+    await setShowroomWindowSize(application, width, height)
+    await page.locator('#shellNavHome').click()
+    await page.locator('#homeNewsList .homeNewsItem').first().waitFor({ state: 'visible', timeout: 10_000 })
+    const viewport = await page.locator('html').boundingBox()
+    const panels = await Promise.all([
+        page.locator('.homeNewsPanel').boundingBox(),
+        page.locator('.homeDashboard').boundingBox(),
+        page.locator('.homeSidePanel').boundingBox()
+    ])
+    if(!viewport || panels.some(panel => !panel)) throw new Error(`Unable to measure the ${width}x${height} Home layout.`)
+    const epsilon = 4
+    for(const panel of panels) {
+        if(panel.x < -epsilon || panel.x + panel.width > viewport.width + epsilon) {
+            throw new Error(`Home panel overflows horizontally at ${width}x${height}.`)
+        }
+    }
+    if(await page.locator('#homeNewsList .homeNewsItem').count() !== 3) throw new Error(`Home News changed during ${width}x${height} resize.`)
+    if(await page.locator('#homeTrendingList .homeTrendingItem').count() !== 5) throw new Error(`Home Trending changed during ${width}x${height} resize.`)
+}
+
 async function verifyResponsiveDetailLayout(application, page, width, height) {
     await setShowroomWindowSize(application, width, height)
     await resetShowroomCatalog(page)
@@ -219,8 +240,31 @@ async function run(argv = process.argv.slice(2)) {
         const page = await application.firstWindow()
         const rendererErrors = []
         page.on('pageerror', error => rendererErrors.push(error?.stack || error?.message || String(error)))
+        page.on('console', message => {
+            if(message.type() === 'error') rendererErrors.push(message.text())
+        })
         await page.waitForLoadState('domcontentloaded')
         await page.locator('#loadingContainer').waitFor({ state: 'hidden', timeout: 20_000 })
+        await page.bringToFront()
+        try {
+            await page.locator('#homeNewsList .homeNewsItem').first().waitFor({ state: 'visible', timeout: 10_000 })
+            await page.locator('#homeTrendingList .homeTrendingItem').first().waitFor({ state: 'visible', timeout: 10_000 })
+        } catch(error) {
+            const newsStatus = String(await page.locator('#homeNewsStatus').textContent().catch(() => '') || '').trim()
+            const trendingStatus = String(await page.locator('#homeTrendingStatus').textContent().catch(() => '') || '').trim()
+            const homeFeedsState = await page.locator('html').getAttribute('data-home-feeds')
+            const homeFeedScripts = await page.locator('script[src*="home-feeds"]').count()
+            const route = await page.locator('#landingContainer').getAttribute('data-shell-route')
+            const diagnostics = `News: ${newsStatus}; Trending: ${trendingStatus}; Route: ${route || 'unset'}; Home feeds: ${homeFeedsState || 'not loaded'}; scripts: ${homeFeedScripts}${rendererErrors.length ? `; Renderer: ${rendererErrors.join(' | ')}` : ''}`
+            throw new Error(`Home feed verification failed. ${diagnostics}`, { cause: error })
+        }
+        if(options.verify) {
+            const newsCount = await page.locator('#homeNewsList .homeNewsItem').count()
+            const trendingCount = await page.locator('#homeTrendingList .homeTrendingItem').count()
+            if(newsCount !== 3) throw new Error(`Home News expected 3 entries, received ${newsCount}.`)
+            if(trendingCount !== 5) throw new Error(`Home Trending expected 5 entries, received ${trendingCount}.`)
+            console.log('Verified deterministic Home News and Trending Community feeds.')
+        }
         await page.locator('#shellNavCommunity').click()
         await page.locator('.schematicCard').first().waitFor({ state: 'visible', timeout: 10_000 })
         console.log(`Showroom ready with ${runtime.entries.length} representative creations.`)
@@ -425,6 +469,10 @@ async function run(argv = process.argv.slice(2)) {
                 await verifyResponsiveDetailLayout(application, page, width, height)
             }
             console.log('Verified responsive Community dialogs at large, default, and minimum launcher sizes.')
+            for(const [width, height] of [[1600, 900], [1180, 680], [980, 600]]) {
+                await verifyResponsiveHomeLayout(application, page, width, height)
+            }
+            console.log('Verified responsive Home feeds at large, default, and minimum launcher sizes.')
             if(rendererErrors.length > 0) throw new Error(`Renderer error during showroom verification: ${rendererErrors[0]}`)
             await application.close()
             application = null
@@ -449,4 +497,4 @@ if(require.main === module) {
     })
 }
 
-module.exports = { closeOpenDetail, parseArguments, resetShowroomCatalog, run, usage, waitForApplicationClose, waitForAttribute, waitForText }
+module.exports = { closeOpenDetail, parseArguments, resetShowroomCatalog, run, usage, verifyResponsiveHomeLayout, waitForApplicationClose, waitForAttribute, waitForText }

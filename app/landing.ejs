@@ -5,19 +5,18 @@
     </div>
 
     <section id="upper" class="shellRouteView homeWorkspace" aria-labelledby="homeTitle">
-        <div id="left" class="homeHeroPanel workshopPanel">
-            <span class="workshopEyebrow"><%- lang('home.eyebrow') %></span>
-            <h1 id="homeTitle"><%- lang('home.title') %></h1>
-            <p><%- lang('home.subtitle') %></p>
-            <div class="homeBrandRule" aria-hidden="true"><span></span><span></span><span></span></div>
-            <div class="homeHeroStatus">
-                <span class="statusRune" aria-hidden="true"></span>
+        <section id="left" class="homeNewsPanel workshopPanel" aria-labelledby="homeTitle">
+            <header class="homeFeedHeader">
                 <div>
-                    <small><%- lang('home.channelLabel') %></small>
-                    <strong id="homeChannelValue"><%- lang('home.channelLoading') %></strong>
+                    <span class="workshopEyebrow"><%- lang('home.recentNews') %></span>
+                    <h1 id="homeTitle"><%- lang('home.newsTitle') %></h1>
                 </div>
-            </div>
-        </div>
+                <span id="homeNewsCacheBadge" class="panelChip" hidden><%- lang('home.cached') %></span>
+            </header>
+            <p id="homeNewsStatus" class="homeFeedStatus" role="status" aria-live="polite"><%- lang('home.loadingNews') %></p>
+            <ol id="homeNewsList" class="homeFeedList homeNewsList" aria-label="<%- lang('home.recentNews') %>"></ol>
+            <button id="homeNewsAllButton" type="button" class="workshopButton secondary compact"><%- lang('home.viewAllNews') %></button>
+        </section>
 
         <div id="content" class="homeDashboard">
             <article class="workshopPanel homePackCard">
@@ -26,9 +25,12 @@
                         <span class="workshopEyebrow"><%- lang('home.selectedPack') %></span>
                         <h2 id="homeProfileName"><%- lang('home.loadingProfile') %></h2>
                     </div>
-                    <span class="itemSlot" aria-hidden="true">
-                        <img src="assets/brand/allegator-games-app-icon.png" alt="">
-                    </span>
+                    <div class="homePackIdentity">
+                        <span id="homeChannelValue" class="panelChip"><%- lang('home.channelLoading') %></span>
+                        <span class="itemSlot" aria-hidden="true">
+                            <img src="assets/brand/allegator-games-app-icon.png" alt="">
+                        </span>
+                    </div>
                 </header>
                 <p id="homeProfileDescription"><%- lang('home.profileDescription') %></p>
                 <dl class="homeStatsGrid">
@@ -68,6 +70,18 @@
         </div>
 
         <div id="right" class="homeSidePanel workshopPanel">
+            <section class="homeTrendingSection" aria-labelledby="homeTrendingTitle">
+                <header class="homeFeedHeader compact">
+                    <div>
+                        <span class="workshopEyebrow"><%- lang('home.trendingCommunity') %></span>
+                        <h2 id="homeTrendingTitle"><%- lang('home.trendingTitle') %></h2>
+                    </div>
+                    <span id="homeTrendingCacheBadge" class="panelChip" hidden><%- lang('home.cached') %></span>
+                </header>
+                <p id="homeTrendingStatus" class="homeFeedStatus" role="status" aria-live="polite"><%- lang('home.loadingTrending') %></p>
+                <ol id="homeTrendingList" class="homeFeedList homeTrendingList" aria-label="<%- lang('home.trendingCommunity') %>"></ol>
+            </section>
+            <div class="engravedDivider homeTrendingDivider" aria-hidden="true"></div>
             <span class="workshopEyebrow"><%- lang('home.workshopNotes') %></span>
             <h2><%- lang('home.communityCalloutTitle') %></h2>
             <p><%- lang('home.communityCalloutBody') %></p>
@@ -125,3 +139,4 @@
 <script src="./assets/js/scripts/community-modules.js" defer></script>
 <script src="./assets/js/scripts/landing.js" defer></script>
 <script src="./assets/js/scripts/shell.js" defer></script>
+<script src="./assets/js/scripts/home-feeds.js" defer></script>

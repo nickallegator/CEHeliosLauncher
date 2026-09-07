@@ -42,7 +42,7 @@ async function getCommunityApiClient(){
     const base = service.enabled && service.schemaVersion === 1 ? service.apiBaseUrl : null
     if(!base) return null
     if(!communityApiClient || communityApiClient.baseUrl !== base){
-        communityApiClient = new CommunityApiClient({
+        communityApiClient = getSharedCommunityApiClient({
             baseUrl: base,
             cachePath: pathUtil.join(SCHEMATICS_CACHE_DIR, 'community-catalog-v1.json'),
             timeoutMs: 10000

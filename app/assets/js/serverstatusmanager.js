@@ -4,9 +4,9 @@ class ServerStatusManager {
     constructor(options = {}) {
         this.fetchStatus = options.fetchStatus
         this.onUpdate = options.onUpdate || (() => {})
-        this.now = options.now || Date.now
-        this.setTimer = options.setTimer || setTimeout
-        this.clearTimer = options.clearTimer || clearTimeout
+        this.now = options.now || (() => Date.now())
+        this.setTimer = options.setTimer || ((callback, delay) => setTimeout(callback, delay))
+        this.clearTimer = options.clearTimer || (timer => clearTimeout(timer))
         this.server = null
         this.active = false
         this.timer = null
