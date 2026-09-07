@@ -183,9 +183,10 @@ test('Home optional-module summary includes nested optional modules', () => {
 test('legacy renderer entry scripts share a collision-free lexical scope', () => {
     const scriptsDirectory = path.resolve(__dirname, '..', '..', 'app', 'assets', 'js', 'scripts')
     const landing = fs.readFileSync(path.join(scriptsDirectory, 'landing.js'), 'utf8')
+    const newsView = fs.readFileSync(path.join(scriptsDirectory, 'news-view.js'), 'utf8')
     const uiBinder = fs.readFileSync(path.join(scriptsDirectory, 'uibinder.js'), 'utf8')
 
-    assert.doesNotThrow(() => new vm.Script(`${landing}\n${uiBinder}`))
+    assert.doesNotThrow(() => new vm.Script(`${landing}\n${newsView}\n${uiBinder}`))
 })
 
 test('renderer template contains the brand sequence and persistent navigation', async () => {
@@ -206,7 +207,20 @@ test('renderer template contains the brand sequence and persistent navigation', 
     assert.match(html, /id="homeNewsAllButton"/)
     assert.match(html, /id="homeTrendingList"/)
     assert.match(html, /scripts\/home-feeds\.js/)
+    assert.match(html, /id="newsArchiveNavigation"/)
+    assert.match(html, /id="newsSearchInput"/)
+    assert.match(html, /id="newsArticleHero"/)
+    assert.match(html, /id="newsOpenWeb"/)
+    assert.match(html, /scripts\/news-view\.js/)
     assert.doesNotMatch(html, /Build something powerful/)
+    assert.doesNotMatch(html, /newsArticleComments/)
+})
+
+test('News uses the dedicated workshop stylesheet rather than the legacy carousel', () => {
+    const launcherCss = fs.readFileSync(path.resolve(__dirname, '..', '..', 'app', 'assets', 'css', 'launcher.css'), 'utf8')
+    const overhaulCss = fs.readFileSync(path.resolve(__dirname, '..', '..', 'app', 'assets', 'css', 'visual-overhaul.css'), 'utf8')
+    assert.doesNotMatch(launcherCss, /sections\/news\.css/)
+    assert.match(overhaulCss, /overhaul\/news\.css/)
 })
 
 test('profile selectors resolve launcher-managed artwork locally', () => {

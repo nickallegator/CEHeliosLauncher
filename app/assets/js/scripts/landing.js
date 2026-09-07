@@ -875,14 +875,6 @@ async function dlAsync(login = true, launchOptions = {}) {
 
 // DOM Cache
 const newsContainer                 = document.getElementById('newsContainer')
-const newsContent                   = document.getElementById('newsContent')
-const newsArticleTitle              = document.getElementById('newsArticleTitle')
-const newsArticleDate               = document.getElementById('newsArticleDate')
-const newsArticleAuthor             = document.getElementById('newsArticleAuthor')
-const newsArticleComments           = document.getElementById('newsArticleComments')
-const newsNavigationStatus          = document.getElementById('newsNavigationStatus')
-const newsArticleContentScrollable  = document.getElementById('newsArticleContentScrollable')
-const nELoadSpan                    = document.getElementById('nELoadSpan')
 const topActions                    = document.getElementById('topActions')
 
 logLandingTemplateStatus()
@@ -892,7 +884,6 @@ let newsActive = false
 let schematicsActive = false
 let landingOverlayGlideCount = 0
 let newsInitialized = false
-let newsInitPromise = null
 let schematicsReadyPromise = null
 let schematicsInitialized = false
 
@@ -988,33 +979,20 @@ async function ensureSchematicsReady(){
 }
 
 async function ensureNewsInitialized({ force = false } = {}){
-    if(force){
-        newsInitPromise = null
-        newsInitialized = false
-    }
-    if(newsInitialized && !force){
-        return
-    }
-    if(!newsInitPromise){
-        newsInitPromise = initNews({ force })
-            .then(() => {
-                newsInitialized = true
-            })
-            .finally(() => {
-                newsInitPromise = null
-            })
-    }
-    await newsInitPromise
+    if(!window.AGNewsView) throw new Error('The News view is not ready.')
+    const result = await window.AGNewsView.activate({ force })
+    newsInitialized = true
+    return result
 }
 
 function refreshNewsIfInitialized(){
     if(!newsInitialized){
         return
     }
-    ensureNewsInitialized({ force: true })
-        .catch((err) => {
-            loggerLanding.warn('Failed to refresh news.', err)
-        })
+    const refresh = window.AGNewsView?.refresh?.()
+    refresh?.catch((err) => {
+        loggerLanding.warn('Failed to refresh news.', err)
+    })
 }
 
 /**
@@ -1079,6 +1057,7 @@ document.getElementById('newsButton').onclick = () => {
     // Toggle tabbing.
     if(newsActive){
         resetOverlayTabbing()
+        window.AGNewsView?.deactivate()
         slide_(newsContainer, false)
         newsActive = false
     } else {
@@ -1117,6 +1096,7 @@ document.getElementById('schematicsButton').onclick = async () => {
     } else {
         if(newsActive){
             newsActive = false
+            window.AGNewsView?.deactivate()
             hideOverlay(newsContainer)
         }
         enableOverlayTabbing('#schematicsContainer')
@@ -1137,9 +1117,6 @@ document.getElementById('schematicsButton').onclick = async () => {
     }
 }
 
-// Array to store article meta.
-let newsArr = null
-
 const newsFeedRepository = new NewsFeedRepository({
     readCache: () => ConfigManager.getHomeNewsFeedCache(),
     writeCache: (cache) => {
@@ -1147,70 +1124,6 @@ const newsFeedRepository = new NewsFeedRepository({
         ConfigManager.save()
     }
 })
-
-// News load animation listener.
-let newsLoadingListener = null
-
-/**
- * Set the news loading animation.
- * 
- * @param {boolean} val True to set loading animation, otherwise false.
- */
-function setNewsLoading(val){
-    if(val){
-        const nLStr = Lang.queryJS('landing.news.checking')
-        let dotStr = '..'
-        nELoadSpan.textContent = nLStr + dotStr
-        newsLoadingListener = setInterval(() => {
-            if(dotStr.length >= 3){
-                dotStr = ''
-            } else {
-                dotStr += '.'
-            }
-            nELoadSpan.textContent = nLStr + dotStr
-        }, 750)
-    } else {
-        if(newsLoadingListener != null){
-            clearInterval(newsLoadingListener)
-            newsLoadingListener = null
-        }
-    }
-}
-
-// Bind retry button.
-newsErrorRetry.onclick = () => {
-    $('#newsErrorFailed').fadeOut(250, () => {
-        ensureNewsInitialized({ force: true }).catch((err) => {
-            loggerLanding.warn('Failed to reload news from retry action.', err)
-        })
-        $('#newsErrorLoading').fadeIn(250)
-    })
-}
-
-newsArticleContentScrollable.onscroll = (e) => {
-    if(e.target.scrollTop > Number.parseFloat($('.newsArticleSpacerTop').css('height'))){
-        newsContent.setAttribute('scrolled', '')
-    } else {
-        newsContent.removeAttribute('scrolled')
-    }
-}
-
-/**
- * Reload the news without restarting.
- * 
- * @returns {Promise.<void>} A promise which resolves when the news
- * content has finished loading and transitioning.
- */
-function reloadNews(){
-    return new Promise((resolve, reject) => {
-        $('#newsContent').fadeOut(250, () => {
-            $('#newsErrorLoading').fadeIn(250)
-            ensureNewsInitialized({ force: true }).then(() => {
-                resolve()
-            })
-        })
-    })
-}
 
 let newsAlertShown = false
 
@@ -1220,162 +1133,6 @@ let newsAlertShown = false
 function showNewsAlert(){
     newsAlertShown = true
     $(newsButtonAlert).fadeIn(250)
-}
-
-async function digestMessage(str) {
-    const msgUint8 = new TextEncoder().encode(str)
-    const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const hashHex = hashArray
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('')
-    return hashHex
-}
-
-/**
- * Initialize News UI. This will load the news and prepare
- * the UI accordingly.
- * 
- * @returns {Promise.<void>} A promise which resolves when the news
- * content has finished loading and transitioning.
- */
-async function initNews(options = {}){
-
-    setNewsLoading(true)
-
-    const news = await loadNews({ force: options.force === true })
-
-    newsArr = news?.articles || null
-
-    if(newsArr == null){
-        // News Loading Failed
-        setNewsLoading(false)
-
-        await $('#newsErrorLoading').fadeOut(250).promise()
-        await $('#newsErrorFailed').fadeIn(250).promise()
-
-    } else if(newsArr.length === 0) {
-        // No News Articles
-        setNewsLoading(false)
-
-        ConfigManager.setNewsCache({
-            date: null,
-            content: null,
-            dismissed: false
-        })
-        ConfigManager.save()
-
-        await $('#newsErrorLoading').fadeOut(250).promise()
-        await $('#newsErrorNone').fadeIn(250).promise()
-    } else {
-        // Success
-        setNewsLoading(false)
-
-        const lN = newsArr[0]
-        const cached = ConfigManager.getNewsCache()
-        let newHash = await digestMessage(lN.content)
-        let newDate = new Date(lN.date)
-        let isNew = false
-
-        if(cached.date != null && cached.content != null){
-
-            if(new Date(cached.date) >= newDate){
-
-                // Compare Content
-                if(cached.content !== newHash){
-                    isNew = true
-                    showNewsAlert()
-                } else {
-                    if(!cached.dismissed){
-                        isNew = true
-                        showNewsAlert()
-                    }
-                }
-
-            } else {
-                isNew = true
-                showNewsAlert()
-            }
-
-        } else {
-            isNew = true
-            showNewsAlert()
-        }
-
-        if(isNew){
-            ConfigManager.setNewsCache({
-                date: newDate.getTime(),
-                content: newHash,
-                dismissed: false
-            })
-            ConfigManager.save()
-        }
-
-        const switchHandler = (forward) => {
-            let cArt = parseInt(newsContent.getAttribute('article'))
-            let nxtArt = forward ? (cArt >= newsArr.length-1 ? 0 : cArt + 1) : (cArt <= 0 ? newsArr.length-1 : cArt - 1)
-    
-            displayArticle(newsArr[nxtArt], nxtArt+1)
-        }
-
-        document.getElementById('newsNavigateRight').onclick = () => { switchHandler(true) }
-        document.getElementById('newsNavigateLeft').onclick = () => { switchHandler(false) }
-        await $('#newsErrorContainer').fadeOut(250).promise()
-        displayArticle(newsArr[0], 1)
-        await $('#newsContent').fadeIn(250).promise()
-    }
-
-
-}
-
-/**
- * Add keyboard controls to the news UI. Left and right arrows toggle
- * between articles. If you are on the landing page, the up arrow will
- * open the news UI.
- */
-document.addEventListener('keydown', (e) => {
-    if(newsActive){
-        if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
-            document.getElementById(e.key === 'ArrowRight' ? 'newsNavigateRight' : 'newsNavigateLeft').click()
-        }
-        // Interferes with scrolling an article using the down arrow.
-        // Not sure of a straight forward solution at this point.
-        // if(e.key === 'ArrowDown'){
-        //     document.getElementById('newsButton').click()
-        // }
-    } else if(!schematicsActive) {
-        if(getCurrentView() === VIEWS.landing){
-            if(e.key === 'ArrowUp'){
-                document.getElementById('newsButton').click()
-            }
-        }
-    }
-})
-
-/**
- * Display a news article on the UI.
- * 
- * @param {Object} articleObject The article meta object.
- * @param {number} index The article index.
- */
-function displayArticle(articleObject, index){
-    newsArticleTitle.textContent = articleObject.title
-    if(articleObject.link) newsArticleTitle.href = articleObject.link
-    else newsArticleTitle.removeAttribute('href')
-    newsArticleAuthor.textContent = 'by ' + articleObject.author
-    newsArticleDate.textContent = articleObject.date
-    newsArticleComments.textContent = articleObject.comments
-    if(articleObject.commentsLink) newsArticleComments.href = articleObject.commentsLink
-    else newsArticleComments.removeAttribute('href')
-    newsArticleContentScrollable.innerHTML = '<div id="newsArticleContentWrapper"><div class="newsArticleSpacerTop"></div>' + articleObject.content + '<div class="newsArticleSpacerBot"></div></div>'
-    Array.from(newsArticleContentScrollable.getElementsByClassName('bbCodeSpoilerButton')).forEach(v => {
-        v.onclick = () => {
-            const text = v.parentElement.getElementsByClassName('bbCodeSpoilerText')[0]
-            text.style.display = text.style.display === 'block' ? 'none' : 'block'
-        }
-    })
-    newsNavigationStatus.textContent = Lang.query('ejs.landing.newsNavigationStatus', {currentPage: index, totalPages: newsArr.length})
-    newsContent.setAttribute('article', index-1)
 }
 
 /**
@@ -1404,9 +1161,23 @@ async function requestNews(options = {}){
     const cached = ConfigManager.getNewsCache()
     const latestTime = latest?.timestamp ? new Date(latest.timestamp).getTime() : 0
     const cachedTime = Number(cached?.date) || 0
+    const legacyAlreadyRead = !cached?.articleId && cached?.dismissed === true && cachedTime >= latestTime
+    const isDifferentArticle = Boolean(latest && cached?.articleId && cached.articleId !== latest.id)
+    const isFirstTrackedArticle = Boolean(latest && !cached?.articleId && !legacyAlreadyRead)
+    const unread = Boolean(latest && (isDifferentArticle || isFirstTrackedArticle || cached?.dismissed === false))
+    if(latest && (cached?.articleId !== latest.id || Number(cached?.date) !== latestTime)){
+        ConfigManager.setNewsCache({
+            ...cached,
+            articleId: latest.id,
+            date: latestTime,
+            dismissed: legacyAlreadyRead ? true : false
+        })
+        ConfigManager.save()
+    }
+    if(unread) showNewsAlert()
     return {
         ...result,
-        unread: Boolean(latest && (cached?.dismissed === false || !cachedTime || latestTime > cachedTime))
+        unread
     }
 }
 
@@ -1421,12 +1192,10 @@ async function loadNews(options = {}){
 }
 
 async function openNewsArticle(articleId){
+    const returnFocus = document.activeElement?.closest?.('[data-news-id]') || null
     await window.AppShell?.navigate?.('news')
-    await ensureNewsInitialized()
-    const index = newsArr?.findIndex(article => article.id === articleId) ?? -1
-    if(index >= 0) displayArticle(newsArr[index], index + 1)
-    newsArticleTitle?.focus?.()
-    return index >= 0
+    await window.AGNewsView?.openArticle?.(articleId, { returnFocus })
+    return true
 }
 
 window.AGNewsFeed = {
@@ -1444,10 +1213,13 @@ window.AGNewsFeed = {
         const cached = ConfigManager.getNewsCache()
         return {
             ...result,
-            unread: Boolean(result.articles?.[0] && (cached?.dismissed === false || !Number(cached?.date) || latestTime > Number(cached.date)))
+            unread: Boolean(result.articles?.[0] && (cached?.dismissed === false || (cached?.articleId && cached.articleId !== result.articles[0].id) || (!cached?.articleId && latestTime > Number(cached?.date))))
         }
     },
-    openArticle: openNewsArticle
+    activate: options => window.AGNewsView?.activate?.(options),
+    deactivate: () => window.AGNewsView?.deactivate?.(),
+    openArticle: openNewsArticle,
+    refresh: () => window.AGNewsView?.refresh?.()
 }
 
 // Signal that all landing-page functions referenced by uibinder.js are ready.

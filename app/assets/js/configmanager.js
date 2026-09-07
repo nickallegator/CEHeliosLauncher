@@ -99,6 +99,7 @@ const DEFAULT_CONFIG = {
         }
     },
     newsCache: {
+        articleId: null,
         date: null,
         content: null,
         dismissed: false
