@@ -29,6 +29,8 @@ jobs:
     outputs:
       release_id: ${{ steps.prepare.outputs.release_id }}
       prepared_dir: ${{ steps.prepare.outputs.prepared_dir }}
+      mod_version: ${{ steps.prepare.outputs.mod_version }}
+      source_commit: ${{ steps.prepare.outputs.source_commit }}
     steps:
       - name: Checkout launcher repository
         uses: actions/checkout@v4
@@ -103,6 +105,8 @@ jobs:
             --output "dist/release-prepared/$RELEASE_ID"
           echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
           echo "prepared_dir=dist/release-prepared/$RELEASE_ID" >> "$GITHUB_OUTPUT"
+          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "source_commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
 
       - name: Publish review summary
         env:
@@ -172,3 +176,41 @@ jobs:
           if [ -n "$CURRENT_RELEASE" ]; then PROMOTE_ARGS+=(--expected-previous "$CURRENT_RELEASE"); fi
           npm run releases -- promote --release-id "$RELEASE_ID" --channel test "${PROMOTE_ARGS[@]}"
           npm run releases -- verify --channel test
+
+  prepare-news-draft:
+    needs: [prepare, publish-and-promote]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Create short-lived News dispatcher token
+        id: news-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AG_NEWS_DISPATCH_APP_ID }}
+          private-key: ${{ secrets.AG_NEWS_DISPATCH_PRIVATE_KEY }}
+          owner: nickallegator
+          repositories: AllegatorGamesNews
+
+      - name: Request a reviewable Cobble Power News draft
+        env:
+          GH_TOKEN: ${{ secrets.COBBLEPOWER_CROSS_REPO_TOKEN }}
+          NEWS_TOKEN: ${{ steps.news-token.outputs.token }}
+          MOD_TAG: ${{ inputs.mod_tag }}
+          MOD_VERSION: ${{ needs.prepare.outputs.mod_version }}
+          SOURCE_COMMIT: ${{ needs.prepare.outputs.source_commit }}
+        run: |
+          RELEASE_JSON="$(gh release view "$MOD_TAG" --repo nickallegator/Cobble-Power-1.21.X --json body,url)"
+          RELEASE_URL="$(jq -r '.url' <<<"$RELEASE_JSON")"
+          RELEASE_NOTES="$(jq -r '.body // ""' <<<"$RELEASE_JSON")"
+          jq -n \
+            --arg event_type mod-release-promoted \
+            --arg version "$MOD_VERSION" \
+            --arg tag "$MOD_TAG" \
+            --arg commit "$SOURCE_COMMIT" \
+            --arg releaseUrl "$RELEASE_URL" \
+            --arg releaseNotes "$RELEASE_NOTES" \
+            --arg workflowUrl "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{event_type:$event_type,client_payload:{schemaVersion:1,kind:"mod",version:$version,tag:$tag,sourceRepository:"nickallegator/Cobble-Power-1.21.X",sourceCommit:$commit,releaseUrl:$releaseUrl,releaseNotes:$releaseNotes,workflowUrl:$workflowUrl}}' \
+            | gh api --method POST repos/nickallegator/AllegatorGamesNews/dispatches --input - --header "Authorization: Bearer $NEWS_TOKEN"

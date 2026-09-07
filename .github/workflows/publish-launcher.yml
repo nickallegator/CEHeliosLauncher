@@ -171,3 +171,49 @@ jobs:
         run: |
           gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --draft=false
           if ($LASTEXITCODE -ne 0) { throw 'Unable to publish the verified release.' }
+
+  prepare-news-draft:
+    needs: publish
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out published release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 1
+
+      - name: Create short-lived News dispatcher token
+        id: news-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AG_NEWS_DISPATCH_APP_ID }}
+          private-key: ${{ secrets.AG_NEWS_DISPATCH_PRIVATE_KEY }}
+          owner: nickallegator
+          repositories: AllegatorGamesNews
+
+      - name: Request a reviewable launcher News draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEWS_TOKEN: ${{ steps.news-token.outputs.token }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          RELEASE_JSON="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body,url)"
+          RELEASE_URL="$(jq -r '.url' <<<"$RELEASE_JSON")"
+          RELEASE_NOTES="$(jq -r '.body // ""' <<<"$RELEASE_JSON")"
+          jq -n \
+            --arg event_type launcher-release-published \
+            --arg version "$VERSION" \
+            --arg tag "$RELEASE_TAG" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg commit "$SOURCE_COMMIT" \
+            --arg releaseUrl "$RELEASE_URL" \
+            --arg releaseNotes "$RELEASE_NOTES" \
+            --arg workflowUrl "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{event_type:$event_type,client_payload:{schemaVersion:1,kind:"launcher",version:$version,tag:$tag,sourceRepository:$repository,sourceCommit:$commit,releaseUrl:$releaseUrl,releaseNotes:$releaseNotes,workflowUrl:$workflowUrl}}' \
+            | gh api --method POST repos/nickallegator/AllegatorGamesNews/dispatches --input - --header "Authorization: Bearer $NEWS_TOKEN"

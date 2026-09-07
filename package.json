@@ -1,6 +1,6 @@
 {
   "name": "ag-launcher",
-  "version": "2.9.0-test.1",
+  "version": "2.9.1-test.1",
   "productName": "Allegator Games Launcher",
   "description": "Allegator Games modded Minecraft launcher",
   "author": "Allegator Games",
@@ -29,7 +29,7 @@
     "predist:channel": "npm run brand:generate",
     "dist:channel": "node scripts/build-channel-launcher.js",
     "lint": "eslint .",
-    "lint:release": "eslint index.js app/assets/js/launcheridentity.js app/assets/js/launcherupdater.js app/assets/js/channelmanager.js app/assets/js/communitymanager.js app/assets/js/configmanager.js app/assets/js/homefeedmanager.js app/assets/js/newsfeedrepository.js app/assets/js/serverstatusmanager.js app/assets/js/scripts/home-feeds.js app/assets/js/scripts/launcher-updates.js app/assets/js/scripts/settings.js app/assets/js/scripts/uibinder.js app/assets/js/scripts/uicore.js app/assets/js/scripts/landing.js app/assets/js/scripts/landing/schematics/api.js app/assets/js/scripts/landing/schematics/core.js backend/src/config.js backend/src/index.js backend/src/routes/launcherUpdates.js backend/src/services/launcherVersionPolicy.js scripts/build-channel-launcher.js scripts/launcher-release.js scripts/lib/community-showroom.js scripts/run-community-showroom.js tests/backend/launcherVersionPolicy.test.js tests/releases/launcherRelease.test.js tests/renderer/brandAssets.test.js tests/renderer/communityCatalog.test.js tests/renderer/homeFeeds.test.js tests/renderer/launcherUpdater.test.js tests/renderer/launcherUpdateUi.test.js tests/renderer/visualShell.test.js tests/showroom/communityShowroom.test.js",
+    "lint:release": "eslint index.js app/assets/js/launcheridentity.js app/assets/js/launcherupdater.js app/assets/js/channelmanager.js app/assets/js/communitymanager.js app/assets/js/configmanager.js app/assets/js/homefeedmanager.js app/assets/js/newsfeedrepository.js app/assets/js/serverstatusmanager.js app/assets/js/scripts/home-feeds.js app/assets/js/scripts/launcher-updates.js app/assets/js/scripts/settings.js app/assets/js/scripts/uibinder.js app/assets/js/scripts/uicore.js app/assets/js/scripts/landing.js app/assets/js/scripts/landing/schematics/api.js app/assets/js/scripts/landing/schematics/core.js backend/src/config.js backend/src/index.js backend/src/routes/launcherUpdates.js backend/src/services/launcherVersionPolicy.js backend/src/services/newsDiscovery.js scripts/build-channel-launcher.js scripts/launcher-release.js scripts/lib/community-showroom.js scripts/run-community-showroom.js tests/backend/launcherVersionPolicy.test.js tests/backend/releaseChannel.test.js tests/releases/launcherRelease.test.js tests/renderer/brandAssets.test.js tests/renderer/communityCatalog.test.js tests/renderer/homeFeeds.test.js tests/renderer/launcherUpdater.test.js tests/renderer/launcherUpdateUi.test.js tests/renderer/visualShell.test.js tests/showroom/communityShowroom.test.js",
     "test:auth": "node --test tests/auth/microsoftAuthRedirect.test.js",
     "test:mods": "node --test tests/mods/packGenerator.test.js",
     "test:tester": "node --test tests/tester/*.test.js",

@@ -7,6 +7,7 @@ const { asyncRoute } = require('../middleware/asyncRoute')
 const store = require('../services/store')
 const { createReleaseStorage } = require('../services/releaseStorage')
 const { createGameServerRegistry } = require('../services/gameServerRegistry')
+const { injectNewsService } = require('../services/newsDiscovery')
 
 const router = express.Router()
 const distributionLimit = createRateLimit({ windowMs: 60_000, limit: 30 })
@@ -84,6 +85,7 @@ router.get('/releases/channels/:channel/distribution', distributionLimit, requir
 
     const releaseStorage = createReleaseStorage()
     const result = await releaseStorage.getAuthorizedDistribution(req.params.channel)
+    injectNewsService(result.distribution, config.news, { production: process.env.NODE_ENV === 'production' })
     injectSchematicsService(result.distribution)
     injectGameServerServices(result.distribution)
     console.info('[audit] channel distribution issued', { requestId: req.requestId, userId: req.userId, channel: req.params.channel, releaseId: result.releaseId })
@@ -95,3 +97,4 @@ router.get('/releases/channels/:channel/distribution', distributionLimit, requir
 module.exports = router
 module.exports.injectSchematicsService = injectSchematicsService
 module.exports.injectGameServerServices = injectGameServerServices
+module.exports.injectNewsService = injectNewsService

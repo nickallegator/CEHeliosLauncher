@@ -171,7 +171,7 @@ function copyObject(tempRoot, objectKey, sourcePath) {
 function createDistributionBase() {
     return {
         version: '1.0.0',
-        rss: 'https://helios-files.geekcorner.eu.org/rss.xml',
+        rss: 'https://news.allegatorgames.com/rss.xml',
         servers: []
     }
 }

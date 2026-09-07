@@ -17,6 +17,7 @@ const {
 const { normalizeMinecraftUuid } = require('../../backend/src/services/store')
 const { buildMinecraftEntitlements, resolveMinecraftEntitlements } = require('../../backend/src/routes/minecraftAuth')
 const { injectSchematicsService } = require('../../backend/src/routes/releases')
+const { createNewsDiscovery, injectNewsService } = require('../../backend/src/services/newsDiscovery')
 
 test('Minecraft UUIDs normalize consistently and reject invalid identities', () => {
     assert.equal(normalizeMinecraftUuid('12345678-1234-1234-1234-123456789ABC'), '12345678123412341234123456789abc')
@@ -118,4 +119,29 @@ test('authorized distribution service discovery is injected without rebuilding t
         supportedTypes: ['schematics', 'automation']
     })
     assert.deepEqual(injectSchematicsService({ servers: [] }, { publicApiUrl: '' }), { servers: [] })
+})
+
+test('News discovery overrides obsolete RSS and exposes additive JSON discovery', () => {
+    const distribution = { rss: 'https://obsolete.example/rss.xml', servers: [] }
+    injectNewsService(distribution, {
+        enabled: true,
+        publicBaseUrl: 'https://news.allegatorgames.com/',
+        refreshSeconds: 900
+    }, { production: true })
+    assert.equal(distribution.rss, 'https://news.allegatorgames.com/rss.xml')
+    assert.deepEqual(distribution.news, {
+        schemaVersion: 1,
+        enabled: true,
+        indexUrl: 'https://news.allegatorgames.com/api/v1/news.json',
+        rssUrl: 'https://news.allegatorgames.com/rss.xml',
+        siteUrl: 'https://news.allegatorgames.com',
+        refreshSeconds: 900
+    })
+    assert.equal(injectNewsService({ rss: 'legacy' }, { enabled: false }).rss, 'legacy')
+})
+
+test('News discovery rejects unsafe configuration and requires HTTPS in production', () => {
+    assert.throws(() => createNewsDiscovery({ enabled: true, publicBaseUrl: 'file:///secret' }), /HTTP or HTTPS/)
+    assert.throws(() => createNewsDiscovery({ enabled: true, publicBaseUrl: 'https://user:pass@example.test' }), /credentials/)
+    assert.throws(() => createNewsDiscovery({ enabled: true, publicBaseUrl: 'http://news.example.test' }, { production: true }), /HTTPS/)
 })
