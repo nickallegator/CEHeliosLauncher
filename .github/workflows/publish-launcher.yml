@@ -128,11 +128,15 @@ jobs:
       - name: Refuse an existing GitHub release
         shell: pwsh
         run: |
-          $endpoint = "repos/$env:GITHUB_REPOSITORY/releases/tags/$env:RELEASE_TAG"
-          $lookup = & gh api $endpoint 2>&1
-          $lookupExit = $LASTEXITCODE
-          if ($lookupExit -eq 0) { throw "Release $env:RELEASE_TAG already exists and will not be overwritten." }
-          if (($lookup | Out-String) -notmatch 'HTTP 404') { throw "Unable to verify that release $env:RELEASE_TAG does not exist." }
+          $lookupFile = Join-Path $env:RUNNER_TEMP 'launcher-release-lookup.json'
+          $status = & curl.exe --silent --show-error --output $lookupFile --write-out '%{http_code}' `
+            --header "Authorization: Bearer $env:GH_TOKEN" `
+            --header 'Accept: application/vnd.github+json' `
+            --header 'X-GitHub-Api-Version: 2022-11-28' `
+            "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to query release $env:RELEASE_TAG." }
+          if ($status -eq '200') { throw "Release $env:RELEASE_TAG already exists and will not be overwritten." }
+          if ($status -ne '404') { throw "Unable to verify that release $env:RELEASE_TAG does not exist (HTTP $status)." }
 
       - uses: actions/download-artifact@v4
         with:
