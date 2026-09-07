@@ -8,6 +8,7 @@ const { writeJsonAtomic } = require('./lib/pack-generator')
 
 const root = path.resolve(__dirname, '..')
 const configPath = path.join(root, 'packs', 'cobble-power-channel-launcher.json')
+const packagePath = path.join(root, 'package.json')
 const stagingRoot = path.join(root, 'dist', 'channel-staging')
 const outputRoot = path.join(root, 'dist', 'channel-output')
 
@@ -39,7 +40,12 @@ function validateApiBase(value) {
 }
 
 function prepare(apiBase, options = {}) {
-    const build = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    const configured = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+    const packageMetadata = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
+    if(!/^\d+\.\d+\.\d+-test\.\d+$/.test(packageMetadata.version)) {
+        throw new Error(`Authenticated channel builds require a test prerelease package version: ${packageMetadata.version}`)
+    }
+    const build = { ...configured, launcherVersion: packageMetadata.version }
     const channel = {
         ...build.channel,
         remoteDistributionUrl: `${apiBase}/v1/releases/channels/${encodeURIComponent(build.channel.channel)}/distribution`
@@ -105,7 +111,7 @@ function buildInstaller(apiBase, build) {
         'utf8'
     )
     fs.rmSync(outputRoot, { recursive: true, force: true })
-    const result = spawnSync(node, [cli, '--config', 'electron-builder.channel.yml', '--win', 'nsis', '--x64'], {
+    const result = spawnSync(node, [cli, '--config', 'electron-builder.channel.yml', '--win', 'nsis', '--x64', '--publish', 'never'], {
         cwd: root,
         env: { ...process.env, PATH: `${toolDirectory}${path.delimiter}${process.env.PATH || ''}` },
         stdio: 'inherit'

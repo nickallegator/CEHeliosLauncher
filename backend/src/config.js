@@ -72,6 +72,16 @@ const config = {
     corsOrigins: parseList(getEnv('CORS_ORIGINS', '')),
     databaseUrl: getEnv('DATABASE_URL', null),
     sessionTtlDays: parseNumber(getEnv('SESSION_TTL_DAYS', '30'), 30),
+    launcherUpdates: {
+        entries: parseJson(getEnv('LAUNCHER_UPDATE_POLICY_JSON', ''), [{
+            channel: 'test',
+            recommendedVersion: '2.8.0-test.1',
+            minimumVersion: null,
+            updateUrl: 'https://github.com/nickallegator/CEHeliosLauncher/releases',
+            enforce: false,
+            requireHeader: false
+        }])
+    },
     gameServers: {
         statusEnabled: parseBoolean(getEnv('GAME_SERVER_STATUS_ENABLED', 'false')),
         publicApiUrl: getEnv('GAME_SERVER_STATUS_PUBLIC_API_URL', getEnv('BASE_URL', 'http://localhost:8080')),
@@ -183,6 +193,10 @@ const config = {
     },
     oauthStateTtlMinutes: parseNumber(getEnv('OAUTH_STATE_TTL_MINUTES', '10'), 10)
 }
+
+config.launcherUpdates.policies = require('./services/launcherVersionPolicy')
+    .createLauncherVersionPolicies(config.launcherUpdates.entries)
+delete config.launcherUpdates.entries
 
 if(!['disabled', 'admin', 'authenticated'].includes(config.schematics.writeMode)) {
     throw new Error('SCHEMATICS_WRITE_MODE must be disabled, admin, or authenticated')

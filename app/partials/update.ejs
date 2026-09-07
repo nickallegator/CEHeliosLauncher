@@ -1,0 +1,37 @@
+<div id="launcherUpdateModal" class="launcherUpdateModal" aria-hidden="true">
+    <div id="launcherUpdateScrim" class="launcherUpdateScrim"></div>
+    <section id="launcherUpdatePanel" class="launcherUpdatePanel" role="dialog" aria-modal="true" aria-labelledby="launcherUpdateTitle" tabindex="-1">
+        <header class="launcherUpdateHeader">
+            <img src="assets/brand/allegator-games-logo.svg" alt="">
+            <div>
+                <span class="workshopEyebrow"><%- lang('updates.eyebrow') %></span>
+                <h2 id="launcherUpdateTitle"><%- lang('updates.availableTitle') %></h2>
+            </div>
+        </header>
+        <main class="launcherUpdateBody">
+            <div class="launcherUpdateVersionRow">
+                <span id="launcherUpdateVersion"></span>
+                <span id="launcherUpdateSize"></span>
+            </div>
+            <p id="launcherUpdateMessage"><%- lang('updates.availableBody') %></p>
+            <section id="launcherUpdateNotesSection" aria-labelledby="launcherUpdateNotesTitle">
+                <h3 id="launcherUpdateNotesTitle"><%- lang('updates.releaseNotes') %></h3>
+                <pre id="launcherUpdateNotes"></pre>
+            </section>
+            <div id="launcherUpdateProgress" hidden>
+                <div class="launcherUpdateProgressTrack"><div id="launcherUpdateProgressBar"></div></div>
+                <span id="launcherUpdateProgressText" role="status" aria-live="polite"></span>
+            </div>
+            <p id="launcherUpdateError" role="alert" hidden></p>
+        </main>
+        <footer class="launcherUpdateFooter">
+            <button id="launcherUpdateLater" type="button"><%- lang('updates.later') %></button>
+            <button id="launcherUpdatePrimary" type="button" class="primary"><%- lang('updates.download') %></button>
+        </footer>
+    </section>
+</div>
+
+<button id="launcherUpdateNotice" type="button" hidden>
+    <span class="launcherUpdateNoticeMark" aria-hidden="true">↑</span>
+    <span><strong id="launcherUpdateNoticeTitle"><%- lang('updates.noticeAvailable') %></strong><small id="launcherUpdateNoticeDetail"></small></span>
+</button>

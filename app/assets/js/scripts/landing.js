@@ -833,6 +833,7 @@ async function dlAsync(login = true, launchOptions = {}) {
         try {
             // Build Minecraft process.
             proc = pb.build()
+            window.LauncherUpdates?.setGameRunning(true)
             setLaunchEnabled(launchSelectionAvailable)
 
             // Bind listeners to stdout.
@@ -840,6 +841,7 @@ async function dlAsync(login = true, launchOptions = {}) {
             proc.stderr.on('data', gameErrorListener)
             proc.once('close', () => {
                 proc = null
+                window.LauncherUpdates?.setGameRunning(false)
                 setLaunchEnabled(launchSelectionAvailable)
             })
 

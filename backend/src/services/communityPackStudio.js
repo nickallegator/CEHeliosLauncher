@@ -58,7 +58,7 @@ async function persistCompositionIndex(client, { revisionId, itemId, ownerId, in
                search_text=excluded.search_text
              returning id`,
             [componentId, revisionId, component.key, component.kind, component.identifier, component.title,
-                component.namespace, component.contentSha256, component.metadata || {}, component.mergeFragments || [],
+                component.namespace, component.contentSha256, component.metadata || {}, JSON.stringify(component.mergeFragments || []),
                 `${component.title} ${component.identifier} ${component.kind} ${component.namespace} ${(component.metadata?.pokemonForms || component.metadata?.pokemonVariants || []).flatMap(variant => [variant.label, ...(variant.aspects || []), ...(variant.shiny?.declared ? ['shiny'] : [])]).join(' ')}`]
         )
         const id = inserted.rows[0].id
@@ -204,7 +204,7 @@ async function loadSourcesForSelections(db, selections) {
                 namespace: component.namespace,
                 contentSha256: component.content_sha256,
                 metadata: component.metadata || {},
-                mergeFragments: component.merge_fragments || [],
+                mergeFragments: Array.isArray(component.merge_fragments) ? component.merge_fragments : [],
                 filePaths: (component.files || []).map(file => file.path)
             }
         })

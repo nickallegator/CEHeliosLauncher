@@ -143,11 +143,6 @@ async function showMainUI(data){
     debugLog('showMainUI start')
     window.StartupPresentation?.setStage('account')
 
-    if(!isDev && !testerBuild){
-        loggerAutoUpdater.info('Initializing..')
-        ipcRenderer.send('autoUpdateAction', 'initAutoUpdater', ConfigManager.getAllowPrerelease())
-    }
-
     updateSelectedServer(data.getServerById(ConfigManager.getSelectedServer()))
     refreshServerStatus()
     document.getElementById('frameBar').style.backgroundColor = 'rgba(10, 18, 17, 0.98)'
@@ -182,6 +177,8 @@ async function showMainUI(data){
 
     window.AppShell?.setApplicationView(currentView)
     requestAnimationFrame(() => window.StartupPresentation?.markReady())
+    window.agLauncherReady = true
+    window.dispatchEvent(new CustomEvent('ag:launcher-ready'))
     debugLog('showMainUI end')
 }
 

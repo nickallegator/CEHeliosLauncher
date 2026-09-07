@@ -33,7 +33,9 @@ export default defineConfig(
           requireLast: false
         }
       }],
-      '@stylistic/linebreak-style': ['error', 'windows'],
+      // Git stores LF while Windows worktrees may materialize CRLF. Treat both
+      // as equivalent so CI validates code rather than checkout policy.
+      '@stylistic/linebreak-style': 'off',
       'no-var': ['error'],
       'no-control-regex': 'off',
       'no-unused-vars': ['error', {

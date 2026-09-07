@@ -1,0 +1,166 @@
+name: Publish AG Launcher
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable launcher tag to publish
+        required: true
+        type: string
+
+concurrency:
+  group: ag-launcher-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-verify:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the exact release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Validate immutable tag checkout
+        shell: pwsh
+        run: |
+          $tagCommit = git rev-list -n 1 $env:RELEASE_TAG
+          $headCommit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $headCommit) { throw "The requested tag does not resolve to the checked-out commit." }
+          if ((git cat-file -t $env:RELEASE_TAG) -ne 'tag') { throw "Launcher releases require an annotated tag." }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Bootstrap pinned launcher dependencies
+        shell: pwsh
+        run: |
+          node scripts/bootstrap-dependencies.js
+          node scripts/build-file-dependencies.js
+          npm ci
+          npm ci --prefix backend
+
+      - name: Run release safety suites
+        shell: pwsh
+        run: |
+          npm run test:smoke
+          npm run test:schematics-core
+          npm run lint:release
+
+      - name: Enforce unsigned-test and signed-stable policy
+        shell: pwsh
+        env:
+          AG_WINDOWS_PUBLIC_TRUST_SIGNING: ${{ secrets.AG_WINDOWS_PUBLIC_TRUST_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          AZURE_ARTIFACT_SIGNING_PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          AZURE_ARTIFACT_SIGNING_PUBLISHER: ${{ vars.AZURE_ARTIFACT_SIGNING_PUBLISHER }}
+        run: node -e "require('./scripts/launcher-release').assertSigningPolicy(require('./package.json').version)"
+
+      - name: Build authenticated Windows launcher
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          AZURE_ARTIFACT_SIGNING_PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          AZURE_ARTIFACT_SIGNING_PUBLISHER: ${{ vars.AZURE_ARTIFACT_SIGNING_PUBLISHER }}
+        run: npm run dist:channel -- --api-url https://cobblepower-access-api.onrender.com
+
+      - name: Prepare and verify immutable release artifacts
+        shell: pwsh
+        run: |
+          npm run release:prepare -- --tag $env:RELEASE_TAG
+          npm run release:verify -- --tag $env:RELEASE_TAG
+
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ag-launcher-release
+          path: |
+            dist/channel-output/AG-Launcher-Test-setup-*.exe
+            dist/channel-output/AG-Launcher-Test-setup-*.exe.blockmap
+            dist/channel-output/latest.yml
+            dist/channel-output/SHA256SUMS.txt
+            dist/channel-output/bom.cdx.json
+            dist/channel-output/launcher-release.json
+            dist/channel-output/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: build-and-verify
+    runs-on: windows-latest
+    environment: ag-launcher-test
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Refuse an existing GitHub release
+        shell: pwsh
+        run: |
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $env:RELEASE_TAG already exists and will not be overwritten." }
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ag-launcher-release
+          path: release-candidate
+
+      - name: Verify candidate before publication
+        shell: pwsh
+        run: node scripts/launcher-release.js verify --tag $env:RELEASE_TAG --dir release-candidate
+
+      - name: Create draft and upload the complete asset set
+        shell: pwsh
+        run: |
+          $descriptor = Get-Content release-candidate/launcher-release.json | ConvertFrom-Json
+          $arguments = @('release', 'create', $env:RELEASE_TAG, '--repo', $env:GITHUB_REPOSITORY, '--draft', '--title', "AG Launcher $($descriptor.version)", '--notes-file', 'release-candidate/RELEASE_NOTES.md')
+          if ($descriptor.channel -eq 'test') { $arguments += '--prerelease' }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to create draft release.' }
+          gh release upload $env:RELEASE_TAG release-candidate/* --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to upload release assets.' }
+
+      - name: Download and verify remote assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path remote-release | Out-Null
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --dir remote-release
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to download draft assets for verification.' }
+          node scripts/launcher-release.js verify --tag $env:RELEASE_TAG --dir remote-release
+
+      - name: Publish verified release last
+        shell: pwsh
+        run: |
+          gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --draft=false
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to publish the verified release.' }

@@ -238,7 +238,9 @@ function buildInstaller() {
         'electron-builder.test.yml',
         '--win',
         'nsis',
-        '--x64'
+        '--x64',
+        '--publish',
+        'never'
     ], {
         cwd: projectRoot,
         env: {

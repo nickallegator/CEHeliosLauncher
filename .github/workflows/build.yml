@@ -65,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     permissions:
-      contents: write
+      contents: read
 
     strategy:
       matrix:
@@ -97,8 +97,11 @@ jobs:
         run: npm ci
         shell: bash
 
+      - name: Restore electron-builder helper permissions
+        if: runner.os != 'Windows'
+        run: chmod +x node_modules/app-builder-bin/linux/*/app-builder node_modules/app-builder-bin/mac/app-builder_*
+        shell: bash
+
       - name: Build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist
         shell: bash
