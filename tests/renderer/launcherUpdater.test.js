@@ -9,6 +9,7 @@ const {
     UpdateStatus,
     allowedVersion,
     errorCode,
+    normalizeReleaseNotes,
     publicUpdateInfo
 } = require('../../app/assets/js/launcherupdater')
 
@@ -58,18 +59,28 @@ test('launcher request channel follows launcher SemVer instead of the mod-pack c
     assert.equal(getLauncherChannel('2.8.0-beta.1'), 'stable')
 })
 
-test('release metadata is bounded and contains no provider URLs', () => {
+test('release metadata is plain text, bounded, and contains no provider URLs', () => {
     const info = publicUpdateInfo({
         version: '2.8.0-test.2',
         releaseName: 'A'.repeat(500),
-        releaseNotes: '<script>alert(1)</script>',
+        releaseNotes: '<h1>Update</h1><p>Safe &amp; readable.</p><ul><li>First</li><li>Use <code>Settings</code></li></ul><script>alert(1)</script>',
         files: [{ url: 'https://secret.invalid/query?token=secret', size: 1000 }],
         releaseDate: '2026-09-07T00:00:00Z'
     })
     assert.equal(info.releaseName.length, 300)
-    assert.equal(info.releaseNotes, '<script>alert(1)</script>')
+    assert.equal(info.releaseNotes, 'Update\n\nSafe & readable.\n\n\u2022 First\n\u2022 Use Settings')
     assert.equal(info.sizeBytes, 1000)
     assert.equal(JSON.stringify(info).includes('secret.invalid'), false)
+    assert.equal(JSON.stringify(info).includes('alert(1)'), false)
+})
+
+test('release-note normalization handles updater arrays, entities, and malformed markup', () => {
+    assert.equal(normalizeReleaseNotes([
+        { version: '2.8.0-test.4', note: '<h2>Changes</h2><li>Fix &#x48;TML</li>' },
+        { version: 'Fallback version' }
+    ]), 'Changes\n\n\u2022 Fix HTML\n\nFallback version')
+    assert.equal(normalizeReleaseNotes('Plain text with 2 < 3 remains readable.'), 'Plain text with 2 < 3 remains readable.')
+    assert.equal(normalizeReleaseNotes('<p>unfinished <strong>formatting'), 'unfinished formatting')
 })
 
 test('manager checks once, exposes an update, and defers it for the session', async () => {
