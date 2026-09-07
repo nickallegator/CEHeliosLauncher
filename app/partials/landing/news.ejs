@@ -1,58 +1,110 @@
-<div id="newsContainer">
-        <div id="newsContent" article="-1" style="display: none;">
-            <div id="newsStatusContainer">
-                <div id="newsStatusContent">
-                    <div id="newsTitleContainer">
-                        <a id="newsArticleTitle" href="#">Lorem Ipsum</a>
-                    </div>
-                    <div id="newsMetaContainer">
-                        <div id="newsArticleDateWrapper">
-                            <span id="newsArticleDate">Mar 15, 44 BC, 9:14 AM</span>
+<section id="newsContainer" class="newsRoute" aria-labelledby="newsPageTitle" hidden>
+    <div id="newsContent" class="newsWorkspace" data-state="loading">
+        <header class="newsPageHeader">
+            <div class="newsPageHeading">
+                <span class="newsEyebrow"><%- lang('newsPage.eyebrow') %></span>
+                <h1 id="newsPageTitle"><%- lang('newsPage.title') %></h1>
+                <p><%- lang('newsPage.subtitle') %></p>
+            </div>
+            <div class="newsFeedActions">
+                <span id="newsFeedStateBadge" class="newsFeedStateBadge" aria-live="polite"><%- lang('newsPage.checking') %></span>
+                <button id="newsRefreshButton" class="newsRefreshButton" type="button">
+                    <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#retry"></use></svg>
+                    <span><%- lang('newsPage.refresh') %></span>
+                </button>
+            </div>
+        </header>
+
+        <div class="newsEditorialFrame">
+            <aside id="newsArchive" class="newsArchive" aria-labelledby="newsArchiveTitle">
+                <div class="newsArchiveHeader">
+                    <div class="newsArchiveTitleRow">
+                        <div>
+                            <span class="newsSectionLabel"><%- lang('newsPage.archiveEyebrow') %></span>
+                            <h2 id="newsArchiveTitle"><%- lang('newsPage.archiveTitle') %></h2>
                         </div>
-                        <div id="newsArticleAuthorWrapper">
-                            <span id="newsArticleAuthor">by Cicero</span>
+                        <button id="newsArchiveClose" class="newsArchiveClose" type="button" aria-label="<%- lang('newsPage.closeArchive') %>">
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    </div>
+                    <label class="newsSearchField" for="newsSearchInput">
+                        <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#search"></use></svg>
+                        <input id="newsSearchInput" type="search" autocomplete="off" placeholder="<%- lang('newsPage.searchPlaceholder') %>">
+                    </label>
+                    <div id="newsCategoryFilters" class="newsCategoryFilters" role="group" aria-label="<%- lang('newsPage.categoryFilter') %>"></div>
+                    <p id="newsResultCount" class="newsResultCount" aria-live="polite"></p>
+                </div>
+                <nav id="newsArchiveNavigation" class="newsArchiveNavigation" aria-label="<%- lang('newsPage.articleNavigation') %>">
+                    <ol id="newsArchiveList" class="newsArchiveList"></ol>
+                </nav>
+            </aside>
+
+            <div id="newsArchiveScrim" class="newsArchiveScrim" hidden></div>
+
+            <main id="newsReader" class="newsReader">
+                <div class="newsReaderToolbar">
+                    <button id="newsArchiveToggle" class="newsArchiveToggle" type="button" aria-controls="newsArchive" aria-expanded="false">
+                        <svg aria-hidden="true"><use href="assets/brand/allegator-icons.svg#news"></use></svg>
+                        <span><%- lang('newsPage.showArchive') %></span>
+                    </button>
+                    <span id="newsReaderPosition" class="newsReaderPosition"></span>
+                </div>
+
+                <article id="newsArticleContainer" class="newsArticle" aria-labelledby="newsArticleTitle">
+                    <div id="newsArticleContentScrollable" class="newsArticleScrollable" tabindex="0" aria-label="<%- lang('newsPage.articleContent') %>">
+                        <div id="newsArticleHero" class="newsArticleHero" data-category="announcement">
+                            <img id="newsArticleHeroImage" alt="" hidden>
+                            <div class="newsHeroFallback" aria-hidden="true">
+                                <svg><use href="assets/brand/allegator-icons.svg#news"></use></svg>
+                                <span>AG</span>
+                            </div>
                         </div>
-                        <a href="#" id="newsArticleComments">0 Comments</a>
+                        <div id="newsArticleContentWrapper" class="newsArticleContentWrapper">
+                            <div class="newsArticleMetaTopline">
+                                <span id="newsArticleCategory" class="newsCategoryBadge"></span>
+                                <time id="newsArticleDate"></time>
+                            </div>
+                            <h2><a id="newsArticleTitle" href="#"></a></h2>
+                            <p id="newsArticleAuthor" class="newsArticleAuthor"></p>
+                            <div id="newsArticleTags" class="newsArticleTags" aria-label="<%- lang('newsPage.tags') %>"></div>
+                            <div class="newsArticleDivider" aria-hidden="true"></div>
+                            <div id="newsArticleContent" class="newsArticleBody"></div>
+                        </div>
+                    </div>
+
+                    <footer id="newsNavigationContainer" class="newsReaderFooter">
+                        <button id="newsNavigateLeft" class="newsArticleNavigationButton" type="button">
+                            <span aria-hidden="true">←</span>
+                            <span><%- lang('newsPage.previous') %></span>
+                        </button>
+                        <span id="newsNavigationStatus" class="newsNavigationStatus" aria-live="polite"></span>
+                        <a id="newsOpenWeb" class="newsOpenWeb" href="#"><%- lang('newsPage.openWeb') %></a>
+                        <button id="newsNavigateRight" class="newsArticleNavigationButton" type="button">
+                            <span><%- lang('newsPage.next') %></span>
+                            <span aria-hidden="true">→</span>
+                        </button>
+                    </footer>
+                </article>
+
+                <div id="newsErrorContainer" class="newsStatePanel" aria-live="polite">
+                    <div id="newsErrorLoading" class="newsStateContent">
+                        <span class="newsStateIcon" aria-hidden="true"></span>
+                        <h2><%- lang('newsPage.loadingTitle') %></h2>
+                        <p id="nELoadSpan"><%- lang('newsPage.checking') %></p>
+                    </div>
+                    <div id="newsErrorFailed" class="newsStateContent" hidden>
+                        <span class="newsStateIcon newsStateIconError" aria-hidden="true">!</span>
+                        <h2><%- lang('newsPage.unavailableTitle') %></h2>
+                        <p><%- lang('newsPage.unavailableBody') %></p>
+                        <button id="newsErrorRetry" class="newsRefreshButton" type="button"><%- lang('newsPage.retry') %></button>
+                    </div>
+                    <div id="newsErrorNone" class="newsStateContent" hidden>
+                        <span class="newsStateIcon" aria-hidden="true">—</span>
+                        <h2><%- lang('newsPage.emptyTitle') %></h2>
+                        <p><%- lang('newsPage.emptyBody') %></p>
                     </div>
                 </div>
-                <div id="newsNavigationContainer">
-                    <button id="newsNavigateLeft">
-                        <svg id="newsNavigationLeftSVG" viewBox="0 0 24.87 13.97">
-                            <defs>
-                                <style>.arrowLine{fill:none;stroke:#FFF;stroke-width:2px;transition: 0.25s ease;}</style>
-                            </defs>
-                            <polyline class="arrowLine" points="0.71 13.26 12.56 1.41 24.16 13.02"/>
-                        </svg>
-                    </button>
-                    <span id="newsNavigationStatus"><%- lang('landing.newsNavigationStatus', { currentPage: 1, totalPages: 1 }) %></span>
-                    <button id="newsNavigateRight">
-                        <svg id="newsNavigationRightSVG" viewBox="0 0 24.87 13.97">
-                            <defs>
-                                <style>.arrowLine{fill:none;stroke:#FFF;stroke-width:2px;transition: 0.25s ease;}</style>
-                            </defs>
-                            <polyline class="arrowLine" points="0.71 13.26 12.56 1.41 24.16 13.02"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div id="newsArticleContainer">
-                <div id="newsArticleContent">
-                    <div id="newsArticleContentScrollable">
-                        <!-- Article Content -->
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="newsErrorContainer">
-            <div id="newsErrorLoading">
-                <span id="nELoadSpan" class="newsErrorContent"><%- lang('landing.newsErrorLoadSpan') %></span>
-            </div>
-            <div id="newsErrorFailed" style="display: none;">
-                <span id="nEFailedSpan" class="newsErrorContent"><%- lang('landing.newsErrorFailedSpan') %></span>
-                <button id="newsErrorRetry"><%- lang('landing.newsErrorRetryButton') %></button>
-            </div>
-            <div id="newsErrorNone" style="display: none;">
-                <span id="nENoneSpan" class="newsErrorContent"><%- lang('landing.newsErrorNoneSpan') %></span>
-            </div>
+            </main>
         </div>
     </div>
+</section>
