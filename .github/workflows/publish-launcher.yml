@@ -128,8 +128,11 @@ jobs:
       - name: Refuse an existing GitHub release
         shell: pwsh
         run: |
-          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) { throw "Release $env:RELEASE_TAG already exists and will not be overwritten." }
+          $endpoint = "repos/$env:GITHUB_REPOSITORY/releases/tags/$env:RELEASE_TAG"
+          $lookup = & gh api $endpoint 2>&1
+          $lookupExit = $LASTEXITCODE
+          if ($lookupExit -eq 0) { throw "Release $env:RELEASE_TAG already exists and will not be overwritten." }
+          if (($lookup | Out-String) -notmatch 'HTTP 404') { throw "Unable to verify that release $env:RELEASE_TAG does not exist." }
 
       - uses: actions/download-artifact@v4
         with:
