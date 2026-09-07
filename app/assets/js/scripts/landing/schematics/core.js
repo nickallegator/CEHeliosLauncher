@@ -27,8 +27,8 @@ let {
     moduleContainsCobblePower
 } = require('./assets/js/schematicmanager')
 let {
-    CommunityApiClient,
-    createCommunitySessionState
+    createCommunitySessionState,
+    getSharedCommunityApiClient
 } = require('./assets/js/communitymanager')
 let schematicsFormatCore = loadCore()
 let { normalizeJsonSchematic, parseCanonicalSchematic } = schematicsFormatCore

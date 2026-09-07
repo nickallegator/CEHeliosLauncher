@@ -775,6 +775,50 @@ function encodeCursor(offset) {
     return Buffer.from(`showroom:${offset}`, 'utf8').toString('base64url')
 }
 
+function showroomNewsXml(baseUrl) {
+    const items = [
+        {
+            guid: 'ag-showroom-news-3',
+            title: 'Community Workshop Opens Its Doors',
+            author: 'Allegator Games',
+            date: 'Sun, 06 Sep 2026 16:30:00 GMT',
+            description: 'Browse new creations, inspect rich previews, and bring community-made content directly into your Cobble Power workshop.'
+        },
+        {
+            guid: 'ag-showroom-news-2',
+            title: 'Pack Studio Adds Creator Components',
+            author: 'Workshop Team',
+            date: 'Sat, 05 Sep 2026 15:00:00 GMT',
+            description: 'Combine compatible blocks, Pokémon, sounds, and visual assets into a deterministic local Resource Pack.'
+        },
+        {
+            guid: 'ag-showroom-news-1',
+            title: 'One-Click Server Joining Is Ready',
+            author: 'Server Crew',
+            date: 'Fri, 04 Sep 2026 13:15:00 GMT',
+            description: 'The launcher can now show live server status and join the managed Cobble Power server from Home.'
+        }
+    ]
+    const body = items.map(item => `
+        <item>
+            <guid isPermaLink="false">${item.guid}</guid>
+            <title>${item.title}</title>
+            <link>${baseUrl}/showroom/news/${item.guid}</link>
+            <dc:creator><![CDATA[${item.author}]]></dc:creator>
+            <pubDate>${item.date}</pubDate>
+            <description><![CDATA[<p>${item.description}</p>]]></description>
+            <slash:comments>0</slash:comments>
+        </item>`).join('')
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+    <channel>
+        <title>AG Launcher Showroom News</title>
+        <link>${baseUrl}/showroom/news</link>
+        <description>Deterministic local News fixtures for AG Launcher.</description>${body}
+    </channel>
+</rss>`
+}
+
 function filterCatalog(entries, url) {
     const category = String(url.searchParams.get('category') || 'all').toLowerCase()
     if(category !== 'all' && !SHOWROOM_TYPES.includes(category)) return { error: 'invalid_category' }
@@ -818,6 +862,17 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
         }
         if(url.pathname === '/health') {
             writeJson(response, 200, { status: 'ready', mode: 'local-community-showroom' })
+            return
+        }
+        if(url.pathname === '/showroom/news.xml' && request.method === 'GET') {
+            const body = Buffer.from(showroomNewsXml(baseUrl), 'utf8')
+            response.writeHead(200, {
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'no-store',
+                'Content-Length': body.length,
+                'Content-Type': 'application/rss+xml; charset=utf-8'
+            })
+            response.end(body)
             return
         }
         if(url.pathname === '/v1/community/capabilities' && request.method === 'GET') {
@@ -1154,6 +1209,7 @@ function injectShowroomDistribution(source, baseUrl) {
         features: { core: true, collections: false, creators: false },
         allowedVisibilities: ['public']
     }
+    distribution.rss = `${baseUrl}/showroom/news.xml`
     if(distribution.access) {
         distribution.access.apiBaseUrl = baseUrl
         distribution.access.authUrl = baseUrl
@@ -1173,6 +1229,7 @@ function createShowroomConfig(gameDataDirectory) {
             }
         },
         newsCache: { date: null, content: null, dismissed: true },
+        homeFeedCache: { schemaVersion: 1, news: null },
         clientToken: 'local-showroom-client',
         selectedServer: SHOWROOM_PROFILE_ID,
         selectedAccount: SHOWROOM_PLAYER_UUID,
@@ -1332,5 +1389,6 @@ module.exports = {
     filterCatalog,
     injectShowroomDistribution,
     publicEntry,
+    showroomNewsXml,
     startShowroomServer
 }

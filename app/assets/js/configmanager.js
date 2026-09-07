@@ -103,6 +103,10 @@ const DEFAULT_CONFIG = {
         content: null,
         dismissed: false
     },
+    homeFeedCache: {
+        schemaVersion: 1,
+        news: null
+    },
     clientToken: null,
     selectedServer: null, // Resolved
     selectedAccount: null,
@@ -299,6 +303,23 @@ exports.setNewsCache = function(newsCache){
  */
 exports.setNewsCacheDismissed = function(dismissed){
     config.newsCache.dismissed = dismissed
+}
+
+/**
+ * Return the bounded, presentation-safe News summary cache used on Home.
+ */
+exports.getHomeNewsFeedCache = function(){
+    return config.homeFeedCache?.schemaVersion === 1 ? config.homeFeedCache.news : null
+}
+
+/**
+ * Replace the Home News summary cache. Full article markup is never stored here.
+ */
+exports.setHomeNewsFeedCache = function(news){
+    config.homeFeedCache = {
+        schemaVersion: 1,
+        news: news || null
+    }
 }
 
 /**

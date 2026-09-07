@@ -38,6 +38,7 @@ const { quarantineManagedDropins } = require('./assets/js/managedmodcleanup')
 const { isArtifactAuthorizationError } = require('./assets/js/channelpolicy')
 const { getConnectionContract, getEffectiveConnection } = require('./assets/js/serverconnection')
 const { ServerStatusManager } = require('./assets/js/serverstatusmanager')
+const { NewsFeedRepository } = require('./assets/js/newsfeedrepository')
 
 // Launch Elements
 const launch_content          = document.getElementById('launch_content')
@@ -995,7 +996,7 @@ async function ensureNewsInitialized({ force = false } = {}){
         return
     }
     if(!newsInitPromise){
-        newsInitPromise = initNews()
+        newsInitPromise = initNews({ force })
             .then(() => {
                 newsInitialized = true
             })
@@ -1139,6 +1140,14 @@ document.getElementById('schematicsButton').onclick = async () => {
 // Array to store article meta.
 let newsArr = null
 
+const newsFeedRepository = new NewsFeedRepository({
+    readCache: () => ConfigManager.getHomeNewsFeedCache(),
+    writeCache: (cache) => {
+        ConfigManager.setHomeNewsFeedCache(cache)
+        ConfigManager.save()
+    }
+})
+
 // News load animation listener.
 let newsLoadingListener = null
 
@@ -1151,14 +1160,14 @@ function setNewsLoading(val){
     if(val){
         const nLStr = Lang.queryJS('landing.news.checking')
         let dotStr = '..'
-        nELoadSpan.innerHTML = nLStr + dotStr
+        nELoadSpan.textContent = nLStr + dotStr
         newsLoadingListener = setInterval(() => {
             if(dotStr.length >= 3){
                 dotStr = ''
             } else {
                 dotStr += '.'
             }
-            nELoadSpan.innerHTML = nLStr + dotStr
+            nELoadSpan.textContent = nLStr + dotStr
         }, 750)
     } else {
         if(newsLoadingListener != null){
@@ -1230,11 +1239,11 @@ async function digestMessage(str) {
  * @returns {Promise.<void>} A promise which resolves when the news
  * content has finished loading and transitioning.
  */
-async function initNews(){
+async function initNews(options = {}){
 
     setNewsLoading(true)
 
-    const news = await loadNews()
+    const news = await loadNews({ force: options.force === true })
 
     newsArr = news?.articles || null
 
@@ -1350,12 +1359,14 @@ document.addEventListener('keydown', (e) => {
  * @param {number} index The article index.
  */
 function displayArticle(articleObject, index){
-    newsArticleTitle.innerHTML = articleObject.title
-    newsArticleTitle.href = articleObject.link
-    newsArticleAuthor.innerHTML = 'by ' + articleObject.author
-    newsArticleDate.innerHTML = articleObject.date
-    newsArticleComments.innerHTML = articleObject.comments
-    newsArticleComments.href = articleObject.commentsLink
+    newsArticleTitle.textContent = articleObject.title
+    if(articleObject.link) newsArticleTitle.href = articleObject.link
+    else newsArticleTitle.removeAttribute('href')
+    newsArticleAuthor.textContent = 'by ' + articleObject.author
+    newsArticleDate.textContent = articleObject.date
+    newsArticleComments.textContent = articleObject.comments
+    if(articleObject.commentsLink) newsArticleComments.href = articleObject.commentsLink
+    else newsArticleComments.removeAttribute('href')
     newsArticleContentScrollable.innerHTML = '<div id="newsArticleContentWrapper"><div class="newsArticleSpacerTop"></div>' + articleObject.content + '<div class="newsArticleSpacerBot"></div></div>'
     Array.from(newsArticleContentScrollable.getElementsByClassName('bbCodeSpoilerButton')).forEach(v => {
         v.onclick = () => {
@@ -1363,7 +1374,7 @@ function displayArticle(articleObject, index){
             text.style.display = text.style.display === 'block' ? 'none' : 'block'
         }
     })
-    newsNavigationStatus.innerHTML = Lang.query('ejs.landing.newsNavigationStatus', {currentPage: index, totalPages: newsArr.length})
+    newsNavigationStatus.textContent = Lang.query('ejs.landing.newsNavigationStatus', {currentPage: index, totalPages: newsArr.length})
     newsContent.setAttribute('article', index-1)
 }
 
@@ -1371,74 +1382,62 @@ function displayArticle(articleObject, index){
  * Load news information from the RSS feed specified in the
  * distribution index.
  */
-async function loadNews(){
-
+async function requestNews(options = {}){
     const distroData = await DistroAPI.getDistribution()
     if(!distroData.rawDistribution.rss) {
         loggerLanding.debug('No RSS feed provided.')
-        return null
+        throw new Error('No News RSS feed is configured.')
     }
-
-    const promise = new Promise((resolve, reject) => {
-        
-        const newsFeed = distroData.rawDistribution.rss
-        const newsHost = new URL(newsFeed).origin + '/'
-        $.ajax({
-            url: newsFeed,
-            success: (data) => {
-                const items = $(data).find('item')
-                const articles = []
-
-                for(let i=0; i<items.length; i++){
-                // JQuery Element
-                    const el = $(items[i])
-
-                    // Resolve date.
-                    const date = new Date(el.find('pubDate').text()).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric'})
-
-                    // Resolve comments.
-                    let comments = el.find('slash\\:comments').text() || '0'
-                    comments = comments + ' Comment' + (comments === '1' ? '' : 's')
-
-                    // Fix relative links in content.
-                    const content = el.find('content\\:encoded').text().replace(
-                        /src="(?!https?:\/\/|\/\/|data:)(.+?)"/g,
-                        (_match, assetPath) => {
-                            const normalizedPath = String(assetPath || '').replace(/^\/+/, '')
-                            return `src="${newsHost}${normalizedPath}"`
-                        }
-                    )
-
-                    let link   = el.find('link').text()
-                    let title  = el.find('title').text()
-                    let author = el.find('dc\\:creator').text()
-
-                    // Generate article.
-                    articles.push(
-                        {
-                            link,
-                            title,
-                            date,
-                            author,
-                            content,
-                            comments,
-                            commentsLink: link + '#comments'
-                        }
-                    )
-                }
-                resolve({
-                    articles
-                })
-            },
-            timeout: 2500
-        }).catch(err => {
-            resolve({
-                articles: null
-            })
-        })
+    const result = await newsFeedRepository.load({
+        url: distroData.rawDistribution.rss,
+        force: options.force === true,
+        allowCached: options.allowCached === true,
+        signal: options.signal
     })
+    const latest = result.articles?.[0]
+    const cached = ConfigManager.getNewsCache()
+    const latestTime = latest?.timestamp ? new Date(latest.timestamp).getTime() : 0
+    const cachedTime = Number(cached?.date) || 0
+    return {
+        ...result,
+        unread: Boolean(latest && (cached?.dismissed === false || !cachedTime || latestTime > cachedTime))
+    }
+}
 
-    return await promise
+async function loadNews(options = {}){
+    try {
+        return await requestNews(options)
+    } catch(error){
+        if(error?.name === 'AbortError') throw error
+        loggerLanding.warn('Unable to load the News feed.', { message: error?.message })
+        return { articles: null, error }
+    }
+}
+
+async function openNewsArticle(articleId){
+    await window.AppShell?.navigate?.('news')
+    await ensureNewsInitialized()
+    const index = newsArr?.findIndex(article => article.id === articleId) ?? -1
+    if(index >= 0) displayArticle(newsArr[index], index + 1)
+    newsArticleTitle?.focus?.()
+    return index >= 0
+}
+
+window.AGNewsFeed = {
+    load: requestNews,
+    cached: async () => {
+        const distroData = await DistroAPI.getDistribution()
+        const url = distroData.rawDistribution.rss
+        const result = url ? newsFeedRepository.cached(url) : null
+        if(!result) return null
+        const latestTime = result.articles?.[0]?.timestamp ? new Date(result.articles[0].timestamp).getTime() : 0
+        const cached = ConfigManager.getNewsCache()
+        return {
+            ...result,
+            unread: Boolean(result.articles?.[0] && (cached?.dismissed === false || !Number(cached?.date) || latestTime > Number(cached.date)))
+        }
+    },
+    openArticle: openNewsArticle
 }
 
 // Signal that all landing-page functions referenced by uibinder.js are ready.

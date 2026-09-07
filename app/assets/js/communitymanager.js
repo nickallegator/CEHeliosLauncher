@@ -7,6 +7,7 @@ const { SchematicApiClient } = require('./schematicmanager')
 
 const COMMUNITY_CACHE_SCHEMA = 1
 const COMMUNITY_CACHE_LIMIT = 16
+const sharedCommunityClients = new Map()
 
 function normalizeCommunityParams(params = {}) {
     const normalized = new URLSearchParams(params)
@@ -298,10 +299,24 @@ class CommunityApiClient extends SchematicApiClient {
     }
 }
 
+function getSharedCommunityApiClient(options = {}) {
+    const baseUrl = String(options.baseUrl || '').replace(/\/+$/, '')
+    if(!baseUrl) throw new TypeError('A Community API base URL is required.')
+    const cachePath = String(options.cachePath || '')
+    const key = `${baseUrl}\u0000${cachePath}`
+    let client = sharedCommunityClients.get(key)
+    if(!client) {
+        client = new CommunityApiClient({ ...options, baseUrl, cachePath })
+        sharedCommunityClients.set(key, client)
+    }
+    return client
+}
+
 module.exports = {
     COMMUNITY_CACHE_LIMIT,
     COMMUNITY_CACHE_SCHEMA,
     CommunityApiClient,
+    getSharedCommunityApiClient,
     createCommunitySessionState,
     deduplicateCommunityEntries,
     normalizeCommunityEntry,

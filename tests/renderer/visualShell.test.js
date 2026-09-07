@@ -202,6 +202,11 @@ test('renderer template contains the brand sequence and persistent navigation', 
     assert.match(html, /id="launch_join_button"/)
     assert.match(html, /id="homeServerAddress"/)
     assert.match(html, /id="serverOfflineModal"/)
+    assert.match(html, /id="homeNewsList"/)
+    assert.match(html, /id="homeNewsAllButton"/)
+    assert.match(html, /id="homeTrendingList"/)
+    assert.match(html, /scripts\/home-feeds\.js/)
+    assert.doesNotMatch(html, /Build something powerful/)
 })
 
 test('profile selectors resolve launcher-managed artwork locally', () => {
