@@ -111,7 +111,7 @@ function buildInstaller(apiBase, build) {
         'utf8'
     )
     fs.rmSync(outputRoot, { recursive: true, force: true })
-    const result = spawnSync(node, [cli, '--config', 'electron-builder.channel.yml', '--win', 'nsis', '--x64'], {
+    const result = spawnSync(node, [cli, '--config', 'electron-builder.channel.yml', '--win', 'nsis', '--x64', '--publish', 'never'], {
         cwd: root,
         env: { ...process.env, PATH: `${toolDirectory}${path.delimiter}${process.env.PATH || ''}` },
         stdio: 'inherit'

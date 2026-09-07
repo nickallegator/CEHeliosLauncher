@@ -20,7 +20,7 @@
     "deps:bootstrap": "node scripts/bootstrap-dependencies.js",
     "deps:build": "node scripts/build-file-dependencies.js",
     "predist": "npm run brand:generate",
-    "dist": "electron-builder build",
+    "dist": "electron-builder build --publish never",
     "dist:win": "npm run dist -- -w",
     "dist:mac": "npm run dist -- -m",
     "dist:linux": "npm run dist -- -l",
