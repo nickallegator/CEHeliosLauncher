@@ -4,6 +4,7 @@ const semver = require('semver')
 
 const UPDATE_SCHEMA_VERSION = 1
 const RELEASE_NOTES_LIMIT = 20_000
+const RELEASE_NOTES_SOURCE_LIMIT = RELEASE_NOTES_LIMIT * 4
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 
 const UpdateStatus = Object.freeze({
@@ -22,11 +23,45 @@ function text(value, limit = RELEASE_NOTES_LIMIT) {
         .slice(0, limit)
 }
 
-function normalizeReleaseNotes(value) {
-    if(Array.isArray(value)) {
-        return text(value.map(entry => entry?.note || entry?.version || '').filter(Boolean).join('\n\n'))
+function decodeHtmlEntities(value) {
+    const named = {
+        amp: '&',
+        apos: '\'',
+        gt: '>',
+        lt: '<',
+        nbsp: ' ',
+        quot: '"'
     }
-    return text(value)
+    return value.replace(/&(?:#(\d+)|#x([a-f0-9]+)|([a-z]+));/gi, (match, decimal, hexadecimal, name) => {
+        if(name) return named[name.toLowerCase()] ?? match
+        const point = Number.parseInt(decimal || hexadecimal, hexadecimal ? 16 : 10)
+        if(!Number.isInteger(point) || point < 0 || point > 0x10FFFF || (point >= 0xD800 && point <= 0xDFFF)) return '\uFFFD'
+        return String.fromCodePoint(point)
+    })
+}
+
+function htmlToPlainText(value) {
+    return decodeHtmlEntities(String(value == null ? '' : value).slice(0, RELEASE_NOTES_SOURCE_LIMIT))
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<(script|style|iframe|object|embed|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+        .replace(/<li\b[^>]*>/gi, '\n\u2022 ')
+        .replace(/<\/li\s*>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(?:p|div|h[1-6]|ul|ol|pre|blockquote|section|article|table|tr|td|th)\s*>/gi, '\n')
+        .replace(/<(?:p|div|h[1-6]|ul|ol|pre|blockquote|section|article|table|tr)\b[^>]*>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[\t\f\v ]+/g, ' ')
+        .replace(/ *\n */g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+}
+
+function normalizeReleaseNotes(value, limit = RELEASE_NOTES_LIMIT) {
+    const combined = Array.isArray(value)
+        ? value.map(entry => entry?.note || entry?.version || '').filter(Boolean).join('\n\n')
+        : value
+    return text(htmlToPlainText(combined), limit)
 }
 
 function updateSize(info) {
@@ -39,7 +74,7 @@ function publicUpdateInfo(info) {
     if(!info || !semver.valid(info.version)) return null
     return {
         version: info.version,
-        releaseName: text(info.releaseName || `AG Launcher ${info.version}`, 300),
+        releaseName: normalizeReleaseNotes(info.releaseName || `AG Launcher ${info.version}`, 300),
         releaseNotes: normalizeReleaseNotes(info.releaseNotes),
         sizeBytes: updateSize(info),
         releaseDate: Number.isNaN(Date.parse(info.releaseDate)) ? null : new Date(info.releaseDate).toISOString()
