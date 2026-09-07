@@ -140,7 +140,7 @@ function createTestManifest(baseManifest, release) {
 function createDistributionBase() {
     return {
         version: '1.0.0',
-        rss: 'https://helios-files.geekcorner.eu.org/rss.xml',
+        rss: 'https://news.allegatorgames.com/rss.xml',
         discord: {
             clientId: '1086936373057040395',
             smallImageText: 'Cobble Power Test',

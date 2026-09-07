@@ -1384,12 +1384,18 @@ function displayArticle(articleObject, index){
  */
 async function requestNews(options = {}){
     const distroData = await DistroAPI.getDistribution()
-    if(!distroData.rawDistribution.rss) {
+    const discovery = distroData.rawDistribution.news
+    const indexUrl = discovery?.schemaVersion === 1 && discovery.enabled !== false ? discovery.indexUrl : null
+    const rssUrl = discovery?.schemaVersion === 1 && discovery.enabled !== false
+        ? (discovery.rssUrl || distroData.rawDistribution.rss)
+        : distroData.rawDistribution.rss
+    if(!indexUrl && !rssUrl) {
         loggerLanding.debug('No RSS feed provided.')
-        throw new Error('No News RSS feed is configured.')
+        throw new Error('No News feed is configured.')
     }
     const result = await newsFeedRepository.load({
-        url: distroData.rawDistribution.rss,
+        indexUrl,
+        rssUrl,
         force: options.force === true,
         allowCached: options.allowCached === true,
         signal: options.signal
@@ -1427,8 +1433,12 @@ window.AGNewsFeed = {
     load: requestNews,
     cached: async () => {
         const distroData = await DistroAPI.getDistribution()
-        const url = distroData.rawDistribution.rss
-        const result = url ? newsFeedRepository.cached(url) : null
+        const discovery = distroData.rawDistribution.news
+        const indexUrl = discovery?.schemaVersion === 1 && discovery.enabled !== false ? discovery.indexUrl : null
+        const rssUrl = discovery?.schemaVersion === 1 && discovery.enabled !== false
+            ? (discovery.rssUrl || distroData.rawDistribution.rss)
+            : distroData.rawDistribution.rss
+        const result = indexUrl || rssUrl ? newsFeedRepository.cached({ indexUrl, rssUrl }) : null
         if(!result) return null
         const latestTime = result.articles?.[0]?.timestamp ? new Date(result.articles[0].timestamp).getTime() : 0
         const cached = ConfigManager.getNewsCache()

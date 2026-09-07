@@ -775,8 +775,8 @@ function encodeCursor(offset) {
     return Buffer.from(`showroom:${offset}`, 'utf8').toString('base64url')
 }
 
-function showroomNewsXml(baseUrl) {
-    const items = [
+function showroomNewsItems(baseUrl) {
+    return [
         {
             guid: 'ag-showroom-news-3',
             title: 'Community Workshop Opens Its Doors',
@@ -798,12 +798,16 @@ function showroomNewsXml(baseUrl) {
             date: 'Fri, 04 Sep 2026 13:15:00 GMT',
             description: 'The launcher can now show live server status and join the managed Cobble Power server from Home.'
         }
-    ]
+    ].map(item => ({ ...item, link: `${baseUrl}/showroom/news/${item.guid}` }))
+}
+
+function showroomNewsXml(baseUrl) {
+    const items = showroomNewsItems(baseUrl)
     const body = items.map(item => `
         <item>
             <guid isPermaLink="false">${item.guid}</guid>
             <title>${item.title}</title>
-            <link>${baseUrl}/showroom/news/${item.guid}</link>
+            <link>${item.link}</link>
             <dc:creator><![CDATA[${item.author}]]></dc:creator>
             <pubDate>${item.date}</pubDate>
             <description><![CDATA[<p>${item.description}</p>]]></description>
@@ -817,6 +821,27 @@ function showroomNewsXml(baseUrl) {
         <description>Deterministic local News fixtures for AG Launcher.</description>${body}
     </channel>
 </rss>`
+}
+
+function showroomNewsJson(baseUrl) {
+    return {
+        schemaVersion: 1,
+        generatedAt: '2026-09-06T16:30:00.000Z',
+        items: showroomNewsItems(baseUrl).map(item => ({
+            id: item.guid,
+            slug: item.guid,
+            title: item.title,
+            summary: item.description,
+            author: item.author,
+            category: 'announcement',
+            tags: ['showroom'],
+            publishedAt: new Date(item.date).toISOString(),
+            updatedAt: new Date(item.date).toISOString(),
+            canonicalUrl: item.link,
+            heroImage: null,
+            contentHtml: `<p>${item.description}</p>`
+        }))
+    }
 }
 
 function filterCatalog(entries, url) {
@@ -873,6 +898,14 @@ function createShowroomRequestHandler(entries, getBaseUrl) {
                 'Content-Type': 'application/rss+xml; charset=utf-8'
             })
             response.end(body)
+            return
+        }
+        if(url.pathname === '/showroom/news.json' && request.method === 'GET') {
+            writeJson(response, 200, showroomNewsJson(baseUrl), {
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'no-store',
+                ETag: '"ag-showroom-news-v1"'
+            })
             return
         }
         if(url.pathname === '/v1/community/capabilities' && request.method === 'GET') {
@@ -1210,6 +1243,14 @@ function injectShowroomDistribution(source, baseUrl) {
         allowedVisibilities: ['public']
     }
     distribution.rss = `${baseUrl}/showroom/news.xml`
+    distribution.news = {
+        schemaVersion: 1,
+        enabled: true,
+        indexUrl: `${baseUrl}/showroom/news.json`,
+        rssUrl: `${baseUrl}/showroom/news.xml`,
+        siteUrl: `${baseUrl}/showroom/news`,
+        refreshSeconds: 900
+    }
     if(distribution.access) {
         distribution.access.apiBaseUrl = baseUrl
         distribution.access.authUrl = baseUrl

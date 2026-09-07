@@ -72,7 +72,26 @@ Global settings for [Discord Rich Presence](https://discordapp.com/developers/do
 
 ### `DistroIndex.rss: string/url`
 
-A URL to a RSS feed. Used for loading news.
+A URL to an RSS feed. Used by legacy launchers and as a fallback for the schema-versioned News index.
+
+### `DistroIndex.news: NewsDiscovery`
+
+**OPTIONAL**
+
+Schema-versioned News service discovery. New launchers prefer `indexUrl` and fall back to `rssUrl` or the top-level `rss` field.
+
+```json
+{
+    "news": {
+        "schemaVersion": 1,
+        "enabled": true,
+        "indexUrl": "https://news.allegatorgames.com/api/v1/news.json",
+        "rssUrl": "https://news.allegatorgames.com/rss.xml",
+        "siteUrl": "https://news.allegatorgames.com",
+        "refreshSeconds": 900
+    }
+}
+```
 
 ### `DistroIndex.access: AccessConfig`
 

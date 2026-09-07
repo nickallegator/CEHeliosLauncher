@@ -82,6 +82,11 @@ const config = {
             requireHeader: false
         }])
     },
+    news: {
+        enabled: parseBoolean(getEnv('NEWS_ENABLED', 'false')),
+        publicBaseUrl: getEnv('NEWS_PUBLIC_BASE_URL', null),
+        refreshSeconds: parseNumber(getEnv('NEWS_REFRESH_SECONDS', '900'), 900)
+    },
     gameServers: {
         statusEnabled: parseBoolean(getEnv('GAME_SERVER_STATUS_ENABLED', 'false')),
         publicApiUrl: getEnv('GAME_SERVER_STATUS_PUBLIC_API_URL', getEnv('BASE_URL', 'http://localhost:8080')),
@@ -197,6 +202,10 @@ const config = {
 config.launcherUpdates.policies = require('./services/launcherVersionPolicy')
     .createLauncherVersionPolicies(config.launcherUpdates.entries)
 delete config.launcherUpdates.entries
+
+require('./services/newsDiscovery').createNewsDiscovery(config.news, {
+    production: process.env.NODE_ENV === 'production'
+})
 
 if(!['disabled', 'admin', 'authenticated'].includes(config.schematics.writeMode)) {
     throw new Error('SCHEMATICS_WRITE_MODE must be disabled, admin, or authenticated')

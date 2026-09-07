@@ -7,6 +7,7 @@ const { DOMParser } = require('@xmldom/xmldom')
 const {
     NEWS_CACHE_LIMIT,
     NewsFeedRepository,
+    parseNewsJson,
     parseRssXml,
     sanitizeArticleHtml,
     stableArticleId,
@@ -64,7 +65,7 @@ test('News repository coalesces identical requests and falls back to presentatio
     assert.equal(requests, 1)
     assert.deepEqual(first.articles, second.articles)
     assert.equal(cache.articles.length, 1)
-    assert.equal(Object.hasOwn(cache.articles[0], 'content'), false)
+    assert.match(cache.articles[0].content, /<strong>news<\/strong>/)
 
     const offline = new NewsFeedRepository({
         fetchText: async () => { throw new Error('offline') },
@@ -73,6 +74,60 @@ test('News repository coalesces identical requests and falls back to presentatio
     const cached = await offline.load({ url: 'https://news.example.test/feed.xml', allowCached: true })
     assert.equal(cached.offline, true)
     assert.equal(cached.cached, true)
+})
+
+test('News repository prefers schema-versioned JSON, revalidates by ETag, and falls back to RSS', async () => {
+    const json = JSON.stringify({
+        schemaVersion: 1,
+        generatedAt: '2026-09-07T07:00:00.000Z',
+        items: [{
+            id: 'announcement:one',
+            title: 'JSON News',
+            summary: 'A safe summary.',
+            author: 'Allegator Games',
+            category: 'announcement',
+            tags: ['launcher'],
+            publishedAt: '2026-09-07T07:00:00.000Z',
+            canonicalUrl: 'https://news.example.test/news/json-news/',
+            contentHtml: '<p>JSON <strong>content</strong>.</p><script>bad()</script>'
+        }]
+    })
+    const calls = []
+    let cache = null
+    const repository = new NewsFeedRepository({
+        fetchResource: async (url, request) => {
+            calls.push([url, request.headers])
+            return { statusCode: 200, body: json, headers: { etag: '"news-one"' } }
+        },
+        readCache: () => cache,
+        writeCache: value => { cache = value }
+    })
+    const result = await repository.load({
+        indexUrl: 'https://news.example.test/api/v1/news.json',
+        rssUrl: 'https://news.example.test/rss.xml'
+    })
+    assert.equal(result.articles[0].title, 'JSON News')
+    assert.doesNotMatch(result.articles[0].content, /script|bad/)
+    assert.equal(calls.length, 1)
+    assert.equal(cache.etag, '"news-one"')
+
+    const fallback = new NewsFeedRepository({
+        fetchResource: async url => {
+            if(url.endsWith('.json')) throw new Error('JSON unavailable')
+            return { statusCode: 200, body: RSS, headers: {} }
+        },
+        parseXml: (value, context) => parseRssXml(value, { ...context, DOMParser })
+    })
+    const legacy = await fallback.load({
+        indexUrl: 'https://news.example.test/api/v1/news.json',
+        rssUrl: 'https://news.example.test/rss.xml'
+    })
+    assert.equal(legacy.articles[0].title, 'Workshop & Community')
+})
+
+test('News JSON validation rejects unsupported schemas and unsafe content', () => {
+    assert.throws(() => parseNewsJson('{"schemaVersion":2,"items":[]}'), /unsupported schema/)
+    assert.throws(() => parseNewsJson(JSON.stringify({ schemaVersion: 1, items: [{ id: 'missing-fields' }] })), /incomplete/)
 })
 
 test('News caches remain bounded to ten entries', async () => {
